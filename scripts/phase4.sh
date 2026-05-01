@@ -528,7 +528,7 @@ namespace inbox {
         auto = subscribe
         special_use = \Drafts
     }
-    mailbox Sent {
+    mailbox "Sent Items" {
         auto = subscribe
         special_use = \Sent
     }
