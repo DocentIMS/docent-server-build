@@ -161,41 +161,60 @@ fi
 # ============================================================================
 step "Step 2: Extracting tarballs to staging area"
 
+# RC+ tarball layouts vary:
+#   plugin_xai.tar.gz       -> xai/, xframework/ (at top level)
+#   plugin_xsignature.tar.gz -> xsignature/, xframework/ (at top level)
+#   skin_outlook.tar.gz      -> plugins/xskin/, skins/outlook/, README, VERSIONS
+#   skin_outlook_plus.tar.gz -> plugins/xskin/, skins/outlook_plus/, README, VERSIONS
+#
+# Each tarball ships its own copy of xframework. We use the version from
+# the LAST extracted tarball (they should be identical or compatible).
+# Each tarball gets extracted into its own subdirectory of the staging
+# area so we can find things deterministically.
+
 STAGING=$(mktemp -d /tmp/rcplus-staging.XXXXXX)
 trap "rm -rf $STAGING" EXIT
 
 for tb in "${EXPECTED_TARBALLS[@]}"; do
-    tar -xzf "$VENDOR_DIR/$tb" -C "$STAGING/"
-    log_done "Extracted $tb"
+    # Strip .tar.gz and the roundcube_plus_ prefix for the staging dir name
+    SUBDIR="${tb%.tar.gz}"
+    SUBDIR="${SUBDIR#roundcube_plus_}"
+    mkdir -p "$STAGING/$SUBDIR"
+    tar -xzf "$VENDOR_DIR/$tb" -C "$STAGING/$SUBDIR/"
+    log_done "Extracted $tb to staging/$SUBDIR/"
 done
 
-# RC+ tarballs include a top-level plugins/ and sometimes skins/ folder.
-# Merge structure should now be:
-#   $STAGING/plugins/xframework/
-#   $STAGING/plugins/xai/
-#   $STAGING/plugins/xsignature/
-#   $STAGING/plugins/xskin/        (provided by skin tarballs)
-#   $STAGING/skins/outlook/
-#   $STAGING/skins/outlook_plus/
-
-if [ ! -d "$STAGING/plugins/xframework" ]; then
-    log_fail "Expected $STAGING/plugins/xframework not found after extraction"
-    echo "  Tarball contents may have changed. Inspect with:"
-    echo "    tar -tzf $VENDOR_DIR/plugin_xai.tar.gz | head"
-    exit 1
-fi
+# Now staging looks like:
+#   $STAGING/plugin_xai/xai/
+#   $STAGING/plugin_xai/xframework/
+#   $STAGING/plugin_xsignature/xsignature/
+#   $STAGING/plugin_xsignature/xframework/
+#   $STAGING/skin_outlook/plugins/xskin/
+#   $STAGING/skin_outlook/skins/outlook/
+#   $STAGING/skin_outlook_plus/plugins/xskin/
+#   $STAGING/skin_outlook_plus/skins/outlook_plus/
 
 # ============================================================================
 # STEP 3: Install xframework (shared dependency)
 # ============================================================================
 step "Step 3: Installing xframework (shared by all RC+ products)"
 
+# Take xframework from the xai tarball - all copies should be the same version
+XFRAMEWORK_SRC="$STAGING/plugin_xai/xframework"
+if [ ! -d "$XFRAMEWORK_SRC" ]; then
+    # Fall back to xsignature if xai doesn't have it
+    XFRAMEWORK_SRC="$STAGING/plugin_xsignature/xframework"
+fi
+if [ ! -d "$XFRAMEWORK_SRC" ]; then
+    log_fail "Could not find xframework in any extracted tarball"
+    exit 1
+fi
+
 if [ -d "$ROUNDCUBE_PLUGINS_DIR/xframework" ]; then
     log_skip "xframework already installed - updating files (preserving config)"
-    # Sync everything except the config file
-    rsync -a --exclude='config.inc.php' "$STAGING/plugins/xframework/" "$ROUNDCUBE_PLUGINS_DIR/xframework/"
+    rsync -a --exclude='config.inc.php' "$XFRAMEWORK_SRC/" "$ROUNDCUBE_PLUGINS_DIR/xframework/"
 else
-    cp -a "$STAGING/plugins/xframework" "$ROUNDCUBE_PLUGINS_DIR/"
+    cp -a "$XFRAMEWORK_SRC" "$ROUNDCUBE_PLUGINS_DIR/"
     log_done "Copied xframework to $ROUNDCUBE_PLUGINS_DIR/xframework/"
 fi
 
@@ -204,18 +223,25 @@ fi
 # ============================================================================
 step "Step 4: Installing RC+ plugins"
 
+# Map plugin name -> staging source path
+declare -A PLUGIN_SRC_MAP=(
+    [xai]="$STAGING/plugin_xai/xai"
+    [xsignature]="$STAGING/plugin_xsignature/xsignature"
+)
+
 for plugin in "${RC_PLUS_PLUGINS[@]}"; do
-    if [ ! -d "$STAGING/plugins/$plugin" ]; then
-        log_warn "$plugin not found in staging - skipping"
+    SRC="${PLUGIN_SRC_MAP[$plugin]}"
+    if [ ! -d "$SRC" ]; then
+        log_warn "$plugin source not found at $SRC - skipping"
         continue
     fi
 
     PLUGIN_TARGET="$ROUNDCUBE_PLUGINS_DIR/$plugin"
     if [ -d "$PLUGIN_TARGET" ]; then
         log_skip "$plugin already installed - updating files (preserving config)"
-        rsync -a --exclude='config.inc.php' "$STAGING/plugins/$plugin/" "$PLUGIN_TARGET/"
+        rsync -a --exclude='config.inc.php' "$SRC/" "$PLUGIN_TARGET/"
     else
-        cp -a "$STAGING/plugins/$plugin" "$ROUNDCUBE_PLUGINS_DIR/"
+        cp -a "$SRC" "$ROUNDCUBE_PLUGINS_DIR/"
         log_done "Copied $plugin to $PLUGIN_TARGET/"
     fi
 
@@ -233,18 +259,23 @@ for plugin in "${RC_PLUS_PLUGINS[@]}"; do
 done
 
 # ============================================================================
-# STEP 5: Install skins (outlook, outlook_plus)
+# STEP 5: Install skins (outlook, outlook_plus) and xskin plugin
 # ============================================================================
-step "Step 5: Installing RC+ skins"
+step "Step 5: Installing RC+ skins and xskin plugin"
 
-# The skin tarballs also include the xskin plugin which provides shared
-# skin functionality. Install it like the others.
-if [ -d "$STAGING/plugins/xskin" ]; then
+# xskin plugin lives inside the skin tarballs at <staging>/skin_*/plugins/xskin
+# Take it from skin_outlook_plus (default skin) since that's our preferred version
+XSKIN_SRC="$STAGING/skin_outlook_plus/plugins/xskin"
+if [ ! -d "$XSKIN_SRC" ]; then
+    XSKIN_SRC="$STAGING/skin_outlook/plugins/xskin"
+fi
+
+if [ -d "$XSKIN_SRC" ]; then
     if [ -d "$ROUNDCUBE_PLUGINS_DIR/xskin" ]; then
         log_skip "xskin already installed - updating files (preserving config)"
-        rsync -a --exclude='config.inc.php' "$STAGING/plugins/xskin/" "$ROUNDCUBE_PLUGINS_DIR/xskin/"
+        rsync -a --exclude='config.inc.php' "$XSKIN_SRC/" "$ROUNDCUBE_PLUGINS_DIR/xskin/"
     else
-        cp -a "$STAGING/plugins/xskin" "$ROUNDCUBE_PLUGINS_DIR/"
+        cp -a "$XSKIN_SRC" "$ROUNDCUBE_PLUGINS_DIR/"
         log_done "Copied xskin to $ROUNDCUBE_PLUGINS_DIR/xskin/"
     fi
     if [ ! -f "$ROUNDCUBE_PLUGINS_DIR/xskin/config.inc.php" ] && \
@@ -254,11 +285,14 @@ if [ -d "$STAGING/plugins/xskin" ]; then
         chmod 640 "$ROUNDCUBE_PLUGINS_DIR/xskin/config.inc.php"
         log_done "Activated xskin/config.inc.php from .dist"
     fi
+else
+    log_warn "xskin source not found in any skin tarball"
 fi
 
-# Now the actual skin folders
-if [ -d "$STAGING/skins" ]; then
-    for skin_dir in "$STAGING/skins"/*/; do
+# Now the actual skin folders - look in each skin tarball's skins/ directory
+for skin_tb_dir in "$STAGING/skin_outlook" "$STAGING/skin_outlook_plus"; do
+    [ -d "$skin_tb_dir/skins" ] || continue
+    for skin_dir in "$skin_tb_dir/skins"/*/; do
         [ -d "$skin_dir" ] || continue
         skin_name=$(basename "$skin_dir")
         SKIN_TARGET="$ROUNDCUBE_SKINS_DIR/$skin_name"
@@ -271,9 +305,7 @@ if [ -d "$STAGING/skins" ]; then
             log_done "Installed skin: $skin_name"
         fi
     done
-else
-    log_warn "No skins/ directory in staging - no skins to install"
-fi
+done
 
 # ============================================================================
 # STEP 6: Update Roundcube config to enable plugins, set skin, set license
@@ -287,81 +319,358 @@ step "Step 6: Updating Roundcube config"
 #   3. Add $config['license_key'] = '...'
 #
 # The config was written by phase5.sh and we need to preserve everything else.
-# Strategy: use sed/python to surgically modify it. Backup first.
+# We use sed (avoids the cross-language escaping bugs that came from running
+# Python via heredoc - $config in PHP collides with bash $variable expansion).
 
 cp "$ROUNDCUBE_CONFIG" "$ROUNDCUBE_CONFIG.phase5b.bak"
 
-# Use python because the array manipulation is finicky with sed
-python3 <<PYEOF
-import re
+# 1. Add plugins to the array. Roundcube's array is multi-line, so we use
+#    sed to find the closing ']; and inject our plugin entries just before it,
+#    but only if those plugins aren't already there.
+for plugin in "${RC_PLUS_PLUGINS[@]}"; do
+    if grep -q "'$plugin'" "$ROUNDCUBE_CONFIG"; then
+        echo "  Plugin $plugin already in \$config['plugins']"
+    else
+        # Find the line containing only "];" that closes the plugins array
+        # and insert "    'plugin'," before it. We narrow this down by using
+        # sed's address ranges: from the line matching $config['plugins']
+        # up to the next standalone "];".
+        sed -i "/\\\$config\\['plugins'\\]/,/^\\];/{ /^\\];/i\\
+    '$plugin',
+}" "$ROUNDCUBE_CONFIG"
+        echo "  Added '$plugin' to \$config['plugins']"
+    fi
+done
 
-path = '$ROUNDCUBE_CONFIG'
-with open(path, 'r') as f:
-    content = f.read()
+# 2. Set skin - either replace existing line or append
+if grep -q "^\$config\\['skin'\\]" "$ROUNDCUBE_CONFIG"; then
+    sed -i "s|^\$config\\['skin'\\].*|\$config['skin'] = '$DEFAULT_SKIN';|" "$ROUNDCUBE_CONFIG"
+    echo "  Updated existing \$config['skin'] = '$DEFAULT_SKIN'"
+else
+    echo "\$config['skin'] = '$DEFAULT_SKIN';" >> "$ROUNDCUBE_CONFIG"
+    echo "  Appended \$config['skin'] = '$DEFAULT_SKIN'"
+fi
 
-# 1. Update plugins array - add xai, xsignature if not already there
-plugins_to_add = ['xai', 'xsignature']
+# 3. Set license_key - either replace existing or append
+if grep -q "^\$config\\['license_key'\\]" "$ROUNDCUBE_CONFIG"; then
+    sed -i "s|^\$config\\['license_key'\\].*|\$config['license_key'] = '$LICENSE_KEY';|" "$ROUNDCUBE_CONFIG"
+    echo "  Updated existing \$config['license_key']"
+else
+    echo "\$config['license_key'] = '$LICENSE_KEY';" >> "$ROUNDCUBE_CONFIG"
+    echo "  Appended \$config['license_key']"
+fi
 
-# Match the \$config['plugins'] = [ ... ]; block (multi-line)
-plugins_pattern = re.compile(
-    r"(\\\$config\['plugins'\]\s*=\s*\[)(.*?)(\];)",
-    re.DOTALL
-)
-m = plugins_pattern.search(content)
-if not m:
-    print("ERROR: Could not find \$config['plugins'] in $ROUNDCUBE_CONFIG")
-    exit(1)
-
-opening, body, closing = m.group(1), m.group(2), m.group(3)
-existing_plugins = re.findall(r"'([^']+)'", body)
-
-new_plugins = list(existing_plugins)
-added = []
-for p in plugins_to_add:
-    if p not in new_plugins:
-        new_plugins.append(p)
-        added.append(p)
-
-# Reformat the array body cleanly
-new_body = '\n'
-for p in new_plugins:
-    new_body += "    '" + p + "',\n"
-new_block = opening + new_body + closing
-content = plugins_pattern.sub(lambda m: new_block, content)
-
-# 2. Update skin
-skin_pattern = re.compile(r"\\\$config\['skin'\]\s*=\s*'[^']*';")
-if skin_pattern.search(content):
-    content = skin_pattern.sub("\$config['skin'] = '$DEFAULT_SKIN';", content)
-else:
-    # Append before the closing PHP tag (or end of file)
-    content = content.rstrip() + "\n\\\$config['skin'] = '$DEFAULT_SKIN';\n"
-
-# 3. License key - update or insert
-license_pattern = re.compile(r"\\\$config\['license_key'\]\s*=\s*'[^']*';")
-if license_pattern.search(content):
-    content = license_pattern.sub("\$config['license_key'] = '$LICENSE_KEY';", content)
-else:
-    content = content.rstrip() + "\n\\\$config['license_key'] = '$LICENSE_KEY';\n"
-
-with open(path, 'w') as f:
-    f.write(content)
-
-if added:
-    print("  Added plugins to \$config['plugins']: " + ', '.join(added))
-else:
-    print("  All plugins already in \$config['plugins']")
-print("  Set \$config['skin'] = '$DEFAULT_SKIN'")
-print("  Set \$config['license_key'] = '${LICENSE_KEY:0:8}...'")
-PYEOF
-
-if [ $? -ne 0 ]; then
-    log_fail "Failed to update Roundcube config - restoring backup"
+# Verify the resulting file is valid PHP - if not, restore backup
+if ! php -l "$ROUNDCUBE_CONFIG" > /dev/null 2>&1; then
+    log_fail "Resulting config has PHP syntax errors - restoring backup"
+    php -l "$ROUNDCUBE_CONFIG" 2>&1 | tail -5
     cp "$ROUNDCUBE_CONFIG.phase5b.bak" "$ROUNDCUBE_CONFIG"
     exit 1
 fi
 
 log_done "Updated $ROUNDCUBE_CONFIG (plugins, skin, license_key)"
+
+# ============================================================================
+# STEP 6b: Create symlinks under /var/lib/roundcube/
+# ============================================================================
+step "Step 6b: Creating symlinks for Roundcube plugin/skin discovery"
+
+# On Ubuntu, Roundcube's runtime path is /var/lib/roundcube/, but plugins
+# and skins installed via apt go to /usr/share/roundcube/. Phase 5 set up
+# symlinks for the core dirs (program, plugins, skins) so /var/lib/roundcube/
+# already has 'plugins' and 'skins' symlinks pointing at /usr/share/roundcube/.
+#
+# However, Roundcube's plugin loader looks for individual plugin directories
+# under /var/lib/roundcube/plugins/<plugin-name>/. Even when 'plugins' is a
+# symlink, the file resolves to /usr/share/roundcube/plugins/<plugin-name>/.
+# This works for the bundled plugins because they were placed there by apt.
+#
+# RC+ plugins we copy into /usr/share/roundcube/plugins/ are visible too -
+# IF the parent symlink is in place. For safety, also create per-plugin
+# symlinks just in case the parent linking is incomplete on some installs.
+
+for plugin in xframework xskin "${RC_PLUS_PLUGINS[@]}"; do
+    SRC="$ROUNDCUBE_PLUGINS_DIR/$plugin"
+    DST="/var/lib/roundcube/plugins/$plugin"
+    if [ ! -d "$SRC" ]; then
+        continue
+    fi
+    if [ -L "$DST" ] || [ -d "$DST" ]; then
+        log_skip "Plugin symlink/dir $DST already exists"
+    else
+        ln -sf "$SRC" "$DST"
+        log_done "Created symlink: $DST -> $SRC"
+    fi
+done
+
+for skin in outlook outlook_plus; do
+    SRC="$ROUNDCUBE_SKINS_DIR/$skin"
+    DST="/var/lib/roundcube/skins/$skin"
+    if [ ! -d "$SRC" ]; then
+        continue
+    fi
+    if [ -L "$DST" ] || [ -d "$DST" ]; then
+        log_skip "Skin symlink/dir $DST already exists"
+    else
+        ln -sf "$SRC" "$DST"
+        log_done "Created symlink: $DST -> $SRC"
+    fi
+done
+
+# ============================================================================
+# STEP 6c: Apply xskin customizations
+# ============================================================================
+step "Step 6c: Applying xskin customizations"
+
+# Customizations applied to make the webmail look "Outlook-like" with Docent
+# IMS branding. Each setting is applied idempotently: if it exists in the
+# config, replace; if not, append.
+#
+# IMPORTANT NOTES from real-world install:
+# - xskin_color must be a 6-char hex WITHOUT the '#' prefix. xskin.php
+#   validates strlen($color) == 6 and rejects 7-char strings like '#00829a'.
+# - The chosen color must be in the xskin_colors palette array AND match a
+#   precompiled .xcolor-XXXXXX class in the active skin's styles.css. The
+#   18 colors below are the built-in palette compiled into outlook_plus.
+# - Setting xskin_color_<skin> is the strongest override (per-skin), checked
+#   before the global xskin_color fallback.
+
+XSKIN_CONFIG="$ROUNDCUBE_PLUGINS_DIR/xskin/config.inc.php"
+
+apply_setting() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+
+    # Match lines like: $config['key'] = anything;
+    if grep -qE "^\$config\\['$key'\\]" "$file" 2>/dev/null; then
+        sed -i "s|^\$config\\['$key'\\].*|\$config['$key'] = $value;|" "$file"
+        echo "  Updated \$config['$key']"
+    else
+        echo "\$config['$key'] = $value;" >> "$file"
+        echo "  Appended \$config['$key']"
+    fi
+}
+
+if [ -f "$XSKIN_CONFIG" ]; then
+    # Branding controls
+    apply_setting "$XSKIN_CONFIG" "remove_vendor_branding" "true"
+    apply_setting "$XSKIN_CONFIG" "disable_menu_skins" "true"
+    apply_setting "$XSKIN_CONFIG" "disable_menu_languages" "true"
+    apply_setting "$XSKIN_CONFIG" "preview_branding" \
+        "'https://${MAIL_DOMAIN}/branding/docent-watermark.png'"
+
+    # Brand color (Docent teal). Must match a precompiled .xcolor-XXXXXX
+    # class in the active skin. We set both the global default and the
+    # per-skin override for outlook_plus.
+    apply_setting "$XSKIN_CONFIG" "xskin_color" "'00829a'"
+    apply_setting "$XSKIN_CONFIG" "xskin_color_outlook_plus" "'00829a'"
+    apply_setting "$XSKIN_CONFIG" "disable_colors" "true"
+
+    # Palette of valid colors - validator rejects anything not in this list.
+    # These are the 18 colors compiled into outlook_plus's _colors.scss.
+    if ! grep -q "^\$config\\['xskin_colors'\\]" "$XSKIN_CONFIG"; then
+        cat >> "$XSKIN_CONFIG" <<'PALETTE'
+$config['xskin_colors'] = [
+    'df5aad', 'b0263b', 'd74c1b', 'ff9022', '83b600', '00860e',
+    '00b2b3', '00829a', '0075c8', '47b4ff', '3c2cb6', '8d2297',
+    '004e8d', '001b41', '5a0600', '3a0300', '585858', '000000',
+];
+PALETTE
+        echo "  Appended \$config['xskin_colors'] palette"
+    fi
+
+    log_done "Applied xskin customizations to $XSKIN_CONFIG"
+else
+    log_warn "xskin config not found - skipping customizations"
+fi
+
+# ============================================================================
+# STEP 6d: Configure Roundcube branding (skin_logo) and folder ordering
+# ============================================================================
+step "Step 6d: Configuring Roundcube skin_logo and folder ordering"
+
+# Add 'xskin' to the plugins array if not already there. Phase 5 only
+# enabled archive/zipdownload/managesieve; xai/xsignature came in Step 6;
+# and xskin is required by RC+ skins per its README.
+for plugin in xskin; do
+    if grep -q "'$plugin'" "$ROUNDCUBE_CONFIG"; then
+        echo "  Plugin $plugin already in \$config['plugins']"
+    else
+        sed -i "/\\\$config\\['plugins'\\]/,/^\\];/{ /^\\];/i\\
+    '$plugin',
+}" "$ROUNDCUBE_CONFIG"
+        echo "  Added '$plugin' to \$config['plugins']"
+    fi
+done
+
+# Branding logo - one logo for login page, top-bar, and avatar circle.
+# Path is served by the per-domain WordPress vhost.
+if ! grep -q "skin_logo" "$ROUNDCUBE_CONFIG"; then
+    cat >> "$ROUNDCUBE_CONFIG" <<EOF
+
+// Branding logo - one logo for login page, top-bar, and avatar circle.
+// Image lives at /srv/www/${MAIL_DOMAIN}/branding/.
+\$config['skin_logo'] = [
+    '*'     => 'https://${MAIL_DOMAIN}/branding/docent-logo.png',
+    'login' => 'https://${MAIL_DOMAIN}/branding/docent-logo.png',
+];
+EOF
+    echo "  Appended \$config['skin_logo']"
+fi
+
+# Update sent_mbox to "Sent Items" (Outlook convention)
+sed -i "s|^\$config\\['sent_mbox'\\].*|\$config['sent_mbox']   = 'Sent Items';|" \
+    "$ROUNDCUBE_CONFIG"
+
+# Update junk_mbox to point at "Spam" (the actual folder name created by
+# Phase 4's Sieve config). Phase 4 had a mismatch: Sieve delivers to "Spam"
+# but Roundcube was told to look at "Junk". Fixed here.
+sed -i "s|^\$config\\['junk_mbox'\\].*|\$config['junk_mbox']   = 'Spam';|" \
+    "$ROUNDCUBE_CONFIG"
+
+# Set folder display order: Inbox, Sent Items, Drafts, Spam, Trash
+if grep -q "default_folders" "$ROUNDCUBE_CONFIG"; then
+    sed -i "s|^\$config\\['default_folders'\\].*|\$config['default_folders'] = ['INBOX', 'Sent Items', 'Drafts', 'Spam', 'Trash'];|" "$ROUNDCUBE_CONFIG"
+else
+    echo "\$config['default_folders'] = ['INBOX', 'Sent Items', 'Drafts', 'Spam', 'Trash'];" >> "$ROUNDCUBE_CONFIG"
+fi
+
+# Validate resulting PHP
+if ! php -l "$ROUNDCUBE_CONFIG" > /dev/null 2>&1; then
+    log_fail "Roundcube config has PHP syntax errors after edits"
+    php -l "$ROUNDCUBE_CONFIG" 2>&1 | tail -5
+    exit 1
+fi
+
+log_done "Updated Roundcube config (skin_logo, sent_mbox, junk_mbox, folder order)"
+
+# ============================================================================
+# STEP 6e: Install branding assets
+# ============================================================================
+step "Step 6e: Installing branding assets"
+
+# Branding assets (logo, watermark) are served by the WordPress/Apache vhost
+# at /srv/www/<DOMAIN>/branding/. Sources are in this repo at
+# branding/<DOMAIN>/ so each server can have its own brand identity.
+
+BRANDING_REPO="$REPO_ROOT/branding/$MAIL_DOMAIN"
+BRANDING_INSTALL="/srv/www/$MAIL_DOMAIN/branding"
+
+if [ -d "$BRANDING_REPO" ]; then
+    mkdir -p "$BRANDING_INSTALL"
+    # Copy without overwriting if file is already there with same content
+    rsync -a "$BRANDING_REPO/" "$BRANDING_INSTALL/"
+    chown -R www-data:www-data "$BRANDING_INSTALL"
+    find "$BRANDING_INSTALL" -type d -exec chmod 755 {} \;
+    find "$BRANDING_INSTALL" -type f -exec chmod 644 {} \;
+    BRAND_COUNT=$(find "$BRANDING_INSTALL" -type f | wc -l)
+    log_done "Installed $BRAND_COUNT branding asset(s) to $BRANDING_INSTALL"
+else
+    log_warn "Branding source $BRANDING_REPO not found - skipping branding assets"
+fi
+
+# ============================================================================
+# STEP 6f: Rename "Sent" mailbox to "Sent Items" for existing users
+# ============================================================================
+step "Step 6f: Renaming Sent -> Sent Items in user mailboxes"
+
+# Loop through every Dovecot user and rename the Sent folder if it exists.
+# This is idempotent: skips users where Sent doesn't exist or where Sent
+# Items already exists.
+USERS=$(doveadm user '*' 2>/dev/null | head -30)
+if [ -z "$USERS" ]; then
+    log_warn "No Dovecot users found - skipping mailbox rename"
+else
+    for u in $USERS; do
+        if doveadm mailbox list -u "$u" 2>/dev/null | grep -qx "Sent"; then
+            if ! doveadm mailbox list -u "$u" 2>/dev/null | grep -qx "Sent Items"; then
+                doveadm mailbox rename -u "$u" Sent "Sent Items" 2>/dev/null \
+                    && echo "  Renamed Sent -> Sent Items for $u" \
+                    || echo "  Could not rename Sent for $u"
+            fi
+        fi
+    done
+    log_done "Mailbox rename pass complete"
+fi
+
+# ============================================================================
+# STEP 6g: Install custom font (Aptos with Inter fallback)
+# ============================================================================
+step "Step 6g: Installing custom font and CSS overrides"
+
+# Font strategy:
+# 1. Aptos       (Windows 11 / Office 365 - locally installed on user's device)
+# 2. Inter       (self-hosted woff2 files, downloaded if not already present)
+# 3. Segoe UI    (Windows 10/11 fallback)
+# 4. system-ui   (macOS / Linux fallback)
+#
+# Aptos is Microsoft proprietary and can't be hosted. Inter is the closest
+# open-source visual match, OFL-licensed, and we self-host it.
+#
+# CSS file lives in xskin's assets/ dir so xskin's overwrite_css setting
+# can find it via a relative path. Important: overwrite_css must be a path
+# RELATIVE TO THE XSKIN PLUGIN DIR (assets/styles/docent-overrides.css).
+# An absolute path or "plugins/xskin/..." prefix gets doubled by the
+# plugin loader and 404s.
+
+FONTS_INSTALL="$BRANDING_INSTALL/fonts"
+INTER_FILES=(
+    "Inter-Regular.woff2"
+    "Inter-Italic.woff2"
+    "Inter-Medium.woff2"
+    "Inter-SemiBold.woff2"
+    "Inter-Bold.woff2"
+)
+INTER_BASE_URL="https://rsms.me/inter/font-files"
+
+# Download Inter font files if not already present in the repo
+INTER_REPO_DIR="$REPO_ROOT/branding/$MAIL_DOMAIN/fonts"
+if [ -d "$INTER_REPO_DIR" ] && [ "$(ls -A "$INTER_REPO_DIR" 2>/dev/null | grep -c .woff2)" -eq 5 ]; then
+    log_skip "Inter fonts already in repo at $INTER_REPO_DIR"
+else
+    mkdir -p "$INTER_REPO_DIR"
+    cd "$INTER_REPO_DIR"
+    for f in "${INTER_FILES[@]}"; do
+        if [ ! -f "$f" ]; then
+            wget -q "$INTER_BASE_URL/$f" -O "$f"
+            if [ -s "$f" ]; then
+                log_done "Downloaded $f"
+            else
+                rm -f "$f"
+                log_warn "Failed to download $f - font fallback chain still works without it"
+            fi
+        fi
+    done
+    cd - > /dev/null
+fi
+
+# Install fonts to the WordPress vhost branding dir
+mkdir -p "$FONTS_INSTALL"
+if [ -d "$INTER_REPO_DIR" ]; then
+    rsync -a "$INTER_REPO_DIR/" "$FONTS_INSTALL/"
+    chown -R www-data:www-data "$FONTS_INSTALL"
+    chmod 644 "$FONTS_INSTALL"/*.woff2 2>/dev/null
+    FONT_COUNT=$(find "$FONTS_INSTALL" -name "*.woff2" | wc -l)
+    log_done "Installed $FONT_COUNT Inter font file(s) to $FONTS_INSTALL"
+fi
+
+# Install the CSS override file. It lives in xskin's assets dir so xskin's
+# relative-path resolver finds it.
+CSS_REPO="$REPO_ROOT/branding/$MAIL_DOMAIN/docent-overrides.css"
+CSS_INSTALL="$ROUNDCUBE_PLUGINS_DIR/xskin/assets/styles/docent-overrides.css"
+
+if [ -f "$CSS_REPO" ]; then
+    cp "$CSS_REPO" "$CSS_INSTALL"
+    chown root:www-data "$CSS_INSTALL"
+    chmod 640 "$CSS_INSTALL"
+    log_done "Installed CSS overrides at $CSS_INSTALL"
+else
+    log_warn "CSS source $CSS_REPO not found - skipping CSS overrides"
+fi
+
+# Configure xskin to load our CSS file. Path is relative to the xskin plugin dir.
+apply_setting "$XSKIN_CONFIG" "overwrite_css" "'assets/styles/docent-overrides.css'"
 
 # ============================================================================
 # STEP 7: Set ownership and permissions on plugin/skin files

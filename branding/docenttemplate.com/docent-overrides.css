@@ -1,0 +1,89 @@
+/* Docent IMS - Custom font overrides for Roundcube webmail
+   Font priority chain:
+   1. Aptos      (Windows 11 / Office 365 - locally installed)
+   2. Inter      (self-hosted, served from branding/fonts/)
+   3. Segoe UI   (Windows 10 / 11 default)
+   4. system-ui  (macOS = San Francisco; modern Linux DEs = sans default)
+   5. -apple-system (older macOS Safari)
+   6. sans-serif (final fallback)
+
+   Note: We must match xskin's selector specificity. xskin applies a class
+   like "xfont-family-noto-sans" to the <html> element, with rules like
+   "html.xfont-family-noto-sans body { ... }". To override, we use the
+   [class*="xfont-family-"] attribute selector which matches ANY value of
+   that class, has equivalent specificity, and our rules come later so win.
+*/
+
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('https://docenttemplate.com/branding/fonts/Inter-Regular.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+    src: url('https://docenttemplate.com/branding/fonts/Inter-Italic.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://docenttemplate.com/branding/fonts/Inter-Medium.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://docenttemplate.com/branding/fonts/Inter-SemiBold.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('https://docenttemplate.com/branding/fonts/Inter-Bold.woff2') format('woff2');
+}
+
+/* Override every xfont-family-* class xskin might apply.
+   Targeting both html[class*="xfont-family-"] AND plain html selectors
+   covers every code path xskin uses to apply font classes. */
+html[class*="xfont-family-"] body,
+html[class*="xfont-family-"] button,
+html[class*="xfont-family-"] input,
+html[class*="xfont-family-"] optgroup,
+html[class*="xfont-family-"] select,
+html[class*="xfont-family-"] textarea,
+html[class*="xfont-family-"] .popover,
+html body,
+html input,
+html button,
+html textarea,
+html select {
+    font-family: 'Aptos', 'Inter', 'Segoe UI Variable Display', 'Segoe UI',
+                 system-ui, -apple-system, sans-serif !important;
+}
+
+/* Common Roundcube/xskin element classes that may have inline overrides */
+.toolbar, .menu, .popupmenu, .contentbox, .uibox,
+#xsidebar, #xsidebar a, #xsidebar .name, #mainscreen,
+table.records-table, table.messagelist, .xskin-button-text,
+.menu.toolbar a, .listing tbody tr, .listing li {
+    font-family: 'Aptos', 'Inter', 'Segoe UI Variable Display', 'Segoe UI',
+                 system-ui, -apple-system, sans-serif !important;
+}
+
+/* Email message bodies: prefer the email's own fonts (don't use !important
+   so emails with their own fonts still render with sender's chosen font),
+   but fall back to ours when no font is specified. */
+.message-htmlpart,
+.message-partheaders,
+#messagebody {
+    font-family: 'Aptos', 'Inter', 'Segoe UI Variable Display', 'Segoe UI',
+                 system-ui, -apple-system, sans-serif;
+}
