@@ -1,0 +1,9 @@
+
+# Phase0-generated tenant-specific files - never commit
+secrets.local
+tenant.local
+
+# Editor backup files
+*.bak
+*~
+.DS_Store
