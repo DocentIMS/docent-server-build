@@ -126,10 +126,10 @@ echo "==================================================================="
 step "Step 1: Checking RC+ tarball inventory"
 
 EXPECTED_TARBALLS=(
-    plugin_xai.tar.gz
-    plugin_xsignature.tar.gz
-    skin_outlook.tar.gz
-    skin_outlook_plus.tar.gz
+    roundcube_plus_plugin_xai.tar.gz
+    roundcube_plus_plugin_xsignature.tar.gz
+    roundcube_plus_skin_outlook.tar.gz
+    roundcube_plus_skin_outlook_plus.tar.gz
 )
 
 MISSING=()
