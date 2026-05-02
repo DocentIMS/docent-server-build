@@ -48,6 +48,23 @@ LICENSE_FILE=/root/secrets/roundcube-plus.conf
 # Plugins to enable in Roundcube's $config['plugins'] array
 RC_PLUS_PLUGINS=(xai xsignature)
 
+# === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
+# Source per-tenant config and secrets if they exist. These files are created
+# by phase0-bootstrap.sh. If they are not present, the hardcoded defaults
+# above remain in effect (preserving original standalone behavior).
+__PHASE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+__PHASE_REPO_ROOT="$(dirname "$__PHASE_SCRIPT_DIR")"
+if [ -f "$__PHASE_REPO_ROOT/tenant.local" ]; then
+    # shellcheck disable=SC1091
+    source "$__PHASE_REPO_ROOT/tenant.local"
+fi
+if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
+    # shellcheck disable=SC1091
+    source "$__PHASE_REPO_ROOT/secrets.local"
+fi
+unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
+# === END tenant.local/secrets.local source block ===
+
 # ============================================================================
 # REPORT TRACKING
 # ============================================================================
