@@ -308,11 +308,20 @@ EOF
     log_done "SSH config snippet written to $SNIPPET"
 fi
 
-# Validate config before restarting
+# Validate config before restarting.
+# /run/sshd is required by sshd for privilege separation. It's created
+# automatically when sshd is started by systemd, but doesn't necessarily
+# exist yet at this point - and `sshd -t` will fail with
+# "Missing privilege separation directory: /run/sshd" without it.
+mkdir -p /run/sshd
+chmod 0755 /run/sshd
+
 if sshd -t 2>/dev/null; then
     log_done "sshd config validated"
 else
-    log_fail "sshd config has errors - NOT restarting SSH. Check manually."
+    # Show the actual error so we know what's wrong
+    SSHD_ERR=$(sshd -t 2>&1)
+    log_fail "sshd config has errors - NOT restarting SSH. Error: $SSHD_ERR"
 fi
 
 # ============================================================================
