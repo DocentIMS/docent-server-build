@@ -27,6 +27,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 TENANT_FILE="$REPO_ROOT/tenant.local"
 SECRETS_FILE="$REPO_ROOT/secrets.local"
 CREDENTIALS_FILE="$REPO_ROOT/CREDENTIALS.txt"
+QUICK_REFERENCE_FILE="$REPO_ROOT/QUICK-REFERENCE.txt"
 
 # ============================================================================
 # COLORS (only if terminal supports them)
@@ -111,12 +112,13 @@ read -r
 # ============================================================================
 # CHECK FOR EXISTING FILES
 # ============================================================================
-if [ -f "$TENANT_FILE" ] || [ -f "$SECRETS_FILE" ] || [ -f "$CREDENTIALS_FILE" ]; then
+if [ -f "$TENANT_FILE" ] || [ -f "$SECRETS_FILE" ] || [ -f "$CREDENTIALS_FILE" ] || [ -f "$QUICK_REFERENCE_FILE" ]; then
     echo ""
     echo "${RED}WARNING:${RESET} Existing config files found:"
     [ -f "$TENANT_FILE" ] && echo "  $TENANT_FILE"
     [ -f "$SECRETS_FILE" ] && echo "  $SECRETS_FILE"
     [ -f "$CREDENTIALS_FILE" ] && echo "  $CREDENTIALS_FILE"
+    [ -f "$QUICK_REFERENCE_FILE" ] && echo "  $QUICK_REFERENCE_FILE"
     echo ""
     read -r -p "Overwrite them? Type ${BOLD}yes${RESET} to continue: " confirm
     if [ "$confirm" != "yes" ]; then
@@ -438,6 +440,228 @@ chmod 600 "$CREDENTIALS_FILE"
 echo "${GREEN}Wrote $CREDENTIALS_FILE (mode 0600)${RESET}"
 
 # ============================================================================
+# QUICK-REFERENCE.txt - day-to-day commands and recovery
+# ============================================================================
+cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
+==============================================================
+  QUICK REFERENCE - ${PRIMARY_DOMAIN}
+  Generated: $(date -u "+%Y-%m-%d %H:%M UTC")
+==============================================================
+  Day-to-day commands and recovery procedures.
+  Sensitive: contains the same passwords as CREDENTIALS.txt.
+  Permissions: mode 600 (root-only readable).
+
+==============================================================
+  CONNECTING TO THIS SERVER
+==============================================================
+
+  SSH (after phase 1 completes):
+    ssh -p ${SSH_PORT} ${ADMIN_USER}@${SERVER_IP}
+    Password: ${ADMIN_PW}
+
+  SSH (alternative shareable account):
+    ssh -p ${SSH_PORT} ${SHARED_ADMIN_USER}@${SERVER_IP}
+    Password: ${SHARED_ADMIN_PW}
+
+  Web (placeholder/WordPress site):
+    https://${PRIMARY_DOMAIN}/
+
+  Webmail (Roundcube):
+    https://${PRIMARY_DOMAIN}/mail/
+    Username: ${TEST_MAILBOX_LOCAL}    (or full: ${TEST_MAILBOX})
+    Password: ${TEST_MAILBOX_PW}
+
+  WordPress admin (after install wizard):
+    https://${PRIMARY_DOMAIN}/wp-admin/
+
+  Kamatera console (when SSH is broken):
+    https://console.kamatera.com
+    Then open the server's console - login as 'root' with the
+    password Kamatera emailed you when the server was created.
+
+==============================================================
+  PHASE COMMANDS (re-run if needed; all phases idempotent)
+==============================================================
+
+  All phase scripts live in: /root/server-build/scripts/
+  Run as: sudo bash /root/server-build/scripts/phaseN.sh
+
+    phase0-bootstrap.sh        Generate config + this file
+    phase1.sh                  OS hardening, users, SSH, firewall, fail2ban
+    phase2.sh                  Apache + Let's Encrypt TLS
+    phase3.sh                  MariaDB + daily backups
+    phase4.sh                  Postfix + Dovecot + DKIM + DMARC + Spam
+    phase5.sh                  Roundcube webmail
+    phase5b-rc-plus.sh         Roundcube Plus skin and plugins
+    phase5c-globaladdressbook.sh Project Contacts shared address book
+    phase6.sh                  WordPress
+
+  Tip: tee output to a log so you can search for errors later:
+    sudo bash /root/server-build/scripts/phase4.sh 2>&1 | tee /tmp/phase4-run.log
+
+==============================================================
+  CHECKING SERVICE HEALTH
+==============================================================
+
+  All services at once:
+    systemctl status apache2 mariadb postfix dovecot opendkim opendmarc spamd spamass-milter --no-pager
+
+  Restart a single service:
+    sudo systemctl restart <service-name>
+
+  Last 50 lines of the mail log:
+    sudo tail -50 /var/log/mail.log
+
+  Last 50 lines of the Apache error log:
+    sudo tail -50 /var/log/apache2/error.log
+
+  Roundcube error log:
+    sudo tail -50 /var/log/roundcube/errors.log
+
+  Firewall status:
+    sudo ufw status verbose
+
+  fail2ban status (which IPs are banned):
+    sudo fail2ban-client status sshd
+
+==============================================================
+  RECOVERY: I LOCKED MYSELF OUT WITH FAIL2BAN
+==============================================================
+
+  Three wrong SSH password attempts = 1-hour ban from your IP.
+
+  RECOVERY (from Kamatera console as root):
+    sudo fail2ban-client unban <your-IP>
+  Or unban everyone (after a typo storm):
+    sudo fail2ban-client unban --all
+
+  Find your current public IP from your laptop:
+    Browser: https://whatismyipaddress.com/
+
+==============================================================
+  RECOVERY: SSH WON'T CONNECT
+==============================================================
+
+  If wayne can't connect on port ${SSH_PORT}, log in to the
+  Kamatera console (browser, no SSH needed) as root with the
+  Kamatera-emailed password, then:
+
+    1. Confirm SSH is running:
+         systemctl status ssh.socket
+         ss -tlnp | grep ${SSH_PORT}
+
+    2. Confirm firewall lets ${SSH_PORT}/tcp through:
+         ufw status verbose
+
+    3. Confirm fail2ban hasn't banned you (see section above).
+
+    4. Restart SSH if needed:
+         systemctl daemon-reload
+         systemctl restart ssh.socket
+
+==============================================================
+  RECOVERY: TLS CERTIFICATE EXPIRED OR BROKEN
+==============================================================
+
+  Force a renewal (will only renew if cert is < 30 days from expiry):
+    sudo certbot renew
+
+  Force a renewal NOW regardless of expiry (use sparingly - rate
+  limited by Let's Encrypt to 5 per week per domain):
+    sudo certbot renew --force-renewal
+
+  After renewal, reload Apache:
+    sudo systemctl reload apache2
+
+  Auto-renewal status:
+    systemctl status certbot.timer --no-pager
+    sudo systemctl list-timers certbot.timer
+
+==============================================================
+  TESTING MAIL
+==============================================================
+
+  Send a local test message:
+    echo "test body" | mail -s "test subject" ${TEST_MAILBOX}
+
+  Confirm it arrived:
+    sudo find /var/vmail/${PRIMARY_DOMAIN} -name 'new' -type d
+    sudo ls -la /var/vmail/${PRIMARY_DOMAIN}/${TEST_MAILBOX_LOCAL}/new/
+
+  GTUBE spam test (should land in Junk folder, not Inbox):
+    Send to ${TEST_MAILBOX} from any external account with this in
+    the body (single line, no quotes):
+      XJS*C4JDBQADN1.NSBN3*2IDNEN*GTUBE-STANDARD-ANTI-UBE-TEST-EMAIL*C.34X
+
+  External mail tester (verifies SPF/DKIM/DMARC/blacklists):
+    https://www.mail-tester.com/
+
+==============================================================
+  VERIFYING DNS
+==============================================================
+
+  From your Windows PowerShell:
+    nslookup ${PRIMARY_DOMAIN}
+    nslookup www.${PRIMARY_DOMAIN}
+    nslookup mail.${PRIMARY_DOMAIN}
+
+  From the server (more detail):
+    dig @8.8.8.8 ${PRIMARY_DOMAIN}
+    dig @8.8.8.8 MX ${PRIMARY_DOMAIN}
+    dig @8.8.8.8 TXT ${PRIMARY_DOMAIN}
+    dig @8.8.8.8 TXT default._domainkey.${PRIMARY_DOMAIN}
+    dig @8.8.8.8 TXT _dmarc.${PRIMARY_DOMAIN}
+
+==============================================================
+  BACKEND PASSWORDS (used by software, listed for recovery)
+==============================================================
+
+  MariaDB root:        ${ROOT_DB_PW}
+  Mail database:       ${MAIL_DB_PW}
+  Roundcube database:  ${ROUNDCUBE_DB_PW}
+  Roundcube DES key:   ${ROUNDCUBE_DES_KEY}
+  WordPress database:  ${WP_DB_PW}
+
+  Connect to MariaDB as root (no password prompt - uses /root/.my.cnf):
+    sudo mysql
+
+  List databases:
+    sudo mysql -e 'SHOW DATABASES;'
+
+==============================================================
+  MOBAXTERM TIPS (Windows SSH client)
+==============================================================
+
+  - Right-click the session tab to color-code it
+    (suggestion: green = production, red = test, yellow = staging).
+  - Left panel = SFTP browser of the server you're connected to.
+    Drag files between Windows and the server here.
+  - Files coming FROM Windows often have CRLF line endings. After
+    uploading scripts, run on the server:
+      sed -i 's/\\r\$//' /path/to/script.sh
+  - To paste in a session, use right-click (Ctrl+V often doesn't
+    work in terminals).
+
+==============================================================
+  CLEANING UP AFTER VERIFIED BUILD
+==============================================================
+
+  Once you've confirmed the build works end-to-end, delete the
+  sensitive files (passwords are in your password manager):
+
+    rm /root/server-build/CREDENTIALS.txt
+    rm /root/server-build/QUICK-REFERENCE.txt
+
+  The tenant.local and secrets.local files stay - phase scripts
+  read from secrets.local for idempotent re-runs.
+
+==============================================================
+QUICKREF_EOF
+
+chmod 600 "$QUICK_REFERENCE_FILE"
+echo "${GREEN}Wrote $QUICK_REFERENCE_FILE (mode 0600)${RESET}"
+
+# ============================================================================
 # DISPLAY CREDENTIALS
 # ============================================================================
 echo ""
@@ -461,6 +685,7 @@ Files written:
   ${CYAN}${TENANT_FILE}${RESET}
   ${CYAN}${SECRETS_FILE}${RESET}
   ${CYAN}${CREDENTIALS_FILE}${RESET}
+  ${CYAN}${QUICK_REFERENCE_FILE}${RESET}
 
 ${BOLD}NEXT STEPS:${RESET}
 
