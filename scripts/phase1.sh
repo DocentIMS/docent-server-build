@@ -83,19 +83,86 @@ echo "  $(date)"
 echo "==================================================================="
 
 # ============================================================================
-# STEP 1: OS updates
+# STEP 1: OS sanity check, updates, and reboot detection
 # ============================================================================
-step "Step 1: Updating OS packages"
+step "Step 1: OS sanity check and package updates"
 
+# --- Check 1: Verify Ubuntu 24.04 LTS ---
+if [ ! -f /etc/os-release ]; then
+    echo ""
+    echo "  ERROR: /etc/os-release not found. Cannot verify OS."
+    echo "  This build is designed for Ubuntu 24.04 LTS only."
+    echo "  Aborting."
+    exit 1
+fi
+
+. /etc/os-release
+
+if [ "$NAME" != "Ubuntu" ] || [ "$VERSION_ID" != "24.04" ]; then
+    echo ""
+    echo "  ERROR: This build is designed for Ubuntu 24.04 LTS."
+    echo "         Detected: $NAME $VERSION_ID"
+    echo ""
+    echo "  Phase scripts have been written and tested specifically"
+    echo "  for Ubuntu 24.04 LTS. Running on a different version may"
+    echo "  break things in unpredictable ways (different package"
+    echo "  versions, config formats, etc.)."
+    echo ""
+    echo "  Aborting. Provision a fresh Ubuntu 24.04 LTS server and retry."
+    exit 1
+fi
+log_done "OS verified: Ubuntu 24.04 LTS"
+
+# --- Check 2: Show pending updates and prompt before applying ---
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-UPGRADABLE=$(apt list --upgradable 2>/dev/null | grep -c upgradable || true)
-if [ "$UPGRADABLE" -gt 1 ]; then
-    apt-get upgrade -y -qq
-    log_done "Applied $((UPGRADABLE - 1)) package updates"
-else
+UPGRADABLE_OUTPUT=$(apt list --upgradable 2>/dev/null | grep -v "^Listing" || true)
+UPGRADABLE_COUNT=$(echo "$UPGRADABLE_OUTPUT" | grep -cv "^$" || true)
+
+if [ "$UPGRADABLE_COUNT" -eq 0 ]; then
     log_skip "OS packages already up to date"
+else
+    SECURITY_COUNT=$(echo "$UPGRADABLE_OUTPUT" | grep -c "security" || true)
+    echo ""
+    echo "  Pending updates: $UPGRADABLE_COUNT packages ($SECURITY_COUNT security updates)"
+    echo ""
+    echo "  Phase 1 will now apply these updates. This may take 1-3 minutes."
+    echo ""
+    read -r -p "  Continue and apply updates? (y/n): " confirm
+    case "$confirm" in
+        y|Y|yes|YES)
+            apt-get upgrade -y -qq
+            log_done "Applied $UPGRADABLE_COUNT package updates"
+            ;;
+        *)
+            echo "  Aborted by user. No changes made."
+            exit 1
+            ;;
+    esac
 fi
+
+# --- Check 3: Detect if reboot is required after updates ---
+if [ -f /var/run/reboot-required ]; then
+    echo ""
+    echo "==================================================================="
+    echo "  WARNING: System updates require a reboot"
+    echo "==================================================================="
+    echo ""
+    echo "  Phase 1 cannot complete safely without rebooting first."
+    echo "  Some updates (especially kernel updates) only take effect"
+    echo "  after reboot."
+    echo ""
+    echo "  Please reboot now:"
+    echo "    reboot"
+    echo ""
+    echo "  Then SSH back in as root and run phase 1 again."
+    echo "  Phase 1 is idempotent: already-completed steps will be"
+    echo "  skipped on the second run."
+    echo ""
+    echo "==================================================================="
+    exit 1
+fi
+log_done "No reboot required"
 
 # ============================================================================
 # STEP 2: Set hostname
