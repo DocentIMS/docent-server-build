@@ -192,6 +192,69 @@ if [ -f /var/run/reboot-required ]; then
 fi
 log_done "No reboot required"
 
+# --- Check 4: Kernel sanity check ---
+# Even when /var/run/reboot-required isn't present, there can be a mismatch
+# between the running kernel (uname -r) and the highest installed kernel
+# package. This happens occasionally when Ubuntu's update tooling skips
+# creating the reboot-required marker. Catch it here.
+RUNNING_KERNEL="$(uname -r)"
+# Get the highest installed linux-image-* package version (sorted by version,
+# not lexically). dpkg-query gives us "package\tversion" lines.
+INSTALLED_KERNEL_PKG="$(
+    dpkg-query -W -f='${Package}\n' 'linux-image-[0-9]*' 2>/dev/null \
+    | sed 's/^linux-image-//' \
+    | sort -V \
+    | tail -1
+)"
+
+if [ -n "$INSTALLED_KERNEL_PKG" ] && [ "$RUNNING_KERNEL" != "$INSTALLED_KERNEL_PKG" ]; then
+    echo ""
+    echo "==================================================================="
+    echo "  KERNEL MISMATCH - REBOOT RECOMMENDED"
+    echo "==================================================================="
+    echo ""
+    echo "  Running kernel:    $RUNNING_KERNEL"
+    echo "  Installed kernel:  $INSTALLED_KERNEL_PKG"
+    echo ""
+    echo "  These differ. The system is running a kernel that has been"
+    echo "  superseded by a newer one on disk. A reboot will swap kernels."
+    echo ""
+    echo "  Ubuntu didn't flag this with /var/run/reboot-required, but it"
+    echo "  is the same situation: the right thing to do is reboot before"
+    echo "  continuing. Otherwise the rest of phase 1 may configure things"
+    echo "  against the older kernel."
+    echo ""
+    echo "  WHAT WILL HAPPEN:"
+    echo "    1. This script will trigger a reboot in a moment."
+    echo "    2. Your SSH session will disconnect (this is normal)."
+    echo "    3. Wait ~30-60 seconds for the server to come back up."
+    echo "    4. SSH back in as root on port 22 (same as you did before)."
+    echo "    5. Re-run phase 1 with the SAME command:"
+    echo ""
+    echo "         sudo bash /root/server-build/scripts/phase1.sh"
+    echo ""
+    echo "==================================================================="
+    echo ""
+    read -r -p "Type 'yes' to reboot now (anything else aborts): " reboot_confirm
+    if [ "$reboot_confirm" = "yes" ]; then
+        echo ""
+        echo "  Rebooting in 5 seconds. SSH back in and re-run phase 1."
+        echo ""
+        sleep 5
+        systemctl reboot
+        echo "  systemctl reboot did not take effect. Try manually: reboot"
+        exit 1
+    else
+        echo ""
+        echo "  Reboot aborted. Phase 1 stopped."
+        echo "  When you're ready, run:  reboot"
+        echo "  Then SSH back in and re-run phase 1."
+        echo ""
+        exit 1
+    fi
+fi
+log_done "Kernel sanity check passed (running: $RUNNING_KERNEL)"
+
 # ============================================================================
 # STEP 2: Set hostname
 # ============================================================================
