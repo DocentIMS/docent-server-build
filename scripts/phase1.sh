@@ -148,22 +148,47 @@ fi
 if [ -f /var/run/reboot-required ]; then
     echo ""
     echo "==================================================================="
-    echo "  WARNING: System updates require a reboot"
+    echo "  REBOOT REQUIRED"
     echo "==================================================================="
     echo ""
-    echo "  Phase 1 cannot complete safely without rebooting first."
-    echo "  Some updates (especially kernel updates) only take effect"
-    echo "  after reboot."
+    echo "  System updates installed a new kernel or critical libraries that"
+    echo "  require a reboot before they take effect."
     echo ""
-    echo "  Please reboot now:"
-    echo "    reboot"
+    echo "  Phase 1 cannot continue safely until the server has rebooted."
     echo ""
-    echo "  Then SSH back in as root and run phase 1 again."
-    echo "  Phase 1 is idempotent: already-completed steps will be"
-    echo "  skipped on the second run."
+    echo "  WHAT WILL HAPPEN:"
+    echo "    1. This script will trigger a reboot in a moment."
+    echo "    2. Your SSH session will disconnect (this is normal)."
+    echo "    3. Wait ~30-60 seconds for the server to come back up."
+    echo "    4. SSH back in as root on port 22 (same as you did before)."
+    echo "    5. Re-run phase 1 with the SAME command you used to start it:"
+    echo ""
+    echo "         sudo bash /root/server-build/scripts/phase1.sh"
+    echo ""
+    echo "    6. Phase 1 is idempotent: already-completed steps will be"
+    echo "       skipped, and it will continue from this point."
     echo ""
     echo "==================================================================="
-    exit 1
+    echo ""
+    read -r -p "Type 'yes' to reboot now (anything else aborts): " reboot_confirm
+    if [ "$reboot_confirm" = "yes" ]; then
+        echo ""
+        echo "  Rebooting in 5 seconds. SSH back in and re-run phase 1."
+        echo ""
+        sleep 5
+        # systemd-managed reboot - the safest way to trigger it programmatically
+        systemctl reboot
+        # If we get here, the reboot didn't take effect. Exit so user can debug.
+        echo "  systemctl reboot did not take effect. Try manually: reboot"
+        exit 1
+    else
+        echo ""
+        echo "  Reboot aborted. Phase 1 stopped."
+        echo "  When you're ready, run:  reboot"
+        echo "  Then SSH back in and re-run phase 1."
+        echo ""
+        exit 1
+    fi
 fi
 log_done "No reboot required"
 
