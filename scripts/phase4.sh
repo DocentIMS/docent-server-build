@@ -14,10 +14,10 @@ set -u
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-MAIL_DOMAIN="docenttemplate.com"
-MAIL_HOSTNAME="mail.docenttemplate.com"
-TEST_MAILBOX_LOCAL="wglover"
-TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${MAIL_DOMAIN}"
+# Non-domain-dependent constants. These are the same regardless of tenant.
+MAIL_DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
+MAIL_HOSTNAME="mail.docenttemplate.com"  # default - overridden by tenant.local
+TEST_MAILBOX_LOCAL="test"             # default - tenant.local sets TEST_MAILBOX
 
 VMAIL_USER="vmail"
 VMAIL_UID=5000
@@ -29,9 +29,6 @@ MAIL_DB_USER="mailuser"
 ROOT_DEFAULTS_FILE="/root/.my.cnf"
 
 DKIM_SELECTOR="default"
-DKIM_KEY_DIR="/etc/opendkim/keys/${MAIL_DOMAIN}"
-
-CERT_DIR="/etc/letsencrypt/live/${MAIL_DOMAIN}"
 
 # === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
 # Source per-tenant config and secrets if they exist. These files are created
@@ -49,6 +46,15 @@ if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
 fi
 unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
+
+# Domain-dependent paths and values. These MUST be computed AFTER sourcing
+# tenant.local so they pick up the correct MAIL_DOMAIN/MAIL_HOSTNAME values.
+# (If we set them before sourcing, bash evaluates the variables immediately
+# and they keep the docenttemplate.com defaults even after tenant.local
+# overrides MAIL_DOMAIN.)
+TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${MAIL_DOMAIN}"
+DKIM_KEY_DIR="/etc/opendkim/keys/${MAIL_DOMAIN}"
+CERT_DIR="/etc/letsencrypt/live/${MAIL_DOMAIN}"
 
 # ============================================================================
 # REPORT TRACKING

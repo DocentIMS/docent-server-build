@@ -18,16 +18,14 @@ set -u
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-WP_DOMAIN="docenttemplate.com"
-WP_DOMAIN_ALT="www.docenttemplate.com"
-WP_DIR="/srv/www/$WP_DOMAIN"
-WP_DB_NAME="wordpress_docenttemplate"
-WP_DB_USER="wp_dt_user"
+# Non-domain-dependent constants and defaults.
+WP_DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
+WP_DOMAIN_ALT="www.docenttemplate.com"  # default - overridden by tenant.local
+WP_DB_NAME="wordpress_docenttemplate"   # default - overridden by tenant.local
+WP_DB_USER="wp_dt_user"             # default - overridden by tenant.local
 WP_ADMIN_USERNAME="wadmin"          # used as a hint only; you set the real one in wp-admin
-WP_ADMIN_EMAIL="wglover@docentims.com"
-WP_VHOST_FILE="/etc/apache2/sites-available/docenttemplate.com.conf"
+WP_ADMIN_EMAIL="wglover@docentims.com"  # default - overridden by tenant.local
 ROOT_DEFAULTS_FILE="/root/.my.cnf"
-WP_CONFIG="$WP_DIR/wp-config.php"
 
 # === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
 # Source per-tenant config and secrets if they exist. These files are created
@@ -45,6 +43,12 @@ if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
 fi
 unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
+
+# Domain-dependent paths. Computed AFTER sourcing so they pick up the
+# correct WP_DOMAIN value.
+WP_DIR="/srv/www/$WP_DOMAIN"
+WP_VHOST_FILE="/etc/apache2/sites-available/${WP_DOMAIN}.conf"
+WP_CONFIG="$WP_DIR/wp-config.php"
 
 # ============================================================================
 # REPORT TRACKING

@@ -21,15 +21,14 @@ set -u
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-MAIL_DOMAIN="docenttemplate.com"
-MAIL_HOSTNAME="mail.docenttemplate.com"
+# Non-domain-dependent constants.
+MAIL_DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
+MAIL_HOSTNAME="mail.docenttemplate.com"  # default - overridden by tenant.local
 ROUNDCUBE_DIR="/usr/share/roundcube"   # package install location
 ROUNDCUBE_URL_PATH="/mail"             # served at https://<domain>/mail/
 ROUNDCUBE_DB="roundcube"
 ROUNDCUBE_DB_USER="roundcube"
 ROOT_DEFAULTS_FILE="/root/.my.cnf"
-APACHE_VHOST="/etc/apache2/sites-available/${MAIL_DOMAIN}-le-ssl.conf"
-CERT_DIR="/etc/letsencrypt/live/${MAIL_DOMAIN}"
 
 # === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
 # Source per-tenant config and secrets if they exist. These files are created
@@ -47,6 +46,11 @@ if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
 fi
 unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
+
+# Domain-dependent paths. Computed AFTER sourcing so they pick up the
+# correct MAIL_DOMAIN value.
+APACHE_VHOST="/etc/apache2/sites-available/${MAIL_DOMAIN}-le-ssl.conf"
+CERT_DIR="/etc/letsencrypt/live/${MAIL_DOMAIN}"
 
 # ============================================================================
 # REPORT TRACKING
