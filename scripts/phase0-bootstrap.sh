@@ -4,16 +4,17 @@
 #
 # Collects all per-tenant configuration via interactive prompts, auto-derives
 # values that follow the standard convention, generates strong random passwords,
-# and writes two files:
+# and writes three files:
 #
-#   - tenant.local   non-secret per-tenant config (domain, usernames, etc.)
-#   - secrets.local  passwords and API keys (gitignored)
+#   - tenant.local      non-secret per-tenant config (domain, usernames, etc.)
+#   - secrets.local     passwords and API keys (gitignored, machine-readable)
+#   - CREDENTIALS.txt   human-readable summary for the user (gitignored)
 #
-# Each subsequent phase script (1, 2, 3, 4, 5, 5b, 5c, 6) sources these files
-# at the top, falling back to its existing hardcoded defaults if either file
-# is missing (so old behavior is preserved when phase0 is not used).
+# Each subsequent phase script (1, 2, 3, 4, 5, 5b, 5c, 6) sources the .local
+# files at the top, falling back to its existing hardcoded defaults if either
+# file is missing (so old behavior is preserved when phase0 is not used).
 #
-# After this script completes, save secrets.local to your password manager,
+# After this script completes, save CREDENTIALS.txt to your password manager,
 # then proceed to: sudo bash scripts/phase1.sh
 
 set -u
@@ -25,6 +26,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 TENANT_FILE="$REPO_ROOT/tenant.local"
 SECRETS_FILE="$REPO_ROOT/secrets.local"
+CREDENTIALS_FILE="$REPO_ROOT/CREDENTIALS.txt"
 
 # ============================================================================
 # COLORS (only if terminal supports them)
@@ -94,9 +96,10 @@ This script collects everything needed to build a new server.
 You will be asked for ${BOLD}10 things${RESET}. For each item with a default,
 just press Enter to accept; otherwise type a value.
 
-After this completes, two files will be created in this repo:
-  ${CYAN}tenant.local${RESET}   - your non-secret tenant config
-  ${CYAN}secrets.local${RESET}  - passwords (gitignored, keep safe)
+After this completes, three files will be created in this repo:
+  ${CYAN}tenant.local${RESET}     - non-secret tenant config (used by scripts)
+  ${CYAN}secrets.local${RESET}    - passwords (used by scripts)
+  ${CYAN}CREDENTIALS.txt${RESET}  - human-readable credentials summary
 
 You can safely abort with Ctrl+C at any time before the final
 write step. Nothing on the system changes until you run phase 1.
@@ -108,11 +111,12 @@ read -r
 # ============================================================================
 # CHECK FOR EXISTING FILES
 # ============================================================================
-if [ -f "$TENANT_FILE" ] || [ -f "$SECRETS_FILE" ]; then
+if [ -f "$TENANT_FILE" ] || [ -f "$SECRETS_FILE" ] || [ -f "$CREDENTIALS_FILE" ]; then
     echo ""
     echo "${RED}WARNING:${RESET} Existing config files found:"
     [ -f "$TENANT_FILE" ] && echo "  $TENANT_FILE"
     [ -f "$SECRETS_FILE" ] && echo "  $SECRETS_FILE"
+    [ -f "$CREDENTIALS_FILE" ] && echo "  $CREDENTIALS_FILE"
     echo ""
     read -r -p "Overwrite them? Type ${BOLD}yes${RESET} to continue: " confirm
     if [ "$confirm" != "yes" ]; then
@@ -129,10 +133,22 @@ step "Tenant identity"
 PRIMARY_DOMAIN=$(ask_required "Primary domain (e.g., acmemuseum.com)")
 SERVER_IP=$(ask_required "Server public IPv4 address")
 
+step "Purpose"
+
+echo "One-line description of what this server is for."
+echo "This will appear at the top of CREDENTIALS.txt as a reminder."
+echo ""
+SERVER_PURPOSE=$(ask_required "Purpose")
+
 step "Admin accounts"
 
-ADMIN_USER=$(ask "Primary admin username" "wayne")
-STAFF_USER=$(ask "Staff username (blank to skip)" "espen")
+echo "Two admin users will be created. Both have full sudo."
+echo "  - Your personal account (default 'wayne')"
+echo "  - A shareable account (default 'admin')"
+echo ""
+
+ADMIN_USER=$(ask "Personal admin username" "wayne")
+SHARED_ADMIN_USER=$(ask "Shareable admin username" "admin")
 SSH_PORT=$(ask "SSH port" "2222")
 TIMEZONE=$(ask "Timezone" "America/Los_Angeles")
 
@@ -145,7 +161,10 @@ NOTIFICATION_EMAIL=$(ask_required "Notification email")
 
 step "Mail"
 
-TEST_MAILBOX_LOCAL=$(ask "Test mailbox local part (creates <local>@<domain>)" "wglover")
+echo "This is the test email address. You'll use it to verify that mail"
+echo "works. This test email is autocreated as:  test@${PRIMARY_DOMAIN}"
+
+TEST_MAILBOX_LOCAL="test"
 
 step "Roundcube Plus"
 
@@ -181,10 +200,6 @@ ${DIM}The following are auto-derived from your primary domain:${RESET}
   Test mailbox:           ${CYAN}${TEST_MAILBOX}${RESET}
   WordPress database:     ${CYAN}${WP_DB_NAME}${RESET}
   WordPress DB user:      ${CYAN}${WP_DB_USER}${RESET}
-  Apache vhost path:      ${CYAN}/etc/apache2/sites-available/${PRIMARY_DOMAIN}.conf${RESET}
-  Cert directory:         ${CYAN}/etc/letsencrypt/live/${PRIMARY_DOMAIN}${RESET}
-  DKIM key directory:     ${CYAN}/etc/opendkim/keys/${PRIMARY_DOMAIN}${RESET}
-  Branding directory:     ${CYAN}branding/${PRIMARY_DOMAIN}/${RESET}
 
 EOF
 
@@ -194,7 +209,7 @@ EOF
 step "Generating strong random passwords"
 
 ADMIN_PW=$(gen_pw 22)
-STAFF_PW=$(gen_pw 22)
+SHARED_ADMIN_PW=$(gen_pw 22)
 ROOT_DB_PW=$(gen_pw 28)
 MAIL_DB_PW=$(gen_pw 28)
 TEST_MAILBOX_PW=$(gen_pw 22)
@@ -213,8 +228,8 @@ cat <<EOF
 ${BOLD}Tenant config to be written:${RESET}
   Primary domain:          ${CYAN}${PRIMARY_DOMAIN}${RESET}
   Server IP:               ${CYAN}${SERVER_IP}${RESET}
-  Admin user:              ${CYAN}${ADMIN_USER}${RESET}
-  Staff user:              ${CYAN}${STAFF_USER:-(none)}${RESET}
+  Personal admin user:     ${CYAN}${ADMIN_USER}${RESET}
+  Shareable admin user:    ${CYAN}${SHARED_ADMIN_USER}${RESET}
   SSH port:                ${CYAN}${SSH_PORT}${RESET}
   Timezone:                ${CYAN}${TIMEZONE}${RESET}
   Notification email:      ${CYAN}${NOTIFICATION_EMAIL}${RESET}
@@ -227,7 +242,7 @@ ${BOLD}Secrets to be written:${RESET}
 
 EOF
 
-read -r -p "Write these to ${BOLD}tenant.local${RESET} and ${BOLD}secrets.local${RESET}? Type ${BOLD}yes${RESET}: " confirm
+read -r -p "Write these files? Type ${BOLD}yes${RESET}: " confirm
 if [ "$confirm" != "yes" ]; then
     echo "Aborted. No files written."
     exit 1
@@ -238,6 +253,7 @@ fi
 # ============================================================================
 step "Writing files"
 
+# tenant.local - sourced by phase scripts
 cat > "$TENANT_FILE" << TENANT_LOCAL_EOF
 # ============================================================================
 # tenant.local - Generated by phase0-bootstrap.sh on $(date '+%Y-%m-%d %H:%M:%S %Z')
@@ -248,12 +264,17 @@ cat > "$TENANT_FILE" << TENANT_LOCAL_EOF
 
 PRIMARY_DOMAIN="${PRIMARY_DOMAIN}"
 SERVER_IP="${SERVER_IP}"
+SERVER_PURPOSE="${SERVER_PURPOSE}"
 ADMIN_USER="${ADMIN_USER}"
-STAFF_USER="${STAFF_USER}"
+SHARED_ADMIN_USER="${SHARED_ADMIN_USER}"
 SSH_PORT="${SSH_PORT}"
 TIMEZONE="${TIMEZONE}"
 NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL}"
 TEST_MAILBOX_LOCAL="${TEST_MAILBOX_LOCAL}"
+
+# Backward compat: phase scripts still reference STAFF_USER
+# (resolves to the shareable admin so existing logic keeps working)
+STAFF_USER="${SHARED_ADMIN_USER}"
 
 HOSTNAME_FQDN="${PRIMARY_DOMAIN}"
 HOSTNAME_SHORT="${HOSTNAME_SHORT}"
@@ -275,20 +296,24 @@ TENANT_LOCAL_EOF
 chmod 644 "$TENANT_FILE"
 echo "${GREEN}Wrote $TENANT_FILE${RESET}"
 
+# secrets.local - machine-readable, sourced by phase scripts
 cat > "$SECRETS_FILE" << SECRETS_LOCAL_EOF
 # ============================================================================
 # secrets.local - Generated by phase0-bootstrap.sh on $(date '+%Y-%m-%d %H:%M:%S %Z')
 # ============================================================================
-# THIS FILE CONTAINS PASSWORDS. KEEP IT SECURE.
-# Listed in .gitignore. Save a copy to your password manager.
-# Each phase script reads this at runtime.
+# Machine-readable secrets file. Sourced by phase scripts.
+# This file is gitignored.
+# Human-readable version is CREDENTIALS.txt
 # ============================================================================
 
 RC_PLUS_LICENSE_KEY="${RC_PLUS_LICENSE_KEY}"
 XAI_API_KEY="${XAI_API_KEY}"
 
 ADMIN_PW="${ADMIN_PW}"
-STAFF_PW="${STAFF_PW}"
+SHARED_ADMIN_PW="${SHARED_ADMIN_PW}"
+# Backward compat: STAFF_PW maps to the shareable admin's password
+STAFF_PW="${SHARED_ADMIN_PW}"
+
 ROOT_DB_PW="${ROOT_DB_PW}"
 MAIL_DB_PW="${MAIL_DB_PW}"
 TEST_MAILBOX_PW="${TEST_MAILBOX_PW}"
@@ -299,6 +324,120 @@ SECRETS_LOCAL_EOF
 
 chmod 600 "$SECRETS_FILE"
 echo "${GREEN}Wrote $SECRETS_FILE (mode 0600)${RESET}"
+
+# CREDENTIALS.txt - human-readable summary
+XAI_DISPLAY="${XAI_API_KEY}"
+[ -z "$XAI_DISPLAY" ] && XAI_DISPLAY="(not configured)"
+
+cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
+==============================================================
+  CREDENTIALS FOR ${PRIMARY_DOMAIN} (${SERVER_IP})
+  Generated: $(date '+%Y-%m-%d %H:%M %Z')
+==============================================================
+
+==============================================================
+  PURPOSE OF THIS SERVER
+==============================================================
+  ${SERVER_PURPOSE}
+
+==============================================================
+  1. KAMATERA ACCOUNT (your account at kamatera.com)
+==============================================================
+  WHAT IT'S FOR:    Logging into kamatera.com to manage your
+                    servers, view your billing,
+                    your server list, or reset passwords.
+  WHERE YOU USE IT: https://console.kamatera.com (in browser)
+  Username:         (your Kamatera account email)
+  Password:         (your Kamatera account password)
+
+  >>> NOT GENERATED BY THIS SCRIPT - this is your account
+      with Kamatera, set up when you signed up. <<<
+
+==============================================================
+  2. KAMATERA SERVER ROOT (this specific server's root password)
+==============================================================
+  WHAT IT'S FOR:    Logging into the Kamatera browser console
+                    when SSH is broken. Emergency recovery only.
+  WHERE YOU USE IT: Kamatera console (the black-screen browser
+                    window that says "${HOSTNAME_SHORT} login:")
+  Username:         root
+  Password:         (the password Kamatera emailed you when
+                    the server was created)
+
+  >>> NOT GENERATED BY THIS SCRIPT - Kamatera set this when
+      they created the server. <<<
+
+==============================================================
+  3. SSH ADMIN LOGIN  (your day-to-day server access)
+==============================================================
+  WHAT IT'S FOR:    Logging into the server via SSH using
+                    MobaXterm, PuTTY, or any SSH client.
+  WHERE YOU USE IT: ssh -p ${SSH_PORT} ${ADMIN_USER}@${SERVER_IP}
+
+                    Note: SSH is set to port ${SSH_PORT} (not the
+                    default 22) in an attempt to reduce spam
+                    attacks.
+
+  Username:  ${ADMIN_USER}
+  Password:  ${ADMIN_PW}
+
+  Username:  ${SHARED_ADMIN_USER}
+  Password:  ${SHARED_ADMIN_PW}
+
+  Either user works. Both have full sudo. Use '${SHARED_ADMIN_USER}' if you
+  need to give someone else access without sharing your ${ADMIN_USER}
+  account.
+
+==============================================================
+  4. WEBMAIL TEST MAILBOX  (logging into Roundcube)
+==============================================================
+  WHAT IT'S FOR:    Logging into the Roundcube webmail to
+                    test that email works.
+  WHERE YOU USE IT: https://${PRIMARY_DOMAIN}/mail/
+
+  Email address: ${TEST_MAILBOX}
+  Password:      ${TEST_MAILBOX_PW}
+
+==============================================================
+  BACKEND PASSWORDS (you don't type these — software uses them)
+==============================================================
+  These are used by software internally. You don't ever type
+  these into a login screen. Listed here only so they exist
+  in your password manager in case you need to recover them.
+
+  MariaDB root:        ${ROOT_DB_PW}
+  Mail database:       ${MAIL_DB_PW}
+  Roundcube database:  ${ROUNDCUBE_DB_PW}
+  Roundcube DES key:   ${ROUNDCUBE_DES_KEY}
+  WordPress database:  ${WP_DB_PW}
+
+==============================================================
+  PURCHASED LICENSE KEYS
+==============================================================
+  Roundcube Plus:      ${RC_PLUS_LICENSE_KEY}
+  AI API key:          ${XAI_DISPLAY}
+
+==============================================================
+  *** SAVE THIS FILE TO YOUR PASSWORD MANAGER NOW. ***
+
+  After the build is verified working, delete this file
+  from the server with:  rm ${CREDENTIALS_FILE}
+==============================================================
+CREDENTIALS_EOF
+
+chmod 600 "$CREDENTIALS_FILE"
+echo "${GREEN}Wrote $CREDENTIALS_FILE (mode 0600)${RESET}"
+
+# ============================================================================
+# DISPLAY CREDENTIALS
+# ============================================================================
+echo ""
+echo "${BOLD}${YELLOW}=============================================================${RESET}"
+echo "${BOLD}${YELLOW}  CREDENTIALS - SAVE TO PASSWORD MANAGER NOW${RESET}"
+echo "${BOLD}${YELLOW}=============================================================${RESET}"
+echo ""
+cat "$CREDENTIALS_FILE"
+echo ""
 
 # ============================================================================
 # DONE
@@ -312,13 +451,13 @@ ${BOLD}=============================================================
 Files written:
   ${CYAN}${TENANT_FILE}${RESET}
   ${CYAN}${SECRETS_FILE}${RESET}
+  ${CYAN}${CREDENTIALS_FILE}${RESET}
 
 ${BOLD}NEXT STEPS:${RESET}
 
-1. ${YELLOW}Save secrets.local to your password manager NOW.${RESET}
-   This file contains 8 generated passwords + your provided
-   license keys. After the build is verified working, you can
-   safely delete this file from the server.
+1. ${YELLOW}Save CREDENTIALS.txt above to your password manager NOW.${RESET}
+   Highlight it with your mouse and copy. After the build is verified
+   working, delete the file from the server.
 
 2. Add DNS records at your DNS provider (if not already done):
      A     ${PRIMARY_DOMAIN}       -> ${SERVER_IP}
