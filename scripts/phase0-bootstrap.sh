@@ -372,6 +372,13 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
 ==============================================================
   3. SSH ADMIN LOGIN  (your day-to-day server access)
 ==============================================================
+  *** NOT YET ACTIVE - wait for phase 1 to complete ***
+  These credentials will work AFTER phase 1 has run successfully.
+  Until then: SSH is still on port 22 with the original Kamatera
+  root password (section 2). Phase 1 creates these users, opens
+  port ${SSH_PORT}, and locks down port 22.
+  This warning will be removed automatically once phase 1 completes.
+  --------------------------------------------------------------
   WHAT IT'S FOR:    Logging into the server via SSH using
                     MobaXterm, PuTTY, or any SSH client.
   WHERE YOU USE IT: ssh -p ${SSH_PORT} ${ADMIN_USER}@${SERVER_IP}

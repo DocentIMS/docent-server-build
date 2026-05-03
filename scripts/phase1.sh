@@ -749,6 +749,23 @@ if [ "$VERIFY_FAIL" -gt 0 ]; then
     echo ""
 fi
 
+# ============================================================================
+# Remove the "NOT YET ACTIVE" warning from CREDENTIALS.txt now that phase 1
+# has actually created the users and switched SSH. Only do this if all checks
+# passed - if anything failed, leave the warning in place because the
+# credentials probably still won't work.
+# ============================================================================
+CREDENTIALS_FILE="$(dirname "$0")/../CREDENTIALS.txt"
+if [ "$VERIFY_FAIL" -eq 0 ] && [ -f "$CREDENTIALS_FILE" ]; then
+    if grep -q "NOT YET ACTIVE" "$CREDENTIALS_FILE"; then
+        # Strip the 6-line warning block (header + 4 body lines + separator).
+        # Sed deletes from the "*** NOT YET ACTIVE" line through the
+        # "------" separator that closes the warning.
+        sed -i '/\*\*\* NOT YET ACTIVE/,/^  ---/d' "$CREDENTIALS_FILE"
+        log_done "Removed 'NOT YET ACTIVE' warning from CREDENTIALS.txt (SSH login is now live)"
+    fi
+fi
+
 echo "==================================================================="
 echo "  MANUAL VERIFICATION STEPS (cannot be automated)"
 echo "==================================================================="
