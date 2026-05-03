@@ -134,7 +134,7 @@ else
     read -r -p "  Continue and apply updates? (type 'yes' to proceed): " confirm
     case "$confirm" in
         yes|YES)
-            apt-get upgrade -y -qq
+            apt-get upgrade -y -qq -o Dpkg::Use-Pty=0 < /dev/null
             log_done "Applied $UPGRADABLE_COUNT package updates"
             ;;
         *)
@@ -219,7 +219,7 @@ done
 if [ -z "$MISSING" ]; then
     log_skip "All admin tools already installed"
 else
-    apt-get install -y -qq $MISSING
+    apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null
     log_done "Installed packages:$MISSING"
 fi
 

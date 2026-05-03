@@ -198,7 +198,7 @@ if [ -z "$MISSING" ]; then
     log_skip "All mail packages already installed"
 else
     apt-get update -qq
-    apt-get install -y -qq $MISSING
+    apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null
     log_done "Installed:$MISSING"
 fi
 

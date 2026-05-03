@@ -84,7 +84,7 @@ if dpkg -l apache2 2>/dev/null | grep -q "^ii"; then
     log_skip "Apache already installed"
 else
     apt-get update -qq
-    apt-get install -y -qq apache2
+    apt-get install -y -qq -o Dpkg::Use-Pty=0 apache2 < /dev/null
     log_done "Apache installed"
 fi
 
@@ -112,7 +112,7 @@ step "Step 3: Installing certbot + Apache plugin"
 if dpkg -l certbot 2>/dev/null | grep -q "^ii" && dpkg -l python3-certbot-apache 2>/dev/null | grep -q "^ii"; then
     log_skip "certbot and python3-certbot-apache already installed"
 else
-    apt-get install -y -qq certbot python3-certbot-apache
+    apt-get install -y -qq -o Dpkg::Use-Pty=0 certbot python3-certbot-apache < /dev/null
     log_done "certbot + Apache plugin installed"
 fi
 

@@ -74,7 +74,7 @@ if dpkg -l mariadb-server 2>/dev/null | grep -q "^ii"; then
     log_skip "MariaDB already installed"
 else
     apt-get update -qq
-    apt-get install -y -qq mariadb-server mariadb-client
+    apt-get install -y -qq -o Dpkg::Use-Pty=0 mariadb-server mariadb-client < /dev/null
     log_done "MariaDB installed"
 fi
 
