@@ -54,7 +54,10 @@ WP_CONFIG="$WP_DIR/wp-config.php"
 # REPORT TRACKING
 # ============================================================================
 REPORT=()
-WP_DB_PW=""
+# DO NOT initialize WP_DB_PW here - it was already set by sourcing
+# secrets.local above. Setting it to "" would wipe out the canonical
+# value from CREDENTIALS.txt and force the script to generate a new one,
+# breaking the canonical-credentials design.
 
 log_done() { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
 log_skip() { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }

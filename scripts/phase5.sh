@@ -56,8 +56,10 @@ CERT_DIR="/etc/letsencrypt/live/${MAIL_DOMAIN}"
 # REPORT TRACKING
 # ============================================================================
 REPORT=()
-ROUNDCUBE_DB_PW=""
-ROUNDCUBE_DES_KEY=""
+# DO NOT initialize ROUNDCUBE_DB_PW or ROUNDCUBE_DES_KEY here - they were
+# already set by sourcing secrets.local above. Setting them to "" would wipe
+# out the canonical values from CREDENTIALS.txt and force the script to
+# generate new ones, breaking the canonical-credentials design.
 
 log_done() { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
 log_skip() { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }

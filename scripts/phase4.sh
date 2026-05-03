@@ -60,8 +60,10 @@ CERT_DIR="/etc/letsencrypt/live/${MAIL_DOMAIN}"
 # REPORT TRACKING
 # ============================================================================
 REPORT=()
-MAIL_DB_PW=""
-TEST_MAILBOX_PW=""
+# DO NOT initialize MAIL_DB_PW or TEST_MAILBOX_PW here - they were already
+# set by sourcing secrets.local above. Setting them to "" would wipe out
+# the canonical values from CREDENTIALS.txt and force the script to
+# generate new ones, breaking the canonical-credentials design.
 DKIM_TXT_VALUE=""
 
 log_done() { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
