@@ -140,17 +140,19 @@ echo "This will appear at the top of CREDENTIALS.txt as a reminder."
 echo ""
 SERVER_PURPOSE=$(ask_required "Purpose")
 
-step "Admin accounts"
+step "Admin accounts and host settings (hardcoded)"
 
-echo "Two admin users will be created. Both have full sudo."
-echo "  - Your personal account (default 'wayne')"
-echo "  - A shareable account (default 'admin')"
+ADMIN_USER="wayne"
+SHARED_ADMIN_USER="admin"
+SSH_PORT="2222"
+TIMEZONE="America/Los_Angeles"
+
+echo "  Personal admin user:    ${CYAN}${ADMIN_USER}${RESET}"
+echo "  Shareable admin user:   ${CYAN}${SHARED_ADMIN_USER}${RESET}"
+echo "  SSH port:               ${CYAN}${SSH_PORT}${RESET}"
+echo "  Timezone:               ${CYAN}${TIMEZONE}${RESET}"
 echo ""
-
-ADMIN_USER=$(ask "Personal admin username" "wayne")
-SHARED_ADMIN_USER=$(ask "Shareable admin username" "admin")
-SSH_PORT=$(ask "SSH port" "2222")
-TIMEZONE=$(ask "Timezone" "America/Los_Angeles")
+echo "  These values are hardcoded. To change, edit phase0-bootstrap.sh."
 
 step "Notification email"
 
