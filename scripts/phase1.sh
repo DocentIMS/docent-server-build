@@ -87,31 +87,34 @@ echo "==================================================================="
 # ============================================================================
 step "Step 1: OS sanity check and package updates"
 
-# --- Check 1: Verify Ubuntu 24.04 LTS ---
+# --- Check 1: Verify Ubuntu 26.04 LTS ---
 if [ ! -f /etc/os-release ]; then
     echo ""
     echo "  ERROR: /etc/os-release not found. Cannot verify OS."
-    echo "  This build is designed for Ubuntu 24.04 LTS only."
+    echo "  This build is designed for Ubuntu 26.04 LTS only."
     echo "  Aborting."
     exit 1
 fi
 
 . /etc/os-release
 
-if [ "$NAME" != "Ubuntu" ] || [ "$VERSION_ID" != "24.04" ]; then
+if [ "$NAME" != "Ubuntu" ] || [ "$VERSION_ID" != "26.04" ]; then
     echo ""
-    echo "  ERROR: This build is designed for Ubuntu 24.04 LTS."
+    echo "  ERROR: This build is designed for Ubuntu 26.04 LTS."
     echo "         Detected: $NAME $VERSION_ID"
     echo ""
     echo "  Phase scripts have been written and tested specifically"
-    echo "  for Ubuntu 24.04 LTS. Running on a different version may"
-    echo "  break things in unpredictable ways (different package"
-    echo "  versions, config formats, etc.)."
+    echo "  for Ubuntu 26.04 LTS (Resolute Raccoon). Running on a"
+    echo "  different version may break things in unpredictable ways"
+    echo "  (different package versions, config formats, etc.)."
     echo ""
-    echo "  Aborting. Provision a fresh Ubuntu 24.04 LTS server and retry."
+    echo "  Specifically, phase 4 expects Dovecot 2.4 syntax which"
+    echo "  ships with 26.04. Older versions ship Dovecot 2.3."
+    echo ""
+    echo "  Aborting. Provision a fresh Ubuntu 26.04 LTS server and retry."
     exit 1
 fi
-log_done "OS verified: Ubuntu 24.04 LTS"
+log_done "OS verified: Ubuntu 26.04 LTS"
 
 # --- Check 2: Show pending updates and prompt before applying ---
 export DEBIAN_FRONTEND=noninteractive
@@ -128,14 +131,14 @@ else
     echo ""
     echo "  Phase 1 will now apply these updates. This may take 1-3 minutes."
     echo ""
-    read -r -p "  Continue and apply updates? (y/n): " confirm
+    read -r -p "  Continue and apply updates? (type 'yes' to proceed): " confirm
     case "$confirm" in
-        y|Y|yes|YES)
+        yes|YES)
             apt-get upgrade -y -qq
             log_done "Applied $UPGRADABLE_COUNT package updates"
             ;;
         *)
-            echo "  Aborted by user. No changes made."
+            echo "  Aborted (you must type 'yes' to proceed). No changes made."
             exit 1
             ;;
     esac
@@ -404,13 +407,39 @@ else
 fi
 
 # ============================================================================
-# STEP 11: Restart SSH (carefully)
+# STEP 11: Restart SSH (carefully - handles Ubuntu 24.04+ socket activation)
 # ============================================================================
 step "Step 11: Restarting SSH"
 
 if sshd -t 2>/dev/null; then
-    systemctl restart ssh
-    log_done "SSH restarted - now listening on port $SSH_PORT"
+    # Ubuntu 24.04+ uses systemd socket activation: ssh.socket listens for
+    # connections and starts ssh.service on demand. When we change the port
+    # in sshd_config, the sshd-socket-generator creates a drop-in at
+    # /run/systemd/generator/ssh.socket.d/addresses.conf, but systemd does
+    # NOT automatically rebind the socket - we have to daemon-reload AND
+    # restart ssh.socket. Otherwise the socket remains "active" in systemd's
+    # view but isn't actually bound to the new port.
+    #
+    # Make sure /run/sshd exists (sshd needs it for privilege separation).
+    mkdir -p /run/sshd
+    chmod 0755 /run/sshd
+
+    systemctl daemon-reload
+
+    # On 24.04+, ssh.socket is the listener. On older releases, ssh.service is.
+    # Handle both cases.
+    if systemctl list-unit-files ssh.socket 2>/dev/null | grep -q "ssh.socket"; then
+        systemctl restart ssh.socket
+        # ssh.service may or may not be running (it's started on demand).
+        # Restart it if it's active so any existing config is reloaded.
+        if systemctl is-active --quiet ssh.service; then
+            systemctl restart ssh.service
+        fi
+        log_done "SSH socket restarted - now listening on port $SSH_PORT (socket activation)"
+    else
+        systemctl restart ssh
+        log_done "SSH service restarted - now listening on port $SSH_PORT"
+    fi
 else
     log_fail "SSH config invalid, NOT restarted. Check $SSHD_CONFIG and $SSHD_SNIPPET_DIR"
 fi
@@ -557,11 +586,34 @@ else
     VERIFY_FAIL=$((VERIFY_FAIL + 1))
 fi
 
-if systemctl is-active --quiet ssh; then
-    echo "  [PASS] ssh service is active"
+# SSH listener is active. On Ubuntu 24.04+ this is ssh.socket; on older
+# releases it's ssh.service. Check whichever applies.
+if systemctl list-unit-files ssh.socket 2>/dev/null | grep -q "ssh.socket"; then
+    if systemctl is-active --quiet ssh.socket; then
+        echo "  [PASS] ssh.socket is active (port $SSH_PORT bound via socket activation)"
+        VERIFY_PASS=$((VERIFY_PASS + 1))
+    else
+        echo "  [FAIL] ssh.socket is not active"
+        VERIFY_FAIL=$((VERIFY_FAIL + 1))
+    fi
+else
+    if systemctl is-active --quiet ssh; then
+        echo "  [PASS] ssh service is active"
+        VERIFY_PASS=$((VERIFY_PASS + 1))
+    else
+        echo "  [FAIL] ssh service is not active"
+        VERIFY_FAIL=$((VERIFY_FAIL + 1))
+    fi
+fi
+
+# Verify the port is actually bound (not just that the unit thinks it is).
+# This catches the case where ssh.socket reports active but isn't bound to
+# the new port because daemon-reload wasn't called.
+if ss -tlnp 2>/dev/null | grep -qE ":${SSH_PORT}\s"; then
+    echo "  [PASS] Port $SSH_PORT is actually bound and listening"
     VERIFY_PASS=$((VERIFY_PASS + 1))
 else
-    echo "  [FAIL] ssh service is not active"
+    echo "  [FAIL] Port $SSH_PORT not actually bound (try: systemctl daemon-reload && systemctl restart ssh.socket)"
     VERIFY_FAIL=$((VERIFY_FAIL + 1))
 fi
 

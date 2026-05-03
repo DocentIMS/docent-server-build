@@ -107,7 +107,7 @@ else
     if ! dig @8.8.8.8 +short "$MAIL_HOSTNAME" 2>/dev/null | grep -qE '^[0-9]'; then
         log_fail "$MAIL_HOSTNAME does not resolve in public DNS. Add A record at IONOS first."
         echo "         Run: dig @8.8.8.8 +short $MAIL_HOSTNAME"
-        echo "         Expected: 66.55.78.148"
+        echo "         Expected: ${SERVER_IP:-(set in tenant.local)}"
         exit 1
     fi
 
@@ -121,7 +121,7 @@ else
             MARKER="phase4-webroot-test-$$"
             echo "$MARKER" > "$candidate/.well-known/acme-challenge/test"
             chmod 644 "$candidate/.well-known/acme-challenge/test"
-            FETCHED=$(curl -s --max-time 5 "http://$MAIL_DOMAIN/.well-known/acme-challenge/test" 2>/dev/null || true)
+            FETCHED=$(curl -sL --max-time 5 "http://$MAIL_DOMAIN/.well-known/acme-challenge/test" 2>/dev/null || true)
             rm -f "$candidate/.well-known/acme-challenge/test"
             if [ "$FETCHED" = "$MARKER" ]; then
                 WEBROOT="$candidate"
