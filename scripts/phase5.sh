@@ -201,7 +201,13 @@ if [ "$USER_EXISTS" -gt 0 ]; then
         ROUNDCUBE_DB_PW=$(grep -oP "mysql://${ROUNDCUBE_DB_USER}:\K[^@]+" /etc/roundcube/config.inc.php 2>/dev/null || echo "")
     fi
 else
-    ROUNDCUBE_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+    # Use ROUNDCUBE_DB_PW from secrets.local if available, otherwise generate.
+    # When phase0 was used, ROUNDCUBE_DB_PW is the password documented in
+    # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
+    if [ -z "${ROUNDCUBE_DB_PW:-}" ]; then
+        ROUNDCUBE_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        log_warn "No ROUNDCUBE_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+    fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
 CREATE USER '$ROUNDCUBE_DB_USER'@'localhost' IDENTIFIED BY '$ROUNDCUBE_DB_PW';
 GRANT ALL PRIVILEGES ON \`$ROUNDCUBE_DB\`.* TO '$ROUNDCUBE_DB_USER'@'localhost';
@@ -244,11 +250,22 @@ if [ -f "$ROUNDCUBE_CONFIG" ] && grep -q "phase5-marker" "$ROUNDCUBE_CONFIG" 2>/
 else
     if [ -z "$ROUNDCUBE_DB_PW" ]; then
         log_warn "DB password unknown - resetting"
-        ROUNDCUBE_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        # Use the value from secrets.local if it's there (CREDENTIALS.txt must
+        # stay canonical). Otherwise generate.
+        if [ -z "${ROUNDCUBE_DB_PW:-}" ]; then
+            ROUNDCUBE_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+            log_warn "No ROUNDCUBE_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+        fi
         mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
             "ALTER USER '$ROUNDCUBE_DB_USER'@'localhost' IDENTIFIED BY '$ROUNDCUBE_DB_PW'; FLUSH PRIVILEGES;"
     fi
-    ROUNDCUBE_DES_KEY=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
+    # Use ROUNDCUBE_DES_KEY from secrets.local if available, otherwise generate.
+    # When phase0 was used, ROUNDCUBE_DES_KEY is documented in CREDENTIALS.txt -
+    # we MUST use it so CREDENTIALS.txt stays canonical.
+    if [ -z "${ROUNDCUBE_DES_KEY:-}" ]; then
+        ROUNDCUBE_DES_KEY=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
+        log_warn "No ROUNDCUBE_DES_KEY in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+    fi
 
     cat > "$ROUNDCUBE_CONFIG" <<EOF
 <?php
@@ -550,22 +567,15 @@ done
 # ============================================================================
 echo ""
 echo "==================================================================="
-echo "  CREDENTIALS (save to your password manager NOW)"
+echo "  PASSWORDS"
 echo "==================================================================="
-if [ -n "$ROUNDCUBE_DB_PW" ]; then
-    echo "  Roundcube DB user:      $ROUNDCUBE_DB_USER"
-    echo "  Roundcube DB password:  $ROUNDCUBE_DB_PW"
-    echo "  (also stored in /etc/roundcube/config.inc.php)"
-    echo ""
-fi
-if [ -n "$ROUNDCUBE_DES_KEY" ]; then
-    echo "  Roundcube DES key:      $ROUNDCUBE_DES_KEY"
-    echo "  (encrypts session data; don't change after users start logging in)"
-    echo ""
-fi
-if [ -z "$ROUNDCUBE_DB_PW" ] && [ -z "$ROUNDCUBE_DES_KEY" ]; then
-    echo "  (No new credentials generated - Roundcube was already configured)"
-fi
+echo ""
+echo "  All passwords are in CREDENTIALS.txt at the repo root."
+echo "  This script does NOT print passwords (to avoid scrollback exposure)."
+echo ""
+echo "  The Roundcube DB password and DES key are also stored in:"
+echo "    /etc/roundcube/config.inc.php"
+echo ""
 
 # ============================================================================
 # AUTOMATED VERIFICATION

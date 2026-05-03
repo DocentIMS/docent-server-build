@@ -43,9 +43,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 VENDOR_DIR="$REPO_ROOT/vendor/roundcube-plus"
 
-LICENSE_FILE=/root/secrets/roundcube-plus.conf
-
-# Plugins to enable in Roundcube's $config['plugins'] array
 RC_PLUS_PLUGINS=(xai xsignature)
 
 # === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
@@ -94,26 +91,22 @@ if ! grep -q "phase5-marker" "$ROUNDCUBE_CONFIG"; then
     exit 1
 fi
 
-if [ ! -f "$LICENSE_FILE" ]; then
-    echo "ERROR: License file $LICENSE_FILE not found."
+# ============================================================================
+# Determine license key
+# ============================================================================
+# The Roundcube Plus license key comes from secrets.local (which phase0
+# generates from your input). secrets.local is the single source of truth -
+# CREDENTIALS.txt mirrors what's there.
+
+if [ -z "${RC_PLUS_LICENSE_KEY:-}" ]; then
+    echo "ERROR: RC_PLUS_LICENSE_KEY not found in secrets.local."
     echo ""
-    echo "Create it with:"
-    echo "  sudo mkdir -p /root/secrets"
-    echo "  sudo chmod 700 /root/secrets"
-    echo "  sudo tee /root/secrets/roundcube-plus.conf > /dev/null <<'EOF'"
-    echo "license_key=RCP-yourkeyhere"
-    echo "EOF"
-    echo "  sudo chmod 600 /root/secrets/roundcube-plus.conf"
+    echo "Run phase0-bootstrap.sh first - it captures the license key into"
+    echo "secrets.local and CREDENTIALS.txt."
     exit 1
 fi
 
-# Read the license key
-LICENSE_KEY=$(grep -oP '^license_key=\K.+' "$LICENSE_FILE" 2>/dev/null | head -1)
-if [ -z "$LICENSE_KEY" ]; then
-    echo "ERROR: Could not parse license_key from $LICENSE_FILE."
-    echo "Expected format: license_key=RCP-xxxxxxxxxx"
-    exit 1
-fi
+LICENSE_KEY="$RC_PLUS_LICENSE_KEY"
 
 if [ ! -d "$VENDOR_DIR" ]; then
     echo "ERROR: Vendor directory not found: $VENDOR_DIR"
@@ -133,7 +126,7 @@ echo "  Plugins dir:      $ROUNDCUBE_PLUGINS_DIR"
 echo "  Skins dir:        $ROUNDCUBE_SKINS_DIR"
 echo "  Vendor dir:       $VENDOR_DIR"
 echo "  Default skin:     $DEFAULT_SKIN"
-echo "  License key:      ${LICENSE_KEY:0:8}... (loaded from $LICENSE_FILE)"
+echo "  License key:      ${LICENSE_KEY:0:8}... (from secrets.local)"
 echo "  $(date)"
 echo "==================================================================="
 
@@ -815,13 +808,14 @@ else
     vf "www-data CANNOT read xai config"
 fi
 
-# License file is properly secured
-if [ -f "$LICENSE_FILE" ]; then
-    PERMS=$(stat -c '%a' "$LICENSE_FILE")
+# secrets.local is properly secured
+SECRETS_FILE="$REPO_ROOT/secrets.local"
+if [ -f "$SECRETS_FILE" ]; then
+    PERMS=$(stat -c '%a' "$SECRETS_FILE")
     if [ "$PERMS" = "600" ]; then
-        vp "License file mode 600 (root-only)"
+        vp "secrets.local mode 600 (owner-only)"
     else
-        vf "License file has permissions $PERMS (should be 600)"
+        vf "secrets.local has permissions $PERMS (should be 600)"
     fi
 fi
 

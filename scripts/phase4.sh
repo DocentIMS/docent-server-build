@@ -247,7 +247,13 @@ if [ "$USER_EXISTS" -gt 0 ]; then
         MAIL_DB_PW=$(grep "^password" /etc/postfix/mysql-virtual-mailbox-domains.cf | cut -d= -f2- | tr -d ' ')
     fi
 else
-    MAIL_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+    # Use MAIL_DB_PW from secrets.local if available, otherwise generate.
+    # When phase0 was used, MAIL_DB_PW is the password documented in
+    # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
+    if [ -z "${MAIL_DB_PW:-}" ]; then
+        MAIL_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        log_warn "No MAIL_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+    fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
 CREATE USER '$MAIL_DB_USER'@'localhost' IDENTIFIED BY '$MAIL_DB_PW';
 GRANT SELECT ON \`$MAIL_DB\`.* TO '$MAIL_DB_USER'@'localhost';
@@ -306,7 +312,13 @@ MBOX_EXISTS=$(mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -Nse \
 if [ "$MBOX_EXISTS" -gt 0 ]; then
     log_skip "Mailbox $TEST_MAILBOX already exists"
 else
-    TEST_MAILBOX_PW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 22)
+    # Use TEST_MAILBOX_PW from secrets.local if available, otherwise generate.
+    # When phase0 was used, TEST_MAILBOX_PW is the password documented in
+    # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
+    if [ -z "${TEST_MAILBOX_PW:-}" ]; then
+        TEST_MAILBOX_PW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 22)
+        log_warn "No TEST_MAILBOX_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+    fi
     HASHED_PW=$(doveadm pw -s SHA512-CRYPT -p "$TEST_MAILBOX_PW" 2>/dev/null)
     if [ -z "$HASHED_PW" ]; then
         log_fail "doveadm pw failed - cannot create mailbox"
@@ -315,7 +327,7 @@ else
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -e \
         "INSERT INTO virtual_mailboxes (domain_id, email, password)
          SELECT id, '$TEST_MAILBOX', '$HASHED_PW' FROM virtual_domains WHERE name='$MAIL_DOMAIN';"
-    log_done "Created test mailbox $TEST_MAILBOX (password generated)"
+    log_done "Created test mailbox $TEST_MAILBOX"
 fi
 
 # ============================================================================
@@ -331,7 +343,12 @@ fi
 
 if [ -z "$MAIL_DB_PW" ]; then
     log_warn "DB password unknown - resetting"
-    MAIL_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+    # Use the value from secrets.local if it's there (CREDENTIALS.txt must
+    # stay canonical). Otherwise generate.
+    if [ -z "${MAIL_DB_PW:-}" ]; then
+        MAIL_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        log_warn "No MAIL_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+    fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
         "ALTER USER '$MAIL_DB_USER'@'localhost' IDENTIFIED BY '$MAIL_DB_PW'; FLUSH PRIVILEGES;"
 fi
@@ -989,24 +1006,21 @@ done
 # ============================================================================
 # CREDENTIALS
 # ============================================================================
+# ============================================================================
+# PASSWORDS
+# ============================================================================
 echo ""
 echo "==================================================================="
-echo "  CREDENTIALS (save to your password manager NOW)"
+echo "  PASSWORDS"
 echo "==================================================================="
-if [ -n "$TEST_MAILBOX_PW" ]; then
-    echo "  Test mailbox:      $TEST_MAILBOX"
-    echo "  Mailbox password:  $TEST_MAILBOX_PW"
-    echo ""
-fi
-if [ -n "$MAIL_DB_PW" ]; then
-    echo "  Mail DB user:      $MAIL_DB_USER"
-    echo "  Mail DB password:  $MAIL_DB_PW"
-    echo "  (also stored in /etc/postfix/mysql-*.cf and /etc/dovecot/dovecot-sql.conf.ext)"
-    echo ""
-fi
-if [ -z "$TEST_MAILBOX_PW" ] && [ -z "$MAIL_DB_PW" ]; then
-    echo "  (No new credentials generated - mailbox and DB user already existed)"
-fi
+echo ""
+echo "  All passwords are in CREDENTIALS.txt at the repo root."
+echo "  This script does NOT print passwords (to avoid scrollback exposure)."
+echo ""
+echo "  The mail DB password is also stored in:"
+echo "    /etc/postfix/mysql-*.cf"
+echo "    /etc/dovecot/dovecot-sql.conf.ext"
+echo ""
 
 # ============================================================================
 # DKIM RECORD FOR DNS
@@ -1275,7 +1289,9 @@ cat <<EOF
 
   INTERNAL TESTING (works without PTR or DNS records):
 
-  1. Save the test mailbox + DB passwords from above to your password manager.
+  1. Confirm CREDENTIALS.txt is saved in your password manager. The
+     test mailbox password is in section 4. The Mail DB password is
+     in BACKEND PASSWORDS.
 
   2. Send a test message from the local server to the test mailbox:
        echo "test body" | mail -s "test subject" $TEST_MAILBOX

@@ -145,13 +145,19 @@ USER_EXISTS=$(mysql --defaults-file="$ROOT_DEFAULTS_FILE" -Nse \
 if [ "$USER_EXISTS" -gt 0 ]; then
     log_skip "DB user $WP_DB_USER already exists"
 else
-    WP_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+    # Use WP_DB_PW from secrets.local if available, otherwise generate.
+    # When phase0 was used, WP_DB_PW is the password documented in
+    # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
+    if [ -z "${WP_DB_PW:-}" ]; then
+        WP_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        log_warn "No WP_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+    fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
 CREATE USER '$WP_DB_USER'@'localhost' IDENTIFIED BY '$WP_DB_PW';
 GRANT ALL PRIVILEGES ON \`$WP_DB_NAME\`.* TO '$WP_DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 SQL
-    log_done "Created DB user $WP_DB_USER (password generated, stored in wp-config.php)"
+    log_done "Created DB user $WP_DB_USER (full access on $WP_DB_NAME)"
 fi
 
 # ============================================================================
@@ -213,9 +219,13 @@ else
     # extract it from the existing wp-config.php (which means there isn't one,
     # which means the user already exists, which means we have a problem).
     if [ -z "$WP_DB_PW" ]; then
-        # User existed but wp-config.php doesn't. Reset the user's password to
-        # a fresh one so we can write a working wp-config.php.
-        WP_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        # User existed but wp-config.php doesn't. Use secrets.local's
+        # WP_DB_PW if available (CREDENTIALS.txt must stay canonical).
+        # Otherwise generate.
+        if [ -z "${WP_DB_PW:-}" ]; then
+            WP_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+            log_warn "No WP_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+        fi
         mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
             "ALTER USER '$WP_DB_USER'@'localhost' IDENTIFIED BY '$WP_DB_PW'; FLUSH PRIVILEGES;"
         log_warn "DB user existed but wp-config.php was missing - reset DB password"
@@ -387,17 +397,14 @@ done
 # ============================================================================
 echo ""
 echo "==================================================================="
-echo "  CREDENTIALS (save to your password manager NOW)"
+echo "  PASSWORDS"
 echo "==================================================================="
-echo "  Database name:     $WP_DB_NAME"
-echo "  Database user:     $WP_DB_USER"
-if [ -n "$WP_DB_PW" ]; then
-    echo "  Database password: $WP_DB_PW"
-    echo ""
-    echo "  Note: also stored in $WP_CONFIG (mode 640, www-data:www-data)"
-else
-    echo "  Database password: (already set; see existing $WP_CONFIG)"
-fi
+echo ""
+echo "  All passwords are in CREDENTIALS.txt at the repo root."
+echo "  This script does NOT print passwords (to avoid scrollback exposure)."
+echo ""
+echo "  The WordPress DB password is also stored in:"
+echo "    $WP_CONFIG (mode 640, www-data:www-data)"
 echo ""
 echo "  Suggested WP admin username: $WP_ADMIN_USERNAME"
 echo "  Suggested WP admin email:    $WP_ADMIN_EMAIL"
@@ -609,7 +616,8 @@ echo "  MANUAL VERIFICATION & NEXT STEPS"
 echo "==================================================================="
 cat <<EOF
 
-  1. Save the database password (printed above) to your password manager.
+  1. Confirm CREDENTIALS.txt is saved in your password manager.
+     The WordPress DB password is in BACKEND PASSWORDS.
 
   2. In a browser, complete the WordPress install wizard:
        https://$WP_DOMAIN/wp-admin/install.php
