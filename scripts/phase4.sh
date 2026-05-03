@@ -759,7 +759,7 @@ fi
 
 # Update SpamAssassin rules database (silent fail OK - just means we use the
 # package-shipped rules until next sa-update cron run)
-sa-update --no-gpg 2>/dev/null && log_done "Updated SpamAssassin rules database" || log_warn "sa-update failed (will use shipped rules)"
+sa-update --no-gpg 2>/dev/null && log_done "Updated SpamAssassin rules database" || log_warn "sa-update failed (using shipped rules - daily cron will retry; harmless on first run)"
 
 # --- spamass-milter ---------------------------------------------------------
 # Flags:
@@ -783,6 +783,11 @@ mkdir -p /run/spamass-milter
 chown spamass-milter:spamass-milter /run/spamass-milter
 # Add postfix user to spamass-milter group so it can read the socket
 usermod -a -G spamass-milter postfix 2>/dev/null || true
+# Ubuntu 26.04 requirement: spamass-milter's pre-start script refuses to start
+# unless spamass-milter is in the postfix group (because the socket gets
+# chowned to postfix:postfix in $SOCKETOWNER below, and you can't chown to a
+# group you're not in).
+usermod -a -G postfix spamass-milter 2>/dev/null || true
 log_done "Set up /run/spamass-milter/ socket directory"
 
 # --- Dovecot Sieve script ---------------------------------------------------
