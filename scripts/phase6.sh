@@ -305,23 +305,16 @@ fi
 # ============================================================================
 step "Step 6: Configuring Apache vhost"
 
-# Disable the placeholder default vhost FROM PHASE 2 - it has the same
-# ServerName as our WP vhost and would conflict.
-if [ -L /etc/apache2/sites-enabled/000-default.conf ]; then
-    a2dissite -q 000-default >/dev/null 2>&1
-    log_done "Disabled placeholder default vhost (000-default)"
-else
-    log_skip "Placeholder default vhost already disabled"
-fi
-
-# Also disable the certbot-generated SSL vhost from Phase 2 - we replace it
-# with our own that points at WP_DIR.
-if [ -L /etc/apache2/sites-enabled/000-default-le-ssl.conf ]; then
-    a2dissite -q 000-default-le-ssl >/dev/null 2>&1
-    log_done "Disabled placeholder SSL vhost (000-default-le-ssl)"
-else
-    log_skip "Placeholder SSL vhost already disabled"
-fi
+# Phase 2 wrote two vhost files for us:
+#   - 000-default.conf            (catch-all, ServerName _default_)
+#   - 000-default-le-ssl.conf     (catch-all, ServerName _default_, on :443)
+#   - $WP_DOMAIN.conf             (placeholder for the primary domain on :80)
+#   - $WP_DOMAIN-le-ssl.conf      (placeholder SSL vhost on :443, generated
+#                                  by certbot install in phase 2 step 7b)
+#
+# We do NOT disable the 000-default* catch-alls - they handle requests
+# for unknown hostnames (like mail.$WP_DOMAIN). We just overwrite the
+# primary-domain vhost files with the WordPress configuration.
 
 # Write our WP-specific vhost (covers both :80 and :443; redirect HTTP -> HTTPS)
 CERT_DIR="/etc/letsencrypt/live/$WP_DOMAIN"
@@ -362,7 +355,16 @@ cat > "$WP_VHOST_FILE" <<EOF
     CustomLog \${APACHE_LOG_DIR}/$WP_DOMAIN-access.log combined
 </VirtualHost>
 EOF
-log_done "Wrote $WP_VHOST_FILE"
+log_done "Wrote $WP_VHOST_FILE (WordPress vhost for $WP_DOMAIN, both :80 and :443)"
+
+# Phase 2's certbot install may have generated $WP_DOMAIN-le-ssl.conf as a
+# separate file. We now have everything in $WP_VHOST_FILE, so disable any
+# stale -le-ssl twin so we don't have duplicate :443 vhosts for the domain.
+LE_SSL_TWIN="$WP_DOMAIN-le-ssl"
+if [ -L "/etc/apache2/sites-enabled/${LE_SSL_TWIN}.conf" ]; then
+    a2dissite -q "$LE_SSL_TWIN" >/dev/null 2>&1
+    log_done "Disabled certbot's stale -le-ssl twin (replaced by $WP_VHOST_FILE)"
+fi
 
 # Enable the new vhost
 if [ -L "/etc/apache2/sites-enabled/$(basename "$WP_VHOST_FILE")" ]; then
@@ -548,12 +550,12 @@ else
     VERIFY_FAIL=$((VERIFY_FAIL + 1))
 fi
 
-# Placeholder vhosts disabled
-if [ ! -L /etc/apache2/sites-enabled/000-default.conf ]; then
-    echo "  [PASS] Placeholder default vhost is disabled"
+# Catch-all vhost should remain enabled (it handles unknown hostnames like mail.*)
+if [ -L /etc/apache2/sites-enabled/000-default.conf ]; then
+    echo "  [PASS] Catch-all vhost (000-default) is enabled"
     VERIFY_PASS=$((VERIFY_PASS + 1))
 else
-    echo "  [FAIL] Placeholder default vhost is still enabled"
+    echo "  [FAIL] Catch-all vhost (000-default) is NOT enabled - mail.* etc will fall through to WordPress"
     VERIFY_FAIL=$((VERIFY_FAIL + 1))
 fi
 

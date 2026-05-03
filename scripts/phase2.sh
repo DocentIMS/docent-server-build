@@ -201,12 +201,29 @@ EOF
 fi
 
 # ============================================================================
-# STEP 6: Configure default Apache vhost
+# STEP 6: Configure Apache vhosts
 # ============================================================================
-step "Step 6: Configuring default Apache vhost"
+# We write TWO separate vhost files:
+#
+#   000-default.conf   = catch-all (ServerName _default_)
+#                        Serves the placeholder page for any request whose
+#                        Host header doesn't match a more specific vhost
+#                        (e.g., 'mail.${PRIMARY_DOMAIN}' which has no Apache
+#                        service - mail goes through Postfix/Dovecot).
+#                        Stays enabled forever; phase 6 should NOT disable
+#                        this when it takes over the primary domain for WP.
+#
+#   ${PRIMARY_DOMAIN}.conf   = placeholder for the primary domain.
+#                        Serves the same placeholder page until phase 6
+#                        overwrites this file with the WordPress vhost.
+#                        certbot will use this vhost to install the SSL
+#                        version (${PRIMARY_DOMAIN}-le-ssl.conf).
+# ============================================================================
+step "Step 6: Configuring Apache vhosts (catch-all + primary domain placeholder)"
 
 DEFAULT_VHOST="/etc/apache2/sites-available/000-default.conf"
 DEFAULT_VHOST_BACKUP="/etc/apache2/sites-available/000-default.conf.phase2.bak"
+DOMAIN_VHOST="/etc/apache2/sites-available/${PRIMARY_DOMAIN}.conf"
 
 # Backup the original once
 if [ ! -f "$DEFAULT_VHOST_BACKUP" ] && [ -f "$DEFAULT_VHOST" ]; then
@@ -214,9 +231,41 @@ if [ ! -f "$DEFAULT_VHOST_BACKUP" ] && [ -f "$DEFAULT_VHOST" ]; then
     log_done "Backed up original $DEFAULT_VHOST"
 fi
 
-# Write our vhost (idempotent: identical content overwrite is harmless)
+# --- 6a: Catch-all vhost (000-default.conf) ---------------------------------
 cat > "$DEFAULT_VHOST" <<EOF
 # phase2-marker - managed by phase2.sh
+# Catch-all vhost: handles requests whose Host header doesn't match any
+# other vhost. Serves the placeholder page from $DEFAULT_SITE_DIR.
+# Phase 6 (WordPress) should NOT disable this - it's the fallback for
+# mail.* and any other unknown subdomain.
+<VirtualHost *:80>
+    ServerName _default_
+    DocumentRoot $DEFAULT_SITE_DIR
+
+    <Directory $DEFAULT_SITE_DIR>
+        Options -Indexes +FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+EOF
+log_done "Wrote catch-all vhost ($DEFAULT_VHOST)"
+
+# --- 6b: Primary domain placeholder vhost (<domain>.conf) -------------------
+# Phase 6 will overwrite this file when WordPress takes over.
+# IMPORTANT: if phase 6 already ran (file has 'phase6-marker'), we MUST NOT
+# overwrite it. Re-running phase 2 on a phase-6-built server would otherwise
+# clobber the WordPress vhost.
+if [ -f "$DOMAIN_VHOST" ] && grep -q "phase6-marker" "$DOMAIN_VHOST" 2>/dev/null; then
+    log_skip "Primary domain vhost is owned by phase 6 (WordPress) - leaving it alone"
+else
+    cat > "$DOMAIN_VHOST" <<EOF
+# phase2-marker - managed by phase2.sh
+# Placeholder vhost for the primary domain. Phase 6 overwrites this
+# file with the WordPress vhost.
 <VirtualHost *:80>
     ServerName $PRIMARY_DOMAIN
     ServerAlias ${ALT_DOMAINS[*]}
@@ -232,14 +281,22 @@ cat > "$DEFAULT_VHOST" <<EOF
     CustomLog \${APACHE_LOG_DIR}/access.log combined
 </VirtualHost>
 EOF
-log_done "Wrote default vhost ($DEFAULT_VHOST)"
+    log_done "Wrote primary domain placeholder vhost ($DOMAIN_VHOST)"
+fi
 
-# Make sure it's enabled
+# Enable both
 if [ -L /etc/apache2/sites-enabled/000-default.conf ]; then
-    log_skip "Default vhost already enabled"
+    log_skip "Catch-all vhost already enabled"
 else
     a2ensite -q 000-default >/dev/null 2>&1
-    log_done "Enabled default vhost"
+    log_done "Enabled catch-all vhost"
+fi
+
+if [ -L "/etc/apache2/sites-enabled/${PRIMARY_DOMAIN}.conf" ]; then
+    log_skip "Primary domain placeholder vhost already enabled"
+else
+    a2ensite -q "${PRIMARY_DOMAIN}" >/dev/null 2>&1
+    log_done "Enabled primary domain placeholder vhost"
 fi
 
 # Validate config before reloading
@@ -298,9 +355,11 @@ fi
 # ============================================================================
 step "Step 7b: Installing certificate into Apache"
 
-# Detect whether the cert is already wired into Apache by looking for an
-# enabled SSL vhost referencing our cert path.
-SSL_VHOST_FILE="/etc/apache2/sites-enabled/000-default-le-ssl.conf"
+# certbot --apache --install picks up the <domain>.conf vhost (because it
+# matches the cert's ServerName) and generates an SSL twin at
+# <domain>-le-ssl.conf with the cert wired in. It also adds an HTTP->HTTPS
+# redirect to <domain>.conf.
+SSL_VHOST_FILE="/etc/apache2/sites-enabled/${PRIMARY_DOMAIN}-le-ssl.conf"
 if [ -f "$SSL_VHOST_FILE" ] && grep -q "$CERT_DIR" "$SSL_VHOST_FILE" 2>/dev/null; then
     log_skip "Certificate already installed in Apache"
 elif [ -f "$CERT_DIR/fullchain.pem" ]; then
@@ -317,6 +376,61 @@ elif [ -f "$CERT_DIR/fullchain.pem" ]; then
     fi
 else
     log_fail "No certificate to install (Step 7a must have failed)"
+fi
+
+# ============================================================================
+# STEP 7c: Catch-all SSL vhost for unknown hostnames on port 443
+# ============================================================================
+# Without this, an HTTPS request for an unknown hostname (e.g.,
+# https://mail.${PRIMARY_DOMAIN}/) falls through to the FIRST :443 vhost
+# Apache loaded - which is the one for the real domain. Better to have
+# an explicit catch-all that serves the placeholder page. The cert is the
+# real domain's cert (browsers will warn on hostname mismatch, which is
+# fine - this fallback shouldn't be the destination anyone intends to hit).
+step "Step 7c: Configuring catch-all SSL vhost (port 443 fallback)"
+
+CATCHALL_SSL_VHOST="/etc/apache2/sites-available/000-default-le-ssl.conf"
+if [ -f "$CERT_DIR/fullchain.pem" ]; then
+    cat > "$CATCHALL_SSL_VHOST" <<EOF
+# phase2-marker - managed by phase2.sh
+# Catch-all SSL vhost: handles HTTPS requests whose Host header doesn't
+# match a more specific :443 vhost. Uses the primary domain's cert as a
+# fallback (browser will show a hostname mismatch warning - that's fine).
+<VirtualHost *:443>
+    ServerName _default_
+    DocumentRoot $DEFAULT_SITE_DIR
+
+    SSLEngine on
+    SSLCertificateFile $CERT_DIR/fullchain.pem
+    SSLCertificateKeyFile $CERT_DIR/privkey.pem
+
+    <Directory $DEFAULT_SITE_DIR>
+        Options -Indexes +FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+EOF
+    log_done "Wrote catch-all SSL vhost ($CATCHALL_SSL_VHOST)"
+
+    if [ -L /etc/apache2/sites-enabled/000-default-le-ssl.conf ]; then
+        log_skip "Catch-all SSL vhost already enabled"
+    else
+        a2ensite -q 000-default-le-ssl >/dev/null 2>&1
+        log_done "Enabled catch-all SSL vhost"
+    fi
+
+    if apache2ctl configtest >/dev/null 2>&1; then
+        systemctl reload apache2
+        log_done "Apache reloaded with catch-all SSL vhost active"
+    else
+        log_fail "Apache config invalid after adding catch-all SSL vhost"
+    fi
+else
+    log_warn "Skipping catch-all SSL vhost (no cert from step 7a)"
 fi
 
 # ============================================================================
