@@ -662,6 +662,30 @@ chmod 600 "$QUICK_REFERENCE_FILE"
 echo "${GREEN}Wrote $QUICK_REFERENCE_FILE (mode 0600)${RESET}"
 
 # ============================================================================
+# COPY CREDENTIAL FILES TO ADMIN HOME (downloadable without sudo)
+# ============================================================================
+# /root/ is mode 700 - wayne can't read files there without sudo. Copy the
+# two human-readable credential files to /home/$ADMIN_USER/ so wayne can
+# download them straight from MobaXterm's SFTP browser. Owner is set to
+# the admin user so they can read AND delete after saving.
+ADMIN_HOME="/home/${ADMIN_USER}"
+ADMIN_CRED_FILE="${ADMIN_HOME}/CREDENTIALS.txt"
+ADMIN_QREF_FILE="${ADMIN_HOME}/QUICK-REFERENCE.txt"
+
+if [ -d "$ADMIN_HOME" ]; then
+    cp "$CREDENTIALS_FILE" "$ADMIN_CRED_FILE"
+    cp "$QUICK_REFERENCE_FILE" "$ADMIN_QREF_FILE"
+    chown "${ADMIN_USER}:${ADMIN_USER}" "$ADMIN_CRED_FILE" "$ADMIN_QREF_FILE"
+    chmod 600 "$ADMIN_CRED_FILE" "$ADMIN_QREF_FILE"
+    echo "${GREEN}Copied credential files to ${ADMIN_HOME}/ (owner ${ADMIN_USER}, mode 0600)${RESET}"
+else
+    echo "${YELLOW}WARNING: ${ADMIN_HOME} does not exist - skipping admin-home copy${RESET}"
+    echo "${YELLOW}You will need to read /root/CREDENTIALS.txt directly with sudo.${RESET}"
+    ADMIN_CRED_FILE="$CREDENTIALS_FILE"
+    ADMIN_QREF_FILE="$QUICK_REFERENCE_FILE"
+fi
+
+# ============================================================================
 # DISPLAY CREDENTIALS
 # ============================================================================
 echo ""
@@ -671,6 +695,47 @@ echo "${BOLD}${YELLOW}==========================================================
 echo ""
 cat "$CREDENTIALS_FILE"
 echo ""
+
+# ============================================================================
+# FORCING FUNCTION: block until user confirms download
+# ============================================================================
+# This is intentional friction. Without it, on a long session you might
+# move on, lose the scrollback, and find yourself unable to read
+# /root/CREDENTIALS.txt because you've already lost the wayne password.
+# Phase 0 will not exit until you type DOWNLOADED.
+echo ""
+echo "${BOLD}${YELLOW}=============================================================${RESET}"
+echo "${BOLD}${YELLOW}  ACTION REQUIRED - DOWNLOAD CREDENTIALS BEFORE CONTINUING${RESET}"
+echo "${BOLD}${YELLOW}=============================================================${RESET}"
+cat <<EOF
+
+  Two files have been placed in your admin home directory. They are
+  readable as ${ADMIN_USER} - no sudo needed:
+
+    ${CYAN}${ADMIN_CRED_FILE}${RESET}
+    ${CYAN}${ADMIN_QREF_FILE}${RESET}
+
+  ${BOLD}Do this now, before continuing:${RESET}
+
+    1. Open MobaXterm's left sidebar (SFTP browser).
+    2. Navigate to ${ADMIN_HOME}/
+    3. Right-click each file -> Download. Save them somewhere
+       you control (password manager, encrypted folder, etc).
+
+  Phase 0 will not finish until you confirm.
+
+EOF
+
+while true; do
+    read -r -p "  When BOTH files are downloaded, type DOWNLOADED and press Enter: " CONFIRM
+    if [ "$CONFIRM" = "DOWNLOADED" ]; then
+        echo ""
+        echo "${GREEN}  Confirmed. Continuing.${RESET}"
+        echo ""
+        break
+    fi
+    echo "${YELLOW}  (Type the word DOWNLOADED exactly, in capital letters.)${RESET}"
+done
 
 # ============================================================================
 # DONE
@@ -687,21 +752,21 @@ Files written:
   ${CYAN}${CREDENTIALS_FILE}${RESET}
   ${CYAN}${QUICK_REFERENCE_FILE}${RESET}
 
+Downloadable copies (no sudo needed):
+  ${CYAN}${ADMIN_CRED_FILE}${RESET}
+  ${CYAN}${ADMIN_QREF_FILE}${RESET}
+
 ${BOLD}NEXT STEPS:${RESET}
 
-1. ${YELLOW}Save CREDENTIALS.txt above to your password manager NOW.${RESET}
-   Highlight it with your mouse and copy. After the build is verified
-   working, delete the file from the server.
-
-2. Add DNS records at your DNS provider (if not already done):
+1. Add DNS records at your DNS provider (if not already done):
      A     ${PRIMARY_DOMAIN}       -> ${SERVER_IP}
      A     www.${PRIMARY_DOMAIN}   -> ${SERVER_IP}
      A     mail.${PRIMARY_DOMAIN}  -> ${SERVER_IP}
 
-3. Run phase 1 to begin the build:
+2. Run phase 1 to begin the build:
      ${BOLD}sudo bash scripts/phase1.sh${RESET}
 
-4. Continue through phases 2, 3, 4, 5, 5b, 5c, 6 in order.
+3. Continue through phases 2, 3, 4, 5, 5b, 5c, 6 in order.
    Each phase reads from tenant.local and secrets.local.
 
 EOF
