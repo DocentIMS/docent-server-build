@@ -422,6 +422,24 @@ postconf -e "non_smtpd_milters = inet:127.0.0.1:8891 inet:127.0.0.1:8893 unix:/r
 
 log_done "Configured /etc/postfix/main.cf"
 
+# ----------------------------------------------------------------------------
+# Root alias: forward local system mail (cron, fail2ban, system errors) to
+# NOTIFICATION_EMAIL. Without this, mail to root@<host> piles up in
+# /var/mail/root and never reaches a human.
+# ----------------------------------------------------------------------------
+if grep -qE '^# phase4-root-alias-marker' /etc/aliases 2>/dev/null; then
+    log_skip "Root alias already configured in /etc/aliases (already done)"
+else
+    # Strip any existing 'root:' line (Ubuntu may ship a commented example)
+    sed -i -E '/^[[:space:]]*#?[[:space:]]*root:/d' /etc/aliases
+    cat >> /etc/aliases <<EOF
+# phase4-root-alias-marker - forward system mail to admin
+root: ${NOTIFICATION_EMAIL}
+EOF
+    newaliases
+    log_done "Root alias set: root -> ${NOTIFICATION_EMAIL} (newaliases run)"
+fi
+
 if grep -qE '^submission\s' /etc/postfix/master.cf; then
     log_skip "Submission port (587) already enabled in master.cf"
 else
@@ -1153,6 +1171,15 @@ if [ -d /var/lib/opendmarc ] && [ "$(stat -c '%U' /var/lib/opendmarc)" = "opendm
     vp "OpenDMARC data directory exists and is owned by opendmarc"
 else
     vf "OpenDMARC data directory /var/lib/opendmarc/ is missing or wrong owner"
+fi
+
+# Root alias: /etc/aliases should forward root -> NOTIFICATION_EMAIL, and
+# /etc/aliases.db should exist (created by newaliases) so Postfix actually uses it.
+if grep -qE "^root:[[:space:]]*${NOTIFICATION_EMAIL}" /etc/aliases 2>/dev/null && \
+   [ -f /etc/aliases.db ]; then
+    vp "Root alias forwards to $NOTIFICATION_EMAIL (aliases.db compiled)"
+else
+    vf "Root alias missing or /etc/aliases.db not compiled"
 fi
 
 # SpamAssassin (Ubuntu 26.04 service is 'spamd' with systemd-native config -
