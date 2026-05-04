@@ -514,12 +514,16 @@ verify_pkg() {
 
 verify_dir() {
     local d="$1"
+    # expected_owner can be a single owner ("root") or pipe-separated list of
+    # acceptable owners ("root|vmail") for cases where ownership legitimately
+    # changes between phases.
     local expected_owner="$2"
     if [ -d "$d" ]; then
         local actual_owner
         actual_owner=$(stat -c '%U' "$d")
-        if [ "$actual_owner" = "$expected_owner" ]; then
-            echo "  [PASS] Directory $d exists (owner: $expected_owner)"
+        # Build a regex anchor so "root" doesn't match "rooto" etc.
+        if echo "$actual_owner" | grep -qxE "$expected_owner"; then
+            echo "  [PASS] Directory $d exists (owner: $actual_owner, accepted: $expected_owner)"
             VERIFY_PASS=$((VERIFY_PASS + 1))
         else
             echo "  [FAIL] Directory $d owner is $actual_owner, expected $expected_owner"
@@ -582,7 +586,7 @@ fi
 verify_dir "$WEB_ROOT" "root"
 verify_dir "$DEFAULT_SITE_DIR" "www-data"
 verify_dir "$PLONE_HOME" "$PLONE_USER"
-verify_dir "$VMAIL_HOME" "root"
+verify_dir "$VMAIL_HOME" "root|vmail"
 
 # Plone user
 if id "$PLONE_USER" &>/dev/null; then
