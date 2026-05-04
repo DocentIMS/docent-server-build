@@ -522,8 +522,8 @@ if ! grep -q "skin_logo" "$ROUNDCUBE_CONFIG"; then
 // Branding logo - one logo for login page, top-bar, and avatar circle.
 // Image lives at /srv/www/${MAIL_DOMAIN}/branding/.
 \$config['skin_logo'] = [
-    '*'     => 'https://${MAIL_DOMAIN}/branding/docent-logo.png',
-    'login' => 'https://${MAIL_DOMAIN}/branding/docent-logo.png',
+    '*'     => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
+    'login' => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
 ];
 EOF
     echo "  Appended \$config['skin_logo']"
@@ -565,19 +565,38 @@ step "Step 6e: Installing branding assets"
 # branding/<DOMAIN>/ so each server can have its own brand identity.
 
 BRANDING_REPO="$REPO_ROOT/branding/$MAIL_DOMAIN"
+BRANDING_DEFAULT="$REPO_ROOT/branding/_default"
 BRANDING_INSTALL="/srv/www/$MAIL_DOMAIN/branding"
 
+# Pick per-domain branding if it exists, otherwise fall back to _default.
+# Per-domain dirs override _default file-by-file via a two-pass rsync below.
 if [ -d "$BRANDING_REPO" ]; then
+    BRANDING_SRC="$BRANDING_REPO"
+    BRANDING_SRC_LABEL="per-domain ($MAIL_DOMAIN)"
+elif [ -d "$BRANDING_DEFAULT" ]; then
+    BRANDING_SRC="$BRANDING_DEFAULT"
+    BRANDING_SRC_LABEL="_default"
+else
+    BRANDING_SRC=""
+fi
+
+if [ -n "$BRANDING_SRC" ]; then
     mkdir -p "$BRANDING_INSTALL"
-    # Copy without overwriting if file is already there with same content
-    rsync -a "$BRANDING_REPO/" "$BRANDING_INSTALL/"
+    # First pass: lay down _default if it exists (baseline)
+    if [ -d "$BRANDING_DEFAULT" ]; then
+        rsync -a "$BRANDING_DEFAULT/" "$BRANDING_INSTALL/"
+    fi
+    # Second pass: per-domain overrides on top (only if different from _default)
+    if [ -d "$BRANDING_REPO" ]; then
+        rsync -a "$BRANDING_REPO/" "$BRANDING_INSTALL/"
+    fi
     chown -R www-data:www-data "$BRANDING_INSTALL"
     find "$BRANDING_INSTALL" -type d -exec chmod 755 {} \;
     find "$BRANDING_INSTALL" -type f -exec chmod 644 {} \;
     BRAND_COUNT=$(find "$BRANDING_INSTALL" -type f | wc -l)
-    log_done "Installed $BRAND_COUNT branding asset(s) to $BRANDING_INSTALL"
+    log_done "Installed $BRAND_COUNT branding asset(s) to $BRANDING_INSTALL (source: $BRANDING_SRC_LABEL)"
 else
-    log_warn "Branding source $BRANDING_REPO not found - skipping branding assets"
+    log_warn "No branding source found at $BRANDING_REPO or $BRANDING_DEFAULT - skipping"
 fi
 
 # ============================================================================
@@ -590,7 +609,7 @@ step "Step 6f: Renaming Sent -> Sent Items in user mailboxes"
 # Items already exists.
 USERS=$(doveadm user '*' 2>/dev/null | head -30)
 if [ -z "$USERS" ]; then
-    log_warn "No Dovecot users found - skipping mailbox rename"
+    log_skip "No Dovecot users to rename yet (mailbox rename runs on next phase 5b execution after users are created)"
 else
     for u in $USERS; do
         if doveadm mailbox list -u "$u" 2>/dev/null | grep -qx "Sent"; then
@@ -636,11 +655,24 @@ INTER_BASE_URL="https://rsms.me/inter/font-files"
 
 # Download Inter font files if not already present in the repo
 INTER_REPO_DIR="$REPO_ROOT/branding/$MAIL_DOMAIN/fonts"
-if [ -d "$INTER_REPO_DIR" ] && [ "$(ls -A "$INTER_REPO_DIR" 2>/dev/null | grep -c .woff2)" -eq 5 ]; then
-    log_skip "Inter fonts already in repo at $INTER_REPO_DIR"
+INTER_DEFAULT_DIR="$REPO_ROOT/branding/_default/fonts"
+
+# Pick per-domain fonts if present, else _default. Both can be empty
+# (the wget fallback below downloads into the chosen dir).
+if [ -d "$INTER_REPO_DIR" ]; then
+    INTER_SRC_DIR="$INTER_REPO_DIR"
+elif [ -d "$INTER_DEFAULT_DIR" ]; then
+    INTER_SRC_DIR="$INTER_DEFAULT_DIR"
 else
-    mkdir -p "$INTER_REPO_DIR"
-    cd "$INTER_REPO_DIR"
+    # Neither dir exists yet - create the _default one (baseline for all servers)
+    INTER_SRC_DIR="$INTER_DEFAULT_DIR"
+fi
+
+if [ -d "$INTER_SRC_DIR" ] && [ "$(ls -A "$INTER_SRC_DIR" 2>/dev/null | grep -c .woff2)" -eq 5 ]; then
+    log_skip "Inter fonts already in repo at $INTER_SRC_DIR"
+else
+    mkdir -p "$INTER_SRC_DIR"
+    cd "$INTER_SRC_DIR"
     for f in "${INTER_FILES[@]}"; do
         if [ ! -f "$f" ]; then
             wget -q "$INTER_BASE_URL/$f" -O "$f"
@@ -657,8 +689,8 @@ fi
 
 # Install fonts to the WordPress vhost branding dir
 mkdir -p "$FONTS_INSTALL"
-if [ -d "$INTER_REPO_DIR" ]; then
-    rsync -a "$INTER_REPO_DIR/" "$FONTS_INSTALL/"
+if [ -d "$INTER_SRC_DIR" ]; then
+    rsync -a "$INTER_SRC_DIR/" "$FONTS_INSTALL/"
     chown -R www-data:www-data "$FONTS_INSTALL"
     chmod 644 "$FONTS_INSTALL"/*.woff2 2>/dev/null
     FONT_COUNT=$(find "$FONTS_INSTALL" -name "*.woff2" | wc -l)
@@ -666,17 +698,23 @@ if [ -d "$INTER_REPO_DIR" ]; then
 fi
 
 # Install the CSS override file. It lives in xskin's assets dir so xskin's
-# relative-path resolver finds it.
+# relative-path resolver finds it. Per-domain CSS overrides _default.
 CSS_REPO="$REPO_ROOT/branding/$MAIL_DOMAIN/docent-overrides.css"
+CSS_DEFAULT="$REPO_ROOT/branding/_default/docent-overrides.css"
 CSS_INSTALL="$ROUNDCUBE_PLUGINS_DIR/xskin/assets/styles/docent-overrides.css"
 
 if [ -f "$CSS_REPO" ]; then
     cp "$CSS_REPO" "$CSS_INSTALL"
     chown root:www-data "$CSS_INSTALL"
     chmod 640 "$CSS_INSTALL"
-    log_done "Installed CSS overrides at $CSS_INSTALL"
+    log_done "Installed CSS overrides at $CSS_INSTALL (source: per-domain)"
+elif [ -f "$CSS_DEFAULT" ]; then
+    cp "$CSS_DEFAULT" "$CSS_INSTALL"
+    chown root:www-data "$CSS_INSTALL"
+    chmod 640 "$CSS_INSTALL"
+    log_done "Installed CSS overrides at $CSS_INSTALL (source: _default)"
 else
-    log_warn "CSS source $CSS_REPO not found - skipping CSS overrides"
+    log_skip "No CSS overrides found at $CSS_REPO or $CSS_DEFAULT - skinning unmodified (optional)"
 fi
 
 # Configure xskin to load our CSS file. Path is relative to the xskin plugin dir.
