@@ -122,6 +122,10 @@ ask_yes_no() {
 # case), display it and ask for confirmation. If multiple IPs are present
 # or detection fails, fall back to a typed prompt. Either way, the result
 # is validated as a plausible IPv4.
+#
+# IMPORTANT: this function is used as SERVER_IP=$(ask_server_ip), which
+# means anything written to stdout becomes part of $SERVER_IP. All display
+# output MUST go to stderr (>&2). Only the final IP value goes to stdout.
 ask_server_ip() {
     local detected_ips
     detected_ips=$(hostname -I 2>/dev/null | tr ' ' '\n' \
@@ -133,16 +137,16 @@ ask_server_ip() {
     if [ "$ip_count" -eq 1 ]; then
         local detected_ip
         detected_ip=$(echo "$detected_ips" | head -1)
-        echo "  Detected public IPv4: ${CYAN}${detected_ip}${RESET}"
+        echo "  Detected public IPv4: ${CYAN}${detected_ip}${RESET}" >&2
         if ask_yes_no "Use this as the server IP?"; then
             echo "$detected_ip"
             return 0
         fi
-        echo "  OK, enter the correct IP manually."
+        echo "  OK, enter the correct IP manually." >&2
     elif [ "$ip_count" -gt 1 ]; then
-        echo "  Multiple IPv4 addresses detected on this server:"
-        echo "$detected_ips" | sed 's/^/    /'
-        echo "  Auto-detection skipped - please type the correct one."
+        echo "  Multiple IPv4 addresses detected on this server:" >&2
+        echo "$detected_ips" | sed 's/^/    /' >&2
+        echo "  Auto-detection skipped - please type the correct one." >&2
     fi
 
     # Fallback: typed prompt with basic IPv4 sanity check
@@ -154,7 +158,7 @@ ask_server_ip() {
             echo "$response"
             return 0
         fi
-        echo "${RED}Invalid IPv4: '$response'. Expected format: a.b.c.d (each 0-255).${RESET}"
+        echo "${RED}Invalid IPv4: '$response'. Expected format: a.b.c.d (each 0-255).${RESET}" >&2
     done
 }
 
