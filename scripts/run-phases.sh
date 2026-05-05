@@ -24,12 +24,16 @@ set -e
 # ============================================================================
 # COSMETICS
 # ============================================================================
-RESET="\033[0m"
-BOLD="\033[1m"
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-CYAN="\033[36m"
+# Use real escape characters via $'...' (not literal backslash strings).
+# When stdout is not a terminal, you can disable colors by checking [ -t 1 ]
+# but for now we always emit them - terminal handling is good enough on
+# every Linux/MobaXterm/PuTTY combo we care about.
+RESET=$'\e[0m'
+BOLD=$'\e[1m'
+RED=$'\e[31m'
+GREEN=$'\e[32m'
+YELLOW=$'\e[33m'
+CYAN=$'\e[36m'
 
 # ============================================================================
 # DEFAULTS
