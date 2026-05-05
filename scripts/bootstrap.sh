@@ -22,12 +22,25 @@ set -e
 # ============================================================================
 # COSMETICS
 # ============================================================================
-RESET="\033[0m"
-BOLD="\033[1m"
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-CYAN="\033[36m"
+# Use $'\e[...]' bash ANSI-C quoting to get REAL escape characters.
+# Plain "\033[..." (literal) only renders correctly when used with `echo -e`,
+# and we use plain `echo` everywhere - so the literal form would print the
+# raw \033 codes to the screen instead of changing colors.
+if [ -t 1 ]; then
+    RESET=$'\e[0m'
+    BOLD=$'\e[1m'
+    RED=$'\e[31m'
+    GREEN=$'\e[32m'
+    YELLOW=$'\e[33m'
+    CYAN=$'\e[36m'
+else
+    RESET=""
+    BOLD=""
+    RED=""
+    GREEN=""
+    YELLOW=""
+    CYAN=""
+fi
 
 step() { echo ""; echo "${BOLD}=== $1 ===${RESET}"; }
 
@@ -121,12 +134,24 @@ echo "    1. Go to: ${BOLD}https://github.com/settings/keys${RESET}"
 echo "    2. Delete any OLD keys named '${SSH_KEY_COMMENT}' (stale from prior servers)"
 echo "    3. Click ${BOLD}New SSH key${RESET}"
 echo "    4. Title: ${SSH_KEY_COMMENT}"
-echo "    5. Paste the key above"
+echo "    5. ${BOLD}Paste the key${RESET} into the Key field. Copy"
+echo "       ${BOLD}everything from 'ssh-ed25519' through '${SSH_KEY_COMMENT}'${RESET}"
+echo "       on the cyan line above - no extra characters before or after."
 echo "    6. Click ${BOLD}Add SSH key${RESET}"
 echo ""
 echo "${BOLD}${YELLOW}=============================================================${RESET}"
 echo ""
-read -r -p "Press ${BOLD}Enter${RESET} once the key has been added to GitHub..."
+# Explicit yes/no after key paste - too easy to hit Enter without actually
+# pasting and saving the key in GitHub.
+while true; do
+    read -r -p "Have you added the key to GitHub? ${BOLD}(type yes or no)${RESET}: " ans
+    case "$(echo "$ans" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+        yes) break ;;
+        no)  echo "${YELLOW}Take your time - re-run bootstrap.sh after adding the key.${RESET}"
+             exit 0 ;;
+        *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" ;;
+    esac
+done
 
 # ============================================================================
 # Step 4: Verify GitHub auth (with retries)
@@ -226,7 +251,18 @@ echo "    - Notification email"
 echo "    - Roundcube Plus license key"
 echo "    - AI API key (optional)"
 echo ""
-read -r -p "Press ${BOLD}Enter${RESET} to launch phase 0..."
+
+# Explicit yes/no - bare Enter is too easy to hit by accident.
+while true; do
+    read -r -p "Launch phase 0 now? ${BOLD}(type yes or no)${RESET}: " ans
+    case "$(echo "$ans" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
+        yes) break ;;
+        no)  echo "${YELLOW}Aborted. Re-run bootstrap.sh when ready, or run phase 0 manually:${RESET}"
+             echo "  bash $REPO_DIR/scripts/phase0-bootstrap.sh"
+             exit 0 ;;
+        *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" ;;
+    esac
+done
 echo ""
 
 exec bash "$REPO_DIR/scripts/phase0-bootstrap.sh"

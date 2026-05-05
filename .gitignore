@@ -1,7 +1,11 @@
-
 # Phase0-generated tenant-specific files - never commit
 secrets.local
 tenant.local
+CREDENTIALS.txt
+QUICK-REFERENCE.txt
+
+# Per-tenant member data (may contain real client info)
+data/
 
 # Editor backup files
 *.bak

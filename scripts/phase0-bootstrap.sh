@@ -78,6 +78,45 @@ ask_required() {
     echo "$response"
 }
 
+# ask_domain - prompt for a valid FQDN that includes a TLD.
+# Rejects bare hostnames (e.g. "myproject" without ".com") because phase 0's
+# output propagates into mail hostnames, certbot, DKIM/DMARC, etc. and a
+# missing TLD breaks every downstream phase silently.
+ask_domain() {
+    local prompt="$1"
+    local response=""
+    while true; do
+        response=$(ask_required "$prompt")
+        # Lowercase, strip whitespace
+        response=$(echo "$response" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+        # Must look like name.tld (or sub.name.tld) - at least one dot, TLD
+        # at least 2 chars, only letters/digits/hyphens in labels, no leading
+        # or trailing hyphen in any label.
+        if echo "$response" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$'; then
+            echo "$response"
+            return 0
+        fi
+        echo "${RED}Invalid domain: '$response'${RESET}"
+        echo "${RED}Must be a fully-qualified domain like 'acmemuseum.com' (with TLD).${RESET}"
+    done
+}
+
+# ask_yes_no - prompt for an explicit "yes" or "no" answer. No bare-Enter
+# acceptance. Returns 0 on yes, 1 on no. Loops until a valid answer.
+ask_yes_no() {
+    local prompt="$1"
+    local response=""
+    while true; do
+        read -r -p "${YELLOW}${prompt}${RESET} ${BOLD}(type yes or no)${RESET}: " response
+        response=$(echo "$response" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+        case "$response" in
+            yes) return 0 ;;
+            no)  return 1 ;;
+            *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" ;;
+        esac
+    done
+}
+
 step() {
     echo ""
     echo "${BOLD}=== $1 ===${RESET}"
@@ -92,15 +131,23 @@ ${BOLD}=============================================================
   PHASE 0 - SERVER BUILD BOOTSTRAP
 =============================================================${RESET}
 
-This script collects everything needed to build a new server.
+This script collects the per-tenant configuration needed to build
+this server. For each prompt, type a value and press Enter.
 
-You will be asked for ${BOLD}10 things${RESET}. For each item with a default,
-just press Enter to accept; otherwise type a value.
+After this completes, four files will be written on this server
+in ${CYAN}${REPO_ROOT}/${RESET}:
 
-After this completes, three files will be created in this repo:
-  ${CYAN}tenant.local${RESET}     - non-secret tenant config (used by scripts)
-  ${CYAN}secrets.local${RESET}    - passwords (used by scripts)
-  ${CYAN}CREDENTIALS.txt${RESET}  - human-readable credentials summary
+  ${CYAN}${TENANT_FILE}${RESET}
+    non-secret tenant config (used by phase scripts)
+
+  ${CYAN}${SECRETS_FILE}${RESET}
+    passwords (used by phase scripts) - gitignored, mode 600
+
+  ${CYAN}${CREDENTIALS_FILE}${RESET}
+    human-readable credentials summary - gitignored, mode 600
+
+  ${CYAN}${QUICK_REFERENCE_FILE}${RESET}
+    day-to-day commands and password quick reference - mode 600
 
 You can safely abort with Ctrl+C at any time before the final
 write step. Nothing on the system changes until you run phase 1.
@@ -120,8 +167,7 @@ if [ -f "$TENANT_FILE" ] || [ -f "$SECRETS_FILE" ] || [ -f "$CREDENTIALS_FILE" ]
     [ -f "$CREDENTIALS_FILE" ] && echo "  $CREDENTIALS_FILE"
     [ -f "$QUICK_REFERENCE_FILE" ] && echo "  $QUICK_REFERENCE_FILE"
     echo ""
-    read -r -p "Overwrite them? Type ${BOLD}yes${RESET} to continue: " confirm
-    if [ "$confirm" != "yes" ]; then
+    if ! ask_yes_no "Overwrite them?"; then
         echo "Aborted."
         exit 1
     fi
@@ -132,7 +178,7 @@ fi
 # ============================================================================
 step "Tenant identity"
 
-PRIMARY_DOMAIN=$(ask_required "Primary domain (e.g., acmemuseum.com)")
+PRIMARY_DOMAIN=$(ask_domain "Primary domain (e.g., acmemuseum.com)")
 SERVER_IP=$(ask_required "Server public IPv4 address")
 
 step "Purpose"
@@ -163,11 +209,8 @@ echo "DMARC reports, CAA reports, and WordPress admin contact."
 echo ""
 NOTIFICATION_EMAIL=$(ask_required "Notification email")
 
-step "Mail"
-
-echo "This is the test email address. You'll use it to verify that mail"
-echo "works. This test email is autocreated as:  test@${PRIMARY_DOMAIN}"
-
+# Test mailbox is auto-conventioned, never user-configurable. Phase 4 creates
+# it. It will appear in the auto-derived display below.
 TEST_MAILBOX_LOCAL="test"
 
 step "Roundcube Plus"
@@ -246,8 +289,7 @@ ${BOLD}Secrets to be written:${RESET}
 
 EOF
 
-read -r -p "Write these files? Type ${BOLD}yes${RESET}: " confirm
-if [ "$confirm" != "yes" ]; then
+if ! ask_yes_no "Write these files?"; then
     echo "Aborted. No files written."
     exit 1
 fi
@@ -668,6 +710,10 @@ echo "${GREEN}Wrote $QUICK_REFERENCE_FILE (mode 0600)${RESET}"
 # two human-readable credential files to /home/$ADMIN_USER/ so wayne can
 # download them straight from MobaXterm's SFTP browser. Owner is set to
 # the admin user so they can read AND delete after saving.
+#
+# If /home/$ADMIN_USER/ doesn't exist yet (because phase 1 hasn't run and
+# the wayne user hasn't been created), we set DOWNLOAD_LOCATION to the
+# fallback path and adjust the user-facing instructions below.
 ADMIN_HOME="/home/${ADMIN_USER}"
 ADMIN_CRED_FILE="${ADMIN_HOME}/CREDENTIALS.txt"
 ADMIN_QREF_FILE="${ADMIN_HOME}/QUICK-REFERENCE.txt"
@@ -678,11 +724,17 @@ if [ -d "$ADMIN_HOME" ]; then
     chown "${ADMIN_USER}:${ADMIN_USER}" "$ADMIN_CRED_FILE" "$ADMIN_QREF_FILE"
     chmod 600 "$ADMIN_CRED_FILE" "$ADMIN_QREF_FILE"
     echo "${GREEN}Copied credential files to ${ADMIN_HOME}/ (owner ${ADMIN_USER}, mode 0600)${RESET}"
+    DOWNLOAD_DIR="${ADMIN_HOME}"
+    DOWNLOAD_CRED_FILE="${ADMIN_CRED_FILE}"
+    DOWNLOAD_QREF_FILE="${ADMIN_QREF_FILE}"
+    DOWNLOAD_AS_USER="${ADMIN_USER} (no sudo needed)"
 else
-    echo "${YELLOW}WARNING: ${ADMIN_HOME} does not exist - skipping admin-home copy${RESET}"
-    echo "${YELLOW}You will need to read /root/CREDENTIALS.txt directly with sudo.${RESET}"
-    ADMIN_CRED_FILE="$CREDENTIALS_FILE"
-    ADMIN_QREF_FILE="$QUICK_REFERENCE_FILE"
+    echo "${YELLOW}NOTE: ${ADMIN_HOME} does not exist yet - phase 1 will create it.${RESET}"
+    echo "${YELLOW}For now, download credentials directly from ${REPO_ROOT}/ as root.${RESET}"
+    DOWNLOAD_DIR="${REPO_ROOT}"
+    DOWNLOAD_CRED_FILE="${CREDENTIALS_FILE}"
+    DOWNLOAD_QREF_FILE="${QUICK_REFERENCE_FILE}"
+    DOWNLOAD_AS_USER="root (you are root right now, since phase 1 has not run)"
 fi
 
 # ============================================================================
@@ -709,16 +761,16 @@ echo "${BOLD}${YELLOW}  ACTION REQUIRED - DOWNLOAD CREDENTIALS BEFORE CONTINUING
 echo "${BOLD}${YELLOW}=============================================================${RESET}"
 cat <<EOF
 
-  Two files have been placed in your admin home directory. They are
-  readable as ${ADMIN_USER} - no sudo needed:
+  Two files are ready for download. They are readable as
+  ${BOLD}${DOWNLOAD_AS_USER}${RESET}:
 
-    ${CYAN}${ADMIN_CRED_FILE}${RESET}
-    ${CYAN}${ADMIN_QREF_FILE}${RESET}
+    ${CYAN}${DOWNLOAD_CRED_FILE}${RESET}
+    ${CYAN}${DOWNLOAD_QREF_FILE}${RESET}
 
   ${BOLD}Do this now, before continuing:${RESET}
 
     1. Open MobaXterm's left sidebar (SFTP browser).
-    2. Navigate to ${ADMIN_HOME}/
+    2. Navigate to ${CYAN}${DOWNLOAD_DIR}/${RESET}
     3. Right-click each file -> Download. Save them somewhere
        you control (password manager, encrypted folder, etc).
 
@@ -752,9 +804,9 @@ Files written:
   ${CYAN}${CREDENTIALS_FILE}${RESET}
   ${CYAN}${QUICK_REFERENCE_FILE}${RESET}
 
-Downloadable copies (no sudo needed):
-  ${CYAN}${ADMIN_CRED_FILE}${RESET}
-  ${CYAN}${ADMIN_QREF_FILE}${RESET}
+Downloaded copies (saved during the action-required step):
+  ${CYAN}${DOWNLOAD_CRED_FILE}${RESET}
+  ${CYAN}${DOWNLOAD_QREF_FILE}${RESET}
 
 ${BOLD}NEXT STEPS:${RESET}
 
@@ -763,10 +815,22 @@ ${BOLD}NEXT STEPS:${RESET}
      A     www.${PRIMARY_DOMAIN}   -> ${SERVER_IP}
      A     mail.${PRIMARY_DOMAIN}  -> ${SERVER_IP}
 
-2. Run phase 1 to begin the build:
-     ${BOLD}sudo bash scripts/phase1.sh${RESET}
+2. Run the build. RECOMMENDED: chain all phases at once
+   (stops on first failure):
 
-3. Continue through phases 2, 3, 4, 5, 5b, 5c, 6 in order.
+     ${BOLD}sudo bash ${REPO_ROOT}/scripts/run-phases.sh${RESET}
+
+   Or run them one at a time, in order:
+
+     sudo bash ${REPO_ROOT}/scripts/phase1.sh
+     sudo bash ${REPO_ROOT}/scripts/phase2.sh
+     sudo bash ${REPO_ROOT}/scripts/phase3.sh
+     sudo bash ${REPO_ROOT}/scripts/phase4.sh
+     sudo bash ${REPO_ROOT}/scripts/phase5.sh
+     sudo bash ${REPO_ROOT}/scripts/phase5b-rc-plus.sh
+     sudo bash ${REPO_ROOT}/scripts/phase5c-globaladdressbook.sh
+     sudo bash ${REPO_ROOT}/scripts/phase6.sh
+
    Each phase reads from tenant.local and secrets.local.
 
 EOF
