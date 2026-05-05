@@ -22,6 +22,13 @@ ROUNDCUBE_PLUGINS_LOAD=/var/lib/roundcube/plugins
 ROUNDCUBE_PLUGIN_CONFIG_DIR=/etc/roundcube/plugins/globaladdressbook
 PLUGIN_NAME=globaladdressbook
 PLUGIN_REPO=https://github.com/johndoh/roundcube-globaladdressbook.git
+# Pin to a stable tagged release. The plugin's README explicitly warns that
+# master is unstable and intended only for git-master Roundcube. Tag 2.1 is
+# the latest stable release and is documented as "For Roundcube 1.5 and
+# above" - Ubuntu 26.04 ships Roundcube 1.6.x so this matches.
+# Review and bump this every 6-12 months: see
+#   https://github.com/johndoh/roundcube-globaladdressbook/releases
+PLUGIN_VERSION=2.1
 ADDRESSBOOK_DISPLAY_NAME="Project Contacts"
 ADDRESSBOOK_USER="_project_contacts_user_"
 VMAIL_ROOT=/var/vmail
@@ -90,7 +97,16 @@ fi
 step "Step 2: Installing globaladdressbook plugin"
 
 if [ -d "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME/.git" ]; then
-    log_skip "Plugin already cloned at $ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
+    # Already cloned. Check whether it's at the pinned tag.
+    current_ref=$(cd "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME" && \
+        git describe --tags --exact-match 2>/dev/null || \
+        git rev-parse --abbrev-ref HEAD 2>/dev/null || \
+        echo "unknown")
+    if [ "$current_ref" = "$PLUGIN_VERSION" ]; then
+        log_skip "Plugin already cloned at tag $PLUGIN_VERSION"
+    else
+        log_warn "Plugin clone exists but is on '$current_ref', not pinned tag '$PLUGIN_VERSION' - leaving as-is (delete the directory and re-run to pin)"
+    fi
 elif [ -d "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME" ]; then
     log_warn "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME exists but is not a git clone; leaving as-is"
 else
@@ -98,10 +114,12 @@ else
         log_fail "git not installed; cannot clone plugin"
         exit 1
     fi
-    git clone --quiet "$PLUGIN_REPO" "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
+    # Pin to a stable tagged release with a shallow clone (--depth 1).
+    git clone --quiet --depth 1 --branch "$PLUGIN_VERSION" \
+        "$PLUGIN_REPO" "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
     chown -R root:www-data "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
     chmod -R g+r "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
-    log_done "Cloned $PLUGIN_NAME plugin"
+    log_done "Cloned $PLUGIN_NAME plugin at tag $PLUGIN_VERSION"
 fi
 
 # ============================================================================
@@ -224,6 +242,8 @@ verify() {
 
 verify "Plugin source directory exists" \
     test -d "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
+verify "Plugin clone is at pinned tag $PLUGIN_VERSION" \
+    bash -c "cd '$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME' && [ \"\$(git describe --tags --exact-match 2>/dev/null)\" = '$PLUGIN_VERSION' ]"
 verify "Plugin main PHP file exists" \
     test -f "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME/$PLUGIN_NAME.php"
 verify "Plugin config exists" \
