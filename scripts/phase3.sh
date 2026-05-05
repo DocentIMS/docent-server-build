@@ -51,6 +51,33 @@ log_fail() { REPORT+=("[FAIL]    $1"); echo "  ✗ $1"; }
 
 step() { echo ""; echo "=== $1 ==="; }
 
+# wait_for_dpkg_lock - block until /var/lib/dpkg/lock-frontend is released.
+# unattended-upgrades (enabled by phase 1) can hold the lock for several
+# minutes after a fresh server boot. Without this guard, apt commands fail
+# silently with "E: Unable to acquire the dpkg frontend lock" and the script
+# continues past the failed install, leading to confusing cascade errors
+# downstream (configtest fails, services won't start, certbot can't validate).
+# Hit on a real rebuild May 2026.
+wait_for_dpkg_lock() {
+    local max_wait=300
+    local waited=0
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+        if [ "$waited" -eq 0 ]; then
+            echo "  Waiting for dpkg lock (held by another apt/dpkg process)..."
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [ "$waited" -ge "$max_wait" ]; then
+            echo "  Timeout: dpkg lock still held after ${max_wait}s. Aborting."
+            exit 1
+        fi
+    done
+    if [ "$waited" -gt 0 ]; then
+        echo "  dpkg lock released after ${waited}s, continuing."
+    fi
+}
+
+
 # ============================================================================
 # SAFETY CHECK
 # ============================================================================
@@ -73,6 +100,7 @@ export DEBIAN_FRONTEND=noninteractive
 if dpkg -l mariadb-server 2>/dev/null | grep -q "^ii"; then
     log_skip "MariaDB already installed"
 else
+    wait_for_dpkg_lock
     apt-get update -qq
     apt-get install -y -qq -o Dpkg::Use-Pty=0 mariadb-server mariadb-client < /dev/null
     log_done "MariaDB installed"
