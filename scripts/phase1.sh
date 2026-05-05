@@ -562,7 +562,7 @@ echo "  All passwords are in CREDENTIALS.txt at the repo root."
 echo "  This script does NOT print passwords (to avoid scrollback exposure)."
 echo ""
 echo "  To view the credentials again:"
-echo "    cat $(dirname "${BASH_SOURCE[0]}")/../CREDENTIALS.txt"
+echo "    cat $(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/CREDENTIALS.txt"
 echo ""
 
 echo "==================================================================="

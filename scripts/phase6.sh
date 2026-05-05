@@ -644,9 +644,11 @@ cat <<EOF
      a real-looking site so Kamatera will approve PTR.
 
   5. Once the site is "real-looking enough":
-     - Re-submit the PTR request to Kamatera asking for
-       PTR 66.55.78.148 -> docenttemplate.com
-     - Wait for approval before starting Phase 4 (Mail server).
+     - Submit (or re-submit) the PTR request to Kamatera, asking for:
+         PTR $SERVER_IP -> mail.$WP_DOMAIN
+     - Without PTR, outbound mail to Gmail/Outlook/etc. will land in spam.
+       Inbound and webmail still work fine - PTR only affects outbound
+       deliverability reputation.
 
   6. Clear scrollback:  clear && history -c
 
