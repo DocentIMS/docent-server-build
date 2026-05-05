@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Phase 5c — Install globaladdressbook plugin (Project Contacts)
+# Phase 5b — Install globaladdressbook plugin (Project Contacts)
 #
 # Per-tenant shared address book named "Project Contacts".
 # Visible to all users on this Roundcube install with full read/write.
@@ -8,7 +8,7 @@
 #
 # Idempotent: safe to re-run. Skips work that's already done.
 # Also defensively cleans up phantom on-disk Sent directories if found
-# (covers running phase5c on a server that was built with the old phase4.sh
+# (covers running phase5b on a server that was built with the old phase4.sh
 # before the mailbox "Sent Items" fix).
 
 set -u

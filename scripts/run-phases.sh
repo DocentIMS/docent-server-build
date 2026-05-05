@@ -3,7 +3,7 @@
 # run-phases.sh - Chain all build phases automatically.
 #
 # Use only AFTER phase 0 has been run (so tenant.local and secrets.local
-# exist). This script runs phases 1 -> 2 -> 3 -> 4 -> 5 -> 5b -> 5c -> 6
+# exist). This script runs phases 1 -> 2 -> 3 -> 4 -> 5 -> 5a -> 5b -> 5c -> 6
 # in order, stopping at the first failure.
 #
 # All phases are idempotent, so it's safe to re-run this script after a
@@ -46,8 +46,9 @@ PHASES=(
     "3:phase3.sh"
     "4:phase4.sh"
     "5:phase5.sh"
-    "5b:phase5b-rc-plus.sh"
-    "5c:phase5c-globaladdressbook.sh"
+    "5a:phase5a-rc-plus.sh"
+    "5b:phase5b-globaladdressbook.sh"
+    "5c:phase5c-email-ai.sh"
     "6:phase6.sh"
 )
 
@@ -117,7 +118,7 @@ if [ -n "$ONLY_PHASE" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --only $ONLY_PHASE: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 5 5b 5c 6"
+        echo "Valid phase labels: 1 2 3 4 5 5a 5b 5c 6"
         exit 1
     fi
 elif [ -n "$START_FROM" ]; then
@@ -132,7 +133,7 @@ elif [ -n "$START_FROM" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --from $START_FROM: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 5 5b 5c 6"
+        echo "Valid phase labels: 1 2 3 4 5 5a 5b 5c 6"
         exit 1
     fi
 else

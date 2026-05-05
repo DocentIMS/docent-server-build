@@ -530,13 +530,14 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
 
     phase0-bootstrap.sh        Generate config + this file
     phase1.sh                  OS hardening, users, SSH, firewall, fail2ban
-    phase2.sh                  Apache + Let's Encrypt TLS
-    phase3.sh                  MariaDB + daily backups
-    phase4.sh                  Postfix + Dovecot + DKIM + DMARC + Spam
-    phase5.sh                  Roundcube webmail
-    phase5b-rc-plus.sh         Roundcube Plus skin and plugins
-    phase5c-globaladdressbook.sh Project Contacts shared address book
-    phase6.sh                  WordPress
+    phase2.sh                    Apache + Let's Encrypt TLS
+    phase3.sh                    MariaDB + daily backups
+    phase4.sh                    Postfix + Dovecot + DKIM + DMARC + Spam
+    phase5.sh                    Roundcube webmail
+    phase5a-rc-plus.sh           Roundcube Plus skin and plugins
+    phase5b-globaladdressbook.sh Project Contacts shared address book
+    phase5c-email-ai.sh          Email AI (xai plugin) - placeholder
+    phase6.sh                    WordPress
 
   Tip: tee output to a log so you can search for errors later:
     sudo bash /root/server-build/scripts/phase4.sh 2>&1 | tee /tmp/phase4-run.log
@@ -827,8 +828,9 @@ ${BOLD}NEXT STEPS:${RESET}
      sudo bash ${REPO_ROOT}/scripts/phase3.sh
      sudo bash ${REPO_ROOT}/scripts/phase4.sh
      sudo bash ${REPO_ROOT}/scripts/phase5.sh
-     sudo bash ${REPO_ROOT}/scripts/phase5b-rc-plus.sh
-     sudo bash ${REPO_ROOT}/scripts/phase5c-globaladdressbook.sh
+     sudo bash ${REPO_ROOT}/scripts/phase5a-rc-plus.sh
+     sudo bash ${REPO_ROOT}/scripts/phase5b-globaladdressbook.sh
+     sudo bash ${REPO_ROOT}/scripts/phase5c-email-ai.sh
      sudo bash ${REPO_ROOT}/scripts/phase6.sh
 
    Each phase reads from tenant.local and secrets.local.

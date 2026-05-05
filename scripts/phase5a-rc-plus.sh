@@ -1,16 +1,19 @@
 #!/bin/bash
 #
-# phase5b-rc-plus.sh - Phase 5b: Roundcube Plus plugins and skins
+# phase5a-rc-plus.sh - Phase 5a: Roundcube Plus plugins and skins
 #
 # Installs commercial Roundcube Plus products from .tar.gz files stored in
 # this repo at vendor/roundcube-plus/. Activates them in Roundcube's main
 # config and applies the license key from /root/secrets/roundcube-plus.conf.
 #
 # RC+ products supported by this script:
-#   plugin_xai.tar.gz         -> xai plugin (AI Assistant)
 #   plugin_xsignature.tar.gz  -> xsignature plugin (Signature Designer)
 #   skin_outlook.tar.gz       -> outlook skin (free version)
 #   skin_outlook_plus.tar.gz  -> outlook_plus skin (mobile-capable)
+#
+# NOTE: The xai plugin (AI Assistant) lives in phase 5c (Email AI), NOT here.
+# The plugin_xai.tar.gz file is still expected in vendor/ because xframework
+# (a shared dependency) is extracted from it. xai itself is not installed here.
 #
 # All RC+ products require the xframework plugin which ships with each
 # tarball. The script extracts xframework once and shares it.
@@ -23,7 +26,7 @@
 #
 # Idempotent. Safe to re-run. Each step checks current state before acting.
 #
-# Run as root: sudo bash phase5b-rc-plus.sh
+# Run as root: sudo bash phase5a-rc-plus.sh
 #
 
 set -u
@@ -43,7 +46,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 VENDOR_DIR="$REPO_ROOT/vendor/roundcube-plus"
 
-RC_PLUS_PLUGINS=(xai xsignature)
+# RC+ plugins installed here (xai is in phase 5c, not here)
+RC_PLUS_PLUGINS=(xsignature)
 
 # === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
 # Source per-tenant config and secrets if they exist. These files are created
@@ -120,7 +124,7 @@ if [ ! -d "$VENDOR_DIR" ]; then
 fi
 
 echo "==================================================================="
-echo "  Phase 5b - Roundcube Plus plugins & skins"
+echo "  Phase 5a - Roundcube Plus plugins & skins"
 echo "  Roundcube config: $ROUNDCUBE_CONFIG"
 echo "  Plugins dir:      $ROUNDCUBE_PLUGINS_DIR"
 echo "  Skins dir:        $ROUNDCUBE_SKINS_DIR"
@@ -229,13 +233,12 @@ else
 fi
 
 # ============================================================================
-# STEP 4: Install plugins (xai, xsignature)
+# STEP 4: Install plugins (xsignature only - xai is in phase 5c)
 # ============================================================================
 step "Step 4: Installing RC+ plugins"
 
 # Map plugin name -> staging source path
 declare -A PLUGIN_SRC_MAP=(
-    [xai]="$STAGING/plugin_xai/xai"
     [xsignature]="$STAGING/plugin_xsignature/xsignature"
 )
 
@@ -323,8 +326,9 @@ done
 step "Step 6: Updating Roundcube config"
 
 # We need to do three things in /etc/roundcube/config.inc.php:
-#   1. Add xai, xsignature to the $config['plugins'] array
+#   1. Add xsignature to the $config['plugins'] array
 #      (xframework and xskin are loaded by the others, NOT added to plugins)
+#      (xai is added by phase 5c)
 #   2. Set $config['skin'] = 'outlook_plus'
 #   3. Add $config['license_key'] = '...'
 #
@@ -332,7 +336,7 @@ step "Step 6: Updating Roundcube config"
 # We use sed (avoids the cross-language escaping bugs that came from running
 # Python via heredoc - $config in PHP collides with bash $variable expansion).
 
-cp "$ROUNDCUBE_CONFIG" "$ROUNDCUBE_CONFIG.phase5b.bak"
+cp "$ROUNDCUBE_CONFIG" "$ROUNDCUBE_CONFIG.phase5a.bak"
 
 # 1. Add plugins to the array. Roundcube's array is multi-line, so we use
 #    sed to find the closing ']; and inject our plugin entries just before it,
@@ -374,7 +378,7 @@ fi
 if ! php -l "$ROUNDCUBE_CONFIG" > /dev/null 2>&1; then
     log_fail "Resulting config has PHP syntax errors - restoring backup"
     php -l "$ROUNDCUBE_CONFIG" 2>&1 | tail -5
-    cp "$ROUNDCUBE_CONFIG.phase5b.bak" "$ROUNDCUBE_CONFIG"
+    cp "$ROUNDCUBE_CONFIG.phase5a.bak" "$ROUNDCUBE_CONFIG"
     exit 1
 fi
 
@@ -609,7 +613,7 @@ step "Step 6f: Renaming Sent -> Sent Items in user mailboxes"
 # Items already exists.
 USERS=$(doveadm user '*' 2>/dev/null | head -30)
 if [ -z "$USERS" ]; then
-    log_skip "No Dovecot users to rename yet (mailbox rename runs on next phase 5b execution after users are created)"
+    log_skip "No Dovecot users to rename yet (mailbox rename runs on next phase 5a execution after users are created)"
 else
     for u in $USERS; do
         if doveadm mailbox list -u "$u" 2>/dev/null | grep -qx "Sent"; then
@@ -765,7 +769,7 @@ fi
 # ============================================================================
 echo ""
 echo "==================================================================="
-echo "  PHASE 5b COMPLETE - SUMMARY REPORT"
+echo "  PHASE 5a COMPLETE - SUMMARY REPORT"
 echo "==================================================================="
 echo ""
 for line in "${REPORT[@]}"; do
@@ -786,8 +790,8 @@ VERIFY_FAIL=0
 vp() { echo "  [PASS] $1"; VERIFY_PASS=$((VERIFY_PASS + 1)); }
 vf() { echo "  [FAIL] $1"; VERIFY_FAIL=$((VERIFY_FAIL + 1)); }
 
-# All required directories present
-for d in xframework xskin xai xsignature; do
+# All required directories present (xai is in phase 5c, not here)
+for d in xframework xskin xsignature; do
     if [ -d "$ROUNDCUBE_PLUGINS_DIR/$d" ]; then
         vp "Plugin directory $d installed"
     else
@@ -840,10 +844,10 @@ else
 fi
 
 # www-data can read the configs
-if sudo -u www-data test -r "$ROUNDCUBE_PLUGINS_DIR/xai/config.inc.php" 2>/dev/null; then
-    vp "www-data can read xai config"
+if sudo -u www-data test -r "$ROUNDCUBE_PLUGINS_DIR/xsignature/config.inc.php" 2>/dev/null; then
+    vp "www-data can read xsignature config"
 else
-    vf "www-data CANNOT read xai config"
+    vf "www-data CANNOT read xsignature config"
 fi
 
 # secrets.local is properly secured
@@ -879,11 +883,7 @@ cat <<EOF
   2. The interface should now use the "outlook_plus" skin (Outlook-style
      navigation, modern layout, mobile-capable).
 
-  3. Verify each plugin works:
-       - AI Assistant (xai): you may see an AI button somewhere in the compose
-         interface. Configuration is in $ROUNDCUBE_PLUGINS_DIR/xai/config.inc.php
-         - this is where you set your AI API key (OpenAI, etc.)
-
+  3. Verify the plugin works:
        - Signature Designer (xsignature): go to Settings -> Identities -> edit
          your identity. There should now be a richer signature editor than
          the default plain text box.
@@ -892,10 +892,8 @@ cat <<EOF
        sudo tail /var/log/roundcube/errors.log
        sudo tail /var/log/apache2/error.log
 
-  5. AI Assistant configuration:
-       Edit $ROUNDCUBE_PLUGINS_DIR/xai/config.inc.php to add your AI API
-       credentials. The config file lists supported providers (OpenAI, etc.)
-       and how to authenticate to each.
+  5. AI Assistant (xai) is installed by Phase 5c (Email AI), not this phase.
+     Run that next if you want AI features in Roundcube.
 
   Re-running this script is safe - it preserves any plugin-specific config
   customizations you make in plugins/<plugin>/config.inc.php.
