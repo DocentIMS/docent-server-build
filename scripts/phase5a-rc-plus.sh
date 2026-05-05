@@ -523,10 +523,13 @@ done
 if ! grep -q "skin_logo" "$ROUNDCUBE_CONFIG"; then
     cat >> "$ROUNDCUBE_CONFIG" <<EOF
 
-// Branding logo - one logo for login page, top-bar, and avatar circle.
-// Image lives at /srv/www/${MAIL_DOMAIN}/branding/.
+// Branding logo - per-context paths.
+//   '*'     = compact slot (top-left bar, avatar circle, etc.)
+//             Use the square icon - the wide wordmark gets crushed unreadable here.
+//   'login' = full-size login splash. Wide wordmark looks correct at this size.
+// Images live at /srv/www/${MAIL_DOMAIN}/branding/.
 \$config['skin_logo'] = [
-    '*'     => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
+    '*'     => 'https://${MAIL_DOMAIN}/branding/docent-icon.svg',
     'login' => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
 ];
 EOF

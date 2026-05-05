@@ -117,6 +117,47 @@ ask_yes_no() {
     done
 }
 
+# ask_server_ip - try to auto-derive the public IPv4 from hostname -I. If
+# exactly one IPv4 address is bound (the typical Kamatera single-interface
+# case), display it and ask for confirmation. If multiple IPs are present
+# or detection fails, fall back to a typed prompt. Either way, the result
+# is validated as a plausible IPv4.
+ask_server_ip() {
+    local detected_ips
+    detected_ips=$(hostname -I 2>/dev/null | tr ' ' '\n' \
+        | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$' \
+        | grep -vE '^(127\.|169\.254\.)')
+    local ip_count
+    ip_count=$(echo "$detected_ips" | grep -c .)
+
+    if [ "$ip_count" -eq 1 ]; then
+        local detected_ip
+        detected_ip=$(echo "$detected_ips" | head -1)
+        echo "  Detected public IPv4: ${CYAN}${detected_ip}${RESET}"
+        if ask_yes_no "Use this as the server IP?"; then
+            echo "$detected_ip"
+            return 0
+        fi
+        echo "  OK, enter the correct IP manually."
+    elif [ "$ip_count" -gt 1 ]; then
+        echo "  Multiple IPv4 addresses detected on this server:"
+        echo "$detected_ips" | sed 's/^/    /'
+        echo "  Auto-detection skipped - please type the correct one."
+    fi
+
+    # Fallback: typed prompt with basic IPv4 sanity check
+    local response=""
+    while true; do
+        response=$(ask_required "Server public IPv4 address")
+        response=$(echo "$response" | tr -d '[:space:]')
+        if echo "$response" | grep -qE '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$'; then
+            echo "$response"
+            return 0
+        fi
+        echo "${RED}Invalid IPv4: '$response'. Expected format: a.b.c.d (each 0-255).${RESET}"
+    done
+}
+
 step() {
     echo ""
     echo "${BOLD}=== $1 ===${RESET}"
@@ -152,9 +193,11 @@ in ${CYAN}${REPO_ROOT}/${RESET}:
 You can safely abort with Ctrl+C at any time before the final
 write step. Nothing on the system changes until you run phase 1.
 
-Press Enter to begin, or Ctrl+C to abort.
 EOF
-read -r
+if ! ask_yes_no "Begin?"; then
+    echo "Aborted. Re-run phase0-bootstrap.sh when ready."
+    exit 0
+fi
 
 # ============================================================================
 # CHECK FOR EXISTING FILES
@@ -179,7 +222,7 @@ fi
 step "Tenant identity"
 
 PRIMARY_DOMAIN=$(ask_domain "Primary domain (e.g., acmemuseum.com)")
-SERVER_IP=$(ask_required "Server public IPv4 address")
+SERVER_IP=$(ask_server_ip)
 
 step "Purpose"
 
