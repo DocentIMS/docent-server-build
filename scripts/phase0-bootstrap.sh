@@ -103,12 +103,6 @@ ask_domain() {
 
 # ask_yes_no - prompt for an explicit "yes" or "no" answer. No bare-Enter
 # acceptance. Returns 0 on yes, 1 on no. Loops until a valid answer.
-#
-# IMPORTANT: This function may be called from inside another function whose
-# output is captured (e.g. SERVER_IP=$(ask_server_ip), where ask_server_ip
-# itself calls ask_yes_no). The error message for invalid input MUST go to
-# stderr (>&2) so it doesn't pollute the outer capture. Same pattern as the
-# fix in ask_server_ip from commit 922c6ab.
 ask_yes_no() {
     local prompt="$1"
     local response=""
@@ -118,7 +112,7 @@ ask_yes_no() {
         case "$response" in
             yes) return 0 ;;
             no)  return 1 ;;
-            *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" >&2 ;;
+            *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" ;;
         esac
     done
 }
@@ -128,6 +122,10 @@ ask_yes_no() {
 # case), display it and ask for confirmation. If multiple IPs are present
 # or detection fails, fall back to a typed prompt. Either way, the result
 # is validated as a plausible IPv4.
+#
+# IMPORTANT: this function is used as SERVER_IP=$(ask_server_ip), which
+# means anything written to stdout becomes part of $SERVER_IP. All display
+# output MUST go to stderr (>&2). Only the final IP value goes to stdout.
 ask_server_ip() {
     local detected_ips
     detected_ips=$(hostname -I 2>/dev/null | tr ' ' '\n' \
@@ -139,16 +137,16 @@ ask_server_ip() {
     if [ "$ip_count" -eq 1 ]; then
         local detected_ip
         detected_ip=$(echo "$detected_ips" | head -1)
-        echo "  Detected public IPv4: ${CYAN}${detected_ip}${RESET}"
+        echo "  Detected public IPv4: ${CYAN}${detected_ip}${RESET}" >&2
         if ask_yes_no "Use this as the server IP?"; then
             echo "$detected_ip"
             return 0
         fi
-        echo "  OK, enter the correct IP manually."
+        echo "  OK, enter the correct IP manually." >&2
     elif [ "$ip_count" -gt 1 ]; then
-        echo "  Multiple IPv4 addresses detected on this server:"
-        echo "$detected_ips" | sed 's/^/    /'
-        echo "  Auto-detection skipped - please type the correct one."
+        echo "  Multiple IPv4 addresses detected on this server:" >&2
+        echo "$detected_ips" | sed 's/^/    /' >&2
+        echo "  Auto-detection skipped - please type the correct one." >&2
     fi
 
     # Fallback: typed prompt with basic IPv4 sanity check
@@ -160,8 +158,106 @@ ask_server_ip() {
             echo "$response"
             return 0
         fi
-        echo "${RED}Invalid IPv4: '$response'. Expected format: a.b.c.d (each 0-255).${RESET}"
+        echo "${RED}Invalid IPv4: '$response'. Expected format: a.b.c.d (each 0-255).${RESET}" >&2
     done
+}
+
+# check_dns_resolution - sanity-check that the user-entered domain and IP
+# actually match in public DNS. Looks up the A records for the apex domain,
+# www., and mail. subdomains and compares to SERVER_IP. Each is independent:
+# any can be missing, any can mismatch, the user gets a single warning with
+# the actual results and an explicit yes/no to continue.
+#
+# This is advisory, not blocking. Common reasons to continue anyway:
+#   - DNS not yet propagated (brand new domain or just changed records)
+#   - Building before DNS is set up (test/dev servers)
+#   - Using a registrar that's slow to publish
+#
+# Common reasons to STOP and fix:
+#   - Typo in PRIMARY_DOMAIN
+#   - Typo in SERVER_IP
+#   - DNS still pointing at an old server
+#
+# Uses 'dig' if available (preferred), falls back to 'host', falls back to
+# 'getent ahosts'. On a fresh Ubuntu, dnsutils may not be installed yet,
+# so we degrade gracefully if no lookup tool is found.
+check_dns_resolution() {
+    local domain="$1"
+    local expected_ip="$2"
+
+    # Find a usable lookup tool. Quote the result of 'command -v' to swallow
+    # the "not found" output cleanly.
+    local lookup_cmd=""
+    if command -v dig >/dev/null 2>&1; then
+        lookup_cmd="dig"
+    elif command -v host >/dev/null 2>&1; then
+        lookup_cmd="host"
+    elif command -v getent >/dev/null 2>&1; then
+        lookup_cmd="getent"
+    else
+        echo "${YELLOW}  No DNS lookup tool found (dig/host/getent) - skipping cross-check.${RESET}" >&2
+        return 0
+    fi
+
+    # Look up an A record. Returns the resolved IP, or empty if no answer.
+    local resolved=""
+    _resolve() {
+        local name="$1"
+        case "$lookup_cmd" in
+            dig)
+                dig +short +time=3 +tries=1 A "$name" 2>/dev/null \
+                    | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' | head -1
+                ;;
+            host)
+                host -t A "$name" 2>/dev/null \
+                    | awk '/has address/ {print $4; exit}'
+                ;;
+            getent)
+                getent ahosts "$name" 2>/dev/null \
+                    | awk '/STREAM/ {print $1; exit}'
+                ;;
+        esac
+    }
+
+    echo "" >&2
+    echo "${BOLD}  Checking DNS resolution for ${domain}, www.${domain}, mail.${domain}${RESET}" >&2
+    echo "  (using $lookup_cmd, against your system's resolver)" >&2
+
+    local mismatch=0
+    local name
+    for name in "$domain" "www.$domain" "mail.$domain"; do
+        resolved=$(_resolve "$name")
+        if [ -z "$resolved" ]; then
+            echo "  ${YELLOW}!${RESET} ${name} -> ${YELLOW}no A record found${RESET}" >&2
+            mismatch=1
+        elif [ "$resolved" = "$expected_ip" ]; then
+            echo "  ${GREEN}✓${RESET} ${name} -> ${resolved}" >&2
+        else
+            echo "  ${RED}✗${RESET} ${name} -> ${resolved} ${RED}(expected ${expected_ip})${RESET}" >&2
+            mismatch=1
+        fi
+    done
+
+    if [ "$mismatch" -eq 0 ]; then
+        echo "  ${GREEN}All three records resolve correctly.${RESET}" >&2
+        return 0
+    fi
+
+    echo "" >&2
+    echo "${YELLOW}  DNS records do not yet match what you entered.${RESET}" >&2
+    echo "${YELLOW}  This is OK if DNS hasn't propagated yet, or if you're${RESET}" >&2
+    echo "${YELLOW}  building before setting up DNS. Phases 2 (cert) and 4 (mail)${RESET}" >&2
+    echo "${YELLOW}  WILL fail without correct DNS, but you can fix DNS first${RESET}" >&2
+    echo "${YELLOW}  and re-run those phases - they're idempotent.${RESET}" >&2
+    echo "" >&2
+
+    if ask_yes_no "Continue anyway?"; then
+        return 0
+    else
+        echo "" >&2
+        echo "  Aborted. Fix DNS and re-run phase0-bootstrap.sh." >&2
+        exit 1
+    fi
 }
 
 step() {
@@ -229,6 +325,11 @@ step "Tenant identity"
 
 PRIMARY_DOMAIN=$(ask_domain "Primary domain (e.g., acmemuseum.com)")
 SERVER_IP=$(ask_server_ip)
+
+# Sanity-check that DNS is set up before we go on. This catches typos
+# in the domain or IP, and DNS that's still pointing at an old server.
+# Advisory: user can override with a yes if they're building before DNS.
+check_dns_resolution "$PRIMARY_DOMAIN" "$SERVER_IP"
 
 step "Purpose"
 
