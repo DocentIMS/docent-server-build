@@ -103,6 +103,15 @@ ask_domain() {
 
 # ask_yes_no - prompt for an explicit "yes" or "no" answer. No bare-Enter
 # acceptance. Returns 0 on yes, 1 on no. Loops until a valid answer.
+#
+# IMPORTANT: error message goes to stderr (>&2). When ask_yes_no is called
+# from inside a function whose output is captured, e.g.:
+#     SERVER_IP=$(ask_server_ip)         # ask_server_ip internally calls ask_yes_no
+# any stdout from ask_yes_no would be captured into SERVER_IP. A user typo
+# (e.g. typing the IP at the "Use this as the server IP?" prompt instead of
+# 'yes') would push the error message into the captured value, polluting
+# everything downstream. Same pattern as ask_required / ask_domain /
+# ask_server_ip - all three already redirect their errors to stderr.
 ask_yes_no() {
     local prompt="$1"
     local response=""
@@ -112,7 +121,7 @@ ask_yes_no() {
         case "$response" in
             yes) return 0 ;;
             no)  return 1 ;;
-            *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" ;;
+            *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" >&2 ;;
         esac
     done
 }
