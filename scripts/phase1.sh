@@ -69,6 +69,32 @@ log_fail()    { REPORT+=("[FAIL]    $1"); echo "  ✗ $1"; }
 
 step() { echo ""; echo "=== $1 ==="; }
 
+# wait_for_dpkg_lock - block until /var/lib/dpkg/lock-frontend is released.
+# unattended-upgrades (or any background apt process) can hold the lock for
+# several minutes. Without this guard, apt commands fail silently with
+# "E: Unable to acquire the dpkg frontend lock" and the script continues
+# past the failed install. In phase 1 specifically, this caused fail2ban
+# to silently not-install while phase 1 still printed ✓ Installed and
+# moved on, breaking SSH on the rebuild May 2026.
+wait_for_dpkg_lock() {
+    local max_wait=300
+    local waited=0
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+        if [ "$waited" -eq 0 ]; then
+            echo "  Waiting for dpkg lock (held by another apt/dpkg process)..."
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [ "$waited" -ge "$max_wait" ]; then
+            echo "  Timeout: dpkg lock still held after ${max_wait}s. Aborting."
+            exit 1
+        fi
+    done
+    if [ "$waited" -gt 0 ]; then
+        echo "  dpkg lock released after ${waited}s, continuing."
+    fi
+}
+
 # ============================================================================
 # SAFETY CHECK
 # ============================================================================
@@ -118,6 +144,7 @@ log_done "OS verified: Ubuntu 26.04 LTS"
 
 # --- Check 2: Show pending updates and prompt before applying ---
 export DEBIAN_FRONTEND=noninteractive
+wait_for_dpkg_lock
 apt-get update -qq
 UPGRADABLE_OUTPUT=$(apt list --upgradable 2>/dev/null | grep -v "^Listing" || true)
 UPGRADABLE_COUNT=$(echo "$UPGRADABLE_OUTPUT" | grep -cv "^$" || true)
@@ -134,8 +161,13 @@ else
     read -r -p "  Continue and apply updates? (type 'yes' to proceed): " confirm
     case "$confirm" in
         yes|YES)
-            apt-get upgrade -y -qq -o Dpkg::Use-Pty=0 < /dev/null
-            log_done "Applied $UPGRADABLE_COUNT package updates"
+            wait_for_dpkg_lock
+            if apt-get upgrade -y -qq -o Dpkg::Use-Pty=0 < /dev/null; then
+                log_done "Applied $UPGRADABLE_COUNT package updates"
+            else
+                log_fail "apt-get upgrade failed (exit code $?)"
+                exit 1
+            fi
             ;;
         *)
             echo "  Aborted (you must type 'yes' to proceed). No changes made."
@@ -307,8 +339,13 @@ done
 if [ -z "$MISSING" ]; then
     log_skip "All admin tools already installed"
 else
-    apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null
-    log_done "Installed packages:$MISSING"
+    wait_for_dpkg_lock
+    if apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null; then
+        log_done "Installed packages:$MISSING"
+    else
+        log_fail "apt-get install failed (exit code $?). Packages NOT installed:$MISSING"
+        exit 1
+    fi
 fi
 
 # ============================================================================
