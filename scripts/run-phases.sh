@@ -169,6 +169,8 @@ echo "      and re-run this script - already-done phases will be skipped."
 echo "    - All phases are idempotent. Re-running is safe."
 echo ""
 read -r -p "Type ${BOLD}yes${RESET} to start: " confirm
+# Normalize to lowercase so YES/Yes/yes are all accepted
+confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
 if [ "$confirm" != "yes" ]; then
     echo "Aborted."
     exit 1
@@ -225,6 +227,8 @@ for entry in "${TO_RUN[@]}"; do
         echo "${YELLOW}  Review the log before continuing.${RESET}"
         echo ""
         read -r -p "Continue anyway? Type ${BOLD}yes${RESET} to proceed: " keep_going
+        # Normalize to lowercase so YES/Yes/yes are all accepted
+        keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
         if [ "$keep_going" != "yes" ]; then
             echo "Stopped at user request. Resume with:"
             echo "  sudo bash $0 --from $label"
@@ -252,11 +256,85 @@ echo ""
 echo "  Phases run: ${#TO_RUN[@]}"
 echo "  Total time: ${DURATION_MIN}m ${DURATION_SEC}s"
 echo ""
-echo "  Next steps:"
-echo "    1. Verify the build by following the manual checks at the end of"
-echo "       each phase's output (Roundcube login, mail test, WP install)."
-echo "    2. See QUICK-REFERENCE.txt for day-to-day commands and recovery."
-echo "    3. After verifying, delete the sensitive files:"
-echo "         rm $REPO_ROOT/CREDENTIALS.txt"
-echo "         rm $REPO_ROOT/QUICK-REFERENCE.txt"
+
+# ----------------------------------------------------------------------------
+# Source tenant.local so the checklist below can reference real values
+# (PRIMARY_DOMAIN, SERVER_IP, NOTIFICATION_EMAIL, etc.) instead of placeholders
+# ----------------------------------------------------------------------------
+if [ -f "$TENANT_FILE" ]; then
+    # shellcheck disable=SC1090
+    source "$TENANT_FILE"
+fi
+DOMAIN="${PRIMARY_DOMAIN:-<your-domain>}"
+IP="${SERVER_IP:-<server-ip>}"
+NOTIF="${NOTIFICATION_EMAIL:-<notification-email>}"
+
+# ----------------------------------------------------------------------------
+# Consolidated manual verification checklist
+#
+# Each phase prints its own manual-verification block during the run, but
+# scrolling back through 9 phases to find them is painful. This block
+# gathers the steps that actually require human action - the things the
+# automated [PASS]/[FAIL] checks can't verify - into one checklist grouped
+# by area. Each item is intentionally short; for full context, scroll up
+# to the corresponding phase's manual-verification section.
+# ----------------------------------------------------------------------------
+echo "${BOLD}============================================================${RESET}"
+echo "${BOLD}  MANUAL VERIFICATION CHECKLIST${RESET}"
+echo "${BOLD}============================================================${RESET}"
+echo ""
+echo "  These are steps the install script could not verify. Walk through"
+echo "  them in order. Each is independent - if one fails, fix it and"
+echo "  continue, you don't have to re-run any phase."
+echo ""
+
+echo "${BOLD}  SSH / Admin login (phase 1)${RESET}"
+echo "    [ ] From your laptop, SSH as wayne on port 2222:"
+echo "          ssh -p 2222 wayne@${IP}"
+echo "        Password is in CREDENTIALS.txt. Three wrong = 1-hour lockout."
+echo "    [ ] Confirm root SSH is rejected:"
+echo "          ssh -p 2222 root@${IP}    # should fail"
+echo ""
+
+echo "${BOLD}  Web / TLS (phase 2)${RESET}"
+echo "    [ ] Open https://${DOMAIN}/ in browser - placeholder page, lock icon green."
+echo "    [ ] Open http://${DOMAIN}/ - browser auto-redirects to https."
+echo "    [ ] Open https://www.${DOMAIN}/ - works, no cert warning."
+echo ""
+
+echo "${BOLD}  Mail server (phase 4)${RESET}"
+echo "    [ ] Add DNS records at your registrar. Phase 4 generated a complete"
+echo "        BIND zone file you can import - see /root/server_setup/dns/"
+echo "        Or scroll up to phase 4's 'DNS RECORDS TO ADD AT IONOS' block."
+echo "        Records to add: MX, SPF (TXT), DKIM (TXT), DMARC (TXT)."
+echo "    [ ] Submit Kamatera support ticket asking them to add a PTR record:"
+echo "          ${IP} -> mail.${DOMAIN}"
+echo "        Without PTR, outbound mail to Gmail/Outlook lands in spam."
+echo "    [ ] After PTR is approved, test root alias delivery:"
+echo "          echo 'system test' | mail -s 'system test' root"
+echo "        Mail should arrive at ${NOTIF}."
+echo ""
+
+echo "${BOLD}  Webmail (phase 5/5a/5b/5c)${RESET}"
+echo "    [ ] Open https://${DOMAIN}/mail/ - login page renders with Docent logo."
+echo "    [ ] Log in as test@${DOMAIN} - password from CREDENTIALS.txt."
+echo "    [ ] Send a test email to your own external account."
+echo "    [ ] Compose: try the AI Composer (xai plugin) if XAI_API_KEY was set."
+echo ""
+
+echo "${BOLD}  WordPress (phase 6)${RESET}"
+echo "    [ ] Open https://${DOMAIN}/wp-admin/install.php - WP installer wizard appears."
+echo "    [ ] Complete the install - admin user, site title, etc."
+echo "    [ ] Confirm WP loads at https://${DOMAIN}/ once install completes"
+echo "        (the placeholder page from phase 2 will be replaced)."
+echo ""
+
+echo "${BOLD}  Cleanup (do AFTER all of the above succeed)${RESET}"
+echo "    [ ] Save CREDENTIALS.txt to your password manager."
+echo "    [ ] Delete the on-disk credential files:"
+echo "          rm $REPO_ROOT/CREDENTIALS.txt"
+echo "          rm $REPO_ROOT/QUICK-REFERENCE.txt"
+echo "    [ ] (Optional) Clear scrollback: clear && history -c"
+echo ""
+echo "  See QUICK-REFERENCE.txt for day-to-day commands and recovery procedures."
 echo ""
