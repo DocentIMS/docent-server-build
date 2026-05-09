@@ -227,10 +227,32 @@ fi
 # Composer: ON (already default but be explicit)
 set_xai_config "xai_enable_message_generation" "true"
 
-# View summaries: ON. Generates a one-sentence summary at the top of opened
-# emails. Cached encrypted in DB after first generation.
+# View summaries: feature ENABLED but per-user default OFF.
+#
+# Two separate xai settings control this:
+#
+#   xai_enable_view_summaries   - master switch. If true, the feature
+#                                 EXISTS and users can toggle it in
+#                                 Roundcube settings -> Mail -> AI features.
+#                                 If false, the feature is invisible to users.
+#                                 We want true so users CAN turn it on if
+#                                 they choose.
+#
+#   xai_show_summary_on_mail_view - the per-user DEFAULT for that toggle.
+#                                 If true, every email a user opens triggers
+#                                 an OpenAI API call (cached encrypted in DB
+#                                 after first generation, but the first hit
+#                                 costs every time). If false, users see a
+#                                 "Show summary" link instead and only pay
+#                                 for the calls they actually want.
+#                                 We want false because every-email-by-default
+#                                 racks up real costs (~\$30-180/mo for 20 users
+#                                 reading 30 emails/day each).
+#
+# Net effect: feature is fully available, users discover it in settings,
+# but no automatic API calls happen until a user opts in.
 set_xai_config "xai_enable_view_summaries"     "true"
-set_xai_config "xai_show_summary_on_mail_view" "true"
+set_xai_config "xai_show_summary_on_mail_view" "false"
 
 # List-hover summaries: OFF. xai's own docs warn this "may significantly
 # increase API costs" because it generates summaries for every email in
@@ -403,9 +425,15 @@ else
 fi
 
 if grep -qE "^\\\$config\\['xai_enable_view_summaries'\\]\s*=\s*true" "$XAI_CONFIG"; then
-    vp "AI view summaries enabled"
+    vp "AI view summaries available (users can toggle in settings)"
 else
-    vf "AI view summaries NOT enabled"
+    vf "AI view summaries NOT available"
+fi
+
+if grep -qE "^\\\$config\\['xai_show_summary_on_mail_view'\\]\s*=\s*false" "$XAI_CONFIG"; then
+    vp "AI view summaries default is OFF (cost guard - users must opt in)"
+else
+    vf "AI view summaries default is ON - every opened email triggers an API call"
 fi
 
 if grep -qE "^\\\$config\\['xai_enable_list_summaries'\\]\s*=\s*false" "$XAI_CONFIG"; then
