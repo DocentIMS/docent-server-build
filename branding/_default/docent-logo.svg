@@ -1,22 +1,22 @@
 <svg viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg">
-  <!-- Arc element - refined curve -->
+  <!-- Arc element - refined curve (faded) -->
   <path d="M 150 80 Q 600 -20 1050 80" 
-        stroke="#A8A8A8" 
+        stroke="#EAEAEA" 
         stroke-width="3" 
         fill="none" 
-        opacity="0.7"/>
+        opacity="0.4"/>
   
-  <!-- Main logo text with improved spacing and weights -->
+  <!-- Main logo text - heavy-fade grayscale (A3) -->
   <text x="600" y="200" font-family="'Arial', 'Helvetica', sans-serif" font-size="120" text-anchor="middle" font-weight="300" letter-spacing="-2">
-    <tspan fill="#8B6914" font-weight="400">docent</tspan><tspan fill="#3A9FB5" font-weight="600" dx="8">info</tspan><tspan fill="#8B6914" font-weight="400" dx="8">system</tspan><tspan font-size="25" dy="-48" fill="#2C2C2C">TM</tspan>
+    <tspan fill="#C8C8C8" font-weight="400">docent</tspan><tspan fill="#A8A8A8" font-weight="600" dx="8">info</tspan><tspan fill="#C8C8C8" font-weight="400" dx="8">system</tspan><tspan font-size="25" dy="-48" fill="#A8A8A8">TM</tspan>
   </text>
   
-  <!-- Tagline with better positioning and styling -->
+  <!-- Tagline (faded) -->
   <text x="600" y="260" 
         font-family="'Georgia', 'Times New Roman', serif" 
         font-size="35" 
         text-anchor="middle" 
-        fill="#2C2C2C"
+        fill="#A8A8A8"
         font-style="italic"
         letter-spacing="1.8">
     Project Management - One Project at a Time
