@@ -357,9 +357,11 @@ else
 // Default address book - users can add personal contacts
 \$config['address_book_type'] = 'sql';
 
-// Username domain - if a user types just 'wglover' append '@${MAIL_DOMAIN}'
-// before authenticating. Comment out to require full email always.
-\$config['username_domain'] = '${MAIL_DOMAIN}';
+// Username: require full email address always.
+// (Earlier builds set $config['username_domain'] = '${MAIL_DOMAIN}' so users
+// could type just 'wglover'. Removed because the login form does not make it
+// clear which mode is active, leading users to think their password was wrong
+// when they actually typed an unrecognized short username.)
 
 // Force HTTPS - if someone hits http:// redirect to https://
 \$config['force_https'] = true;
@@ -757,9 +759,7 @@ cat <<EOF
      You should see the Roundcube login page.
 
   2. Log in with the test mailbox credentials from Phase 4:
-       Username:  wglover@${MAIL_DOMAIN}  (or just 'wglover' - the
-                                           username_domain config will
-                                           append the domain automatically)
+       Username:  wglover@${MAIL_DOMAIN}  (full email address required)
        Password:  (the test mailbox password from Phase 4)
 
   3. You should land in the inbox and see your existing messages

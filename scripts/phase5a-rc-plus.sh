@@ -520,17 +520,30 @@ done
 
 # Branding logo - one logo for login page, top-bar, and avatar circle.
 # Path is served by the per-domain WordPress vhost.
+#
+# IMPORTANT: skin_logo array keys MUST include a skin-name prefix followed
+# by a colon, per Roundcube docs. Bare keys like '*' or 'login' do NOT
+# reliably resolve - the lookup falls through to the global '*' fallback,
+# which is why the login splash logo wasn't showing in earlier builds even
+# though the small icon worked.
+#
+# Lookup order (most-specific to least): outlook_plus:login -> outlook_plus:*
+# -> *:login -> *. We provide all four so any context renders the right logo.
 if ! grep -q "skin_logo" "$ROUNDCUBE_CONFIG"; then
     cat >> "$ROUNDCUBE_CONFIG" <<EOF
 
-// Branding logo - per-context paths.
-//   '*'     = compact slot (top-left bar, avatar circle, etc.)
-//             Use the square icon - the wide wordmark gets crushed unreadable here.
-//   'login' = full-size login splash. Wide wordmark looks correct at this size.
+// Branding logo - per-skin, per-template resolution.
+//   outlook_plus:login = login page splash (full wordmark, looks correct large)
+//   outlook_plus:*     = compact slot in outlook_plus (top-bar, avatar circle).
+//                        Use the square icon - the wide wordmark gets crushed.
+//   *:login            = fallback for any other skin's login page
+//   *                  = global fallback (compact icon)
 // Images live at /srv/www/${MAIL_DOMAIN}/branding/.
 \$config['skin_logo'] = [
-    '*'     => 'https://${MAIL_DOMAIN}/branding/docent-icon.svg',
-    'login' => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
+    'outlook_plus:login' => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
+    'outlook_plus:*'     => 'https://${MAIL_DOMAIN}/branding/docent-icon.svg',
+    '*:login'            => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
+    '*'                  => 'https://${MAIL_DOMAIN}/branding/docent-icon.svg',
 ];
 EOF
     echo "  Appended \$config['skin_logo']"
@@ -563,9 +576,112 @@ fi
 log_done "Updated Roundcube config (skin_logo, sent_mbox, junk_mbox, folder order)"
 
 # ============================================================================
-# STEP 6e: Install branding assets
+# STEP 6e: Inject CSS override to hide compose-page right-hand options pane
 # ============================================================================
-step "Step 6e: Installing branding assets"
+step "Step 6e: Hiding compose-page right-hand options pane"
+
+# The elastic skin's compose template (which outlook_plus inherits from)
+# renders a right-hand sidebar with #layout-sidebar.sidebar-right containing
+# 'Options and attachments' (return receipt, delivery status, priority,
+# save-sent-message-in dropdown, attach-a-file dropzone). User wants this
+# hidden to maximize compose-area real estate. The Attach button in the
+# top toolbar still works.
+#
+# Approach: drop a custom CSS file into the outlook_plus skin's styles
+# directory, and register it via the skin's meta.json "links.stylesheet"
+# array. We use Python to edit meta.json safely (JSON parse/modify/write)
+# rather than text-mangling it - text edits to JSON break too easily.
+
+CUSTOM_CSS="/usr/share/roundcube/skins/outlook_plus/styles/docent-overrides.css"
+CUSTOM_CSS_REL="/styles/docent-overrides.css"
+SKIN_META="/usr/share/roundcube/skins/outlook_plus/meta.json"
+
+if [ ! -d "$(dirname "$CUSTOM_CSS")" ]; then
+    log_warn "outlook_plus styles dir not found - skipping compose-pane CSS override"
+elif [ ! -f "$SKIN_META" ]; then
+    log_warn "outlook_plus meta.json not found - skipping compose-pane CSS override"
+else
+    # Write the CSS file (regenerated each run - idempotent)
+    cat > "$CUSTOM_CSS" <<'EOF'
+/* Docent overrides - applied by phase 5a, regenerated on each run.
+ * Per-server customizations to the outlook_plus skin.
+ *
+ * Hide the right-hand "Options and attachments" pane on the compose page.
+ * The Attach button in the top toolbar still works (creates an inline
+ * attachments area below the message body). The remaining options
+ * (return receipt, delivery status, priority, save-sent-folder)
+ * are deliberately removed - users can re-enable them by removing
+ * this rule if needed.
+ *
+ * Scoped to body.task-mail.action-compose so we only hide the sidebar
+ * on the compose page, not on inbox view (where the sidebar IS wanted).
+ */
+body.task-mail.action-compose #layout-sidebar.sidebar-right {
+    display: none !important;
+}
+
+/* Let the main compose area expand into the freed space */
+body.task-mail.action-compose #layout-content {
+    margin-right: 0 !important;
+    width: 100% !important;
+}
+EOF
+    chown root:www-data "$CUSTOM_CSS"
+    chmod 644 "$CUSTOM_CSS"
+    log_done "Wrote $CUSTOM_CSS"
+
+    # Register the CSS in meta.json's links.stylesheet array.
+    # Python is the safe way to edit JSON in-place.
+    python3 - "$SKIN_META" "$CUSTOM_CSS_REL" <<'PYEOF'
+import json
+import sys
+import os
+
+meta_path = sys.argv[1]
+css_rel = sys.argv[2]
+
+with open(meta_path) as f:
+    meta = json.load(f)
+
+# Ensure links.stylesheet is an array containing our CSS
+links = meta.setdefault("links", {})
+sheets = links.get("stylesheet")
+
+if sheets is None:
+    links["stylesheet"] = [css_rel]
+elif isinstance(sheets, str):
+    # Existing single string - convert to list and add ours if missing
+    if sheets != css_rel:
+        links["stylesheet"] = [sheets, css_rel]
+elif isinstance(sheets, list):
+    # Existing list - add ours if missing (idempotent)
+    if css_rel not in sheets:
+        sheets.append(css_rel)
+else:
+    # Unexpected type - bail out without touching the file
+    print(f"ERROR: links.stylesheet has unexpected type {type(sheets).__name__}", file=sys.stderr)
+    sys.exit(1)
+
+# Atomic write: write to temp file, then rename
+tmp = meta_path + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(meta, f, indent=4)
+os.replace(tmp, meta_path)
+print(f"  meta.json updated: links.stylesheet now includes {css_rel}")
+PYEOF
+
+    if [ $? -eq 0 ]; then
+        log_done "Registered $CUSTOM_CSS_REL in $SKIN_META"
+    else
+        log_fail "Failed to update $SKIN_META"
+        exit 1
+    fi
+fi
+
+# ============================================================================
+# STEP 6f: Install branding assets
+# ============================================================================
+step "Step 6f: Installing branding assets"
 
 # Branding assets (logo, watermark) are served by the WordPress/Apache vhost
 # at /srv/www/<DOMAIN>/branding/. Sources are in this repo at
