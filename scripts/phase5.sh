@@ -358,7 +358,7 @@ else
 \$config['address_book_type'] = 'sql';
 
 // Username: require full email address always.
-// (Earlier builds set $config['username_domain'] = '${MAIL_DOMAIN}' so users
+// (Earlier builds set \$config['username_domain'] = '\${MAIL_DOMAIN}' so users
 // could type just 'wglover'. Removed because the login form does not make it
 // clear which mode is active, leading users to think their password was wrong
 // when they actually typed an unrecognized short username.)
