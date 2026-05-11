@@ -28,7 +28,7 @@ set -u
 # ============================================================================
 PLONE_USER="plone"
 PLONE_HOME="/home/plone"
-PLONE_INSTANCE_DIR="/home/plone/instance"
+PLONE_INSTANCE_DIR=""  # Set later, after tenant.local is sourced
 PLONE_SHELL="/bin/bash"
 
 # Python version requirements for Plone 6.1 (per official Plone docs)
@@ -82,6 +82,14 @@ if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
 fi
 unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
+
+# Compute Plone path values now that tenant.local has been sourced.
+if [ -z "${MAIL_DOMAIN:-}" ]; then
+    echo "FATAL: MAIL_DOMAIN is not set. tenant.local must define it before phase 7a runs."
+    exit 1
+fi
+PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$MAIL_DOMAIN" | cut -d. -f1)}"
+PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 
 # ============================================================================
 # REPORT TRACKING
