@@ -295,20 +295,20 @@ LE_CERT_DIR="/etc/letsencrypt/live/$PLONE_PUBLIC_HOST"
 if [ -d "$LE_CERT_DIR" ] && [ -f "$LE_CERT_DIR/fullchain.pem" ]; then
     log_skip "Certificate for $PLONE_PUBLIC_HOST already exists at $LE_CERT_DIR"
 else
-    # certbot --apache will:
-    #   1. Add a temporary HTTP vhost for $PLONE_PUBLIC_HOST to satisfy the
-    #      http-01 challenge
-    #   2. Request the cert from Let's Encrypt
-    #   3. Install the cert files under /etc/letsencrypt/live/
-    # We use --apache so certbot handles the challenge, but we pass
-    # --no-redirect so it does NOT add its own vhost / redirect rules
-    # (we install our own vhost in step 6).
-    if ! certbot --apache \
+    # certbot certonly with --webroot: gets the cert without touching Apache
+    # config. Use the WordPress site's webroot since Apache's default vhost
+    # already serves the ACME challenge from there regardless of hostname.
+    # This matches phase 2's certbot pattern. We avoid the --apache plugin
+    # because it has a known bug on certbot 4.x in Ubuntu 26.04 (vhost
+    # ambiguity errors in non-interactive mode).
+    WEBROOT_PATH="/srv/www/$MAIL_DOMAIN"
+    if ! certbot certonly \
+            --webroot \
+            --webroot-path "$WEBROOT_PATH" \
             --non-interactive \
             --agree-tos \
             --email "$NOTIFICATION_EMAIL" \
-            --no-redirect \
-            --domain "$PLONE_PUBLIC_HOST"; then
+            -d "$PLONE_PUBLIC_HOST"; then
         log_fail "certbot failed to obtain cert for $PLONE_PUBLIC_HOST"
         log_fail "Common causes: DNS not pointing at this server, port 80 blocked,"
         log_fail "or Let's Encrypt rate limit on this domain."
