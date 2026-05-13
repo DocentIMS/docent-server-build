@@ -546,7 +546,17 @@ if ! grep -q "skin_logo" "$ROUNDCUBE_CONFIG"; then
     '*'                  => 'https://${DOMAIN}/branding/docent-icon.svg',
 ];
 EOF
-    echo "  Appended \$config['skin_logo']"
+    # Verify the heredoc actually wrote what we expected. Heredocs under
+    # set -u can silently fail (write zero bytes) if any unescaped $word
+    # in the body references an unbound variable. Grep for a unique marker
+    # from the body; if it's not there, the heredoc didn't actually write.
+    if grep -q "skin_logo" "$ROUNDCUBE_CONFIG"; then
+        echo "  Appended \$config['skin_logo']"
+    else
+        echo "  ERROR: heredoc failed to write \$config['skin_logo'] to $ROUNDCUBE_CONFIG"
+        echo "  (heredoc body may contain an unescaped \$word - check for unbound vars)"
+        exit 1
+    fi
 fi
 
 # Update sent_mbox to "Sent Items" (Outlook convention)

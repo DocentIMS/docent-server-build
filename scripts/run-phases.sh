@@ -253,7 +253,20 @@ echo "${BOLD}${GREEN}===========================================================
 echo "${BOLD}${GREEN}  ALL PHASES COMPLETE${RESET}"
 echo "${BOLD}${GREEN}============================================================${RESET}"
 echo ""
-echo "  Phases run: ${#TO_RUN[@]}"
+# Build a comma-separated list of phase labels that ran. Displaying the
+# count alone is ambiguous when --from is used (e.g. "Phases run: 5" with
+# --from 5 looks like "ran phase 5 only" but actually means "ran 5 phases":
+# 5, 5a, 5b, 5c, 6). Showing both removes the ambiguity.
+RAN_LABELS=""
+for entry in "${TO_RUN[@]}"; do
+    label="${entry%%:*}"
+    if [ -z "$RAN_LABELS" ]; then
+        RAN_LABELS="$label"
+    else
+        RAN_LABELS="$RAN_LABELS, $label"
+    fi
+done
+echo "  Phases run: ${#TO_RUN[@]} (${RAN_LABELS})"
 echo "  Total time: ${DURATION_MIN}m ${DURATION_SEC}s"
 echo ""
 
