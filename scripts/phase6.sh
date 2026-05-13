@@ -23,8 +23,9 @@ DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
 WP_DOMAIN_ALT="www.docenttemplate.com"  # default - overridden by tenant.local
 WP_DB_NAME="wordpress_docenttemplate"   # default - overridden by tenant.local
 WP_DB_USER="wp_dt_user"             # default - overridden by tenant.local
-WP_ADMIN_USERNAME="wadmin"          # used as a hint only; you set the real one in wp-admin
+WP_ADMIN_USERNAME="wpadmin"          # default - overridden by tenant.local
 WP_ADMIN_EMAIL="wglover@docentims.com"  # default - overridden by tenant.local
+WP_SITE_TITLE="Docent IMS"          # default - overridden by tenant.local
 ROOT_DEFAULTS_FILE="/root/.my.cnf"
 
 # === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
@@ -418,6 +419,77 @@ else
 fi
 
 # ============================================================================
+# STEP 7: Install wp-cli and run the WordPress install wizard
+# ============================================================================
+# Previously phase 6 stopped here and asked the user to open
+# https://<domain>/wp-admin/install.php in a browser and fill in a form.
+# wp-cli lets us do the same thing from the command line, idempotently.
+# Re-running this step is safe: 'wp core is-installed' returns 0 if the
+# install already happened and we skip everything below.
+step "Step 7: Running the WordPress install wizard via wp-cli"
+
+WP_CLI_BIN="/usr/local/bin/wp"
+WP_CLI_URL="https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
+
+# Install wp-cli if not already present.
+if [ -x "$WP_CLI_BIN" ]; then
+    WP_CLI_VERSION=$("$WP_CLI_BIN" --version 2>/dev/null | awk '{print $2}')
+    log_skip "wp-cli already installed (version ${WP_CLI_VERSION:-unknown})"
+else
+    if curl -fsSL -o /tmp/wp-cli.phar "$WP_CLI_URL"; then
+        chmod +x /tmp/wp-cli.phar
+        mv /tmp/wp-cli.phar "$WP_CLI_BIN"
+        WP_CLI_VERSION=$("$WP_CLI_BIN" --version 2>/dev/null | awk '{print $2}')
+        log_done "Installed wp-cli to $WP_CLI_BIN (version ${WP_CLI_VERSION:-unknown})"
+    else
+        log_fail "Failed to download wp-cli from $WP_CLI_URL"
+        exit 1
+    fi
+fi
+
+# Sanity-check that the password is available in this script's environment.
+# If WP_ADMIN_PW isn't set (e.g. an older phase 0 ran before this variable was
+# introduced), bail out with a clear error rather than inventing one.
+if [ -z "${WP_ADMIN_PW:-}" ]; then
+    log_fail "WP_ADMIN_PW is not set. Re-run phase 0 to regenerate secrets.local,"
+    log_fail "or set it manually in $__PHASE_REPO_ROOT/secrets.local and re-run phase 6."
+    exit 1
+fi
+
+# Run the install (idempotent: only runs if WP isn't already installed).
+# All wp-cli calls go through 'sudo -u www-data' so files are owned correctly.
+if sudo -u www-data "$WP_CLI_BIN" --path="$WP_DIR" core is-installed 2>/dev/null; then
+    log_skip "WordPress is already installed (skipping wizard)"
+else
+    if sudo -u www-data "$WP_CLI_BIN" --path="$WP_DIR" core install \
+            --url="https://$DOMAIN" \
+            --title="$WP_SITE_TITLE" \
+            --admin_user="$WP_ADMIN_USERNAME" \
+            --admin_password="$WP_ADMIN_PW" \
+            --admin_email="$WP_ADMIN_EMAIL" \
+            --skip-email; then
+        log_done "WordPress installed (site: $WP_SITE_TITLE, admin: $WP_ADMIN_USERNAME)"
+    else
+        log_fail "wp-cli core install failed"
+        exit 1
+    fi
+fi
+
+# Discourage search engines = CHECKED.
+# blog_public is the inverse: 0 means "discourage", 1 means "allow indexing".
+# Setting to 0 makes WP add a noindex meta tag and disallow robots in /robots.txt.
+CURRENT_BLOG_PUBLIC=$(sudo -u www-data "$WP_CLI_BIN" --path="$WP_DIR" option get blog_public 2>/dev/null || echo "")
+if [ "$CURRENT_BLOG_PUBLIC" = "0" ]; then
+    log_skip "Search engine visibility already set to 'discourage' (blog_public=0)"
+else
+    if sudo -u www-data "$WP_CLI_BIN" --path="$WP_DIR" option update blog_public 0 >/dev/null 2>&1; then
+        log_done "Set search engine visibility to 'discourage' (blog_public=0)"
+    else
+        log_fail "Failed to set blog_public=0"
+    fi
+fi
+
+# ============================================================================
 # REPORT
 # ============================================================================
 echo ""
@@ -443,11 +515,11 @@ echo ""
 echo "  The WordPress DB password is also stored in:"
 echo "    $WP_CONFIG (mode 640, www-data:www-data)"
 echo ""
-echo "  Suggested WP admin username: $WP_ADMIN_USERNAME"
-echo "  Suggested WP admin email:    $WP_ADMIN_EMAIL"
-echo ""
-echo "  (You'll set the actual admin username/password/email next at"
-echo "   https://$DOMAIN/wp-admin/install.php — see manual steps below)"
+echo "  WordPress admin login (created automatically by Step 7):"
+echo "    URL:      https://$DOMAIN/wp-admin/"
+echo "    Username: $WP_ADMIN_USERNAME"
+echo "    Password: see CREDENTIALS.txt (WP_ADMIN_PW)"
+echo "    Email:    $WP_ADMIN_EMAIL"
 
 # ============================================================================
 # AUTOMATED VERIFICATION
@@ -636,6 +708,34 @@ else
     echo "  [WARN] wp-config.php returned $WP_CONFIG_CODE"
 fi
 
+# wp-cli binary exists and is executable
+if [ -x "$WP_CLI_BIN" ]; then
+    echo "  [PASS] wp-cli installed at $WP_CLI_BIN"
+    VERIFY_PASS=$((VERIFY_PASS + 1))
+else
+    echo "  [FAIL] wp-cli not found at $WP_CLI_BIN"
+    VERIFY_FAIL=$((VERIFY_FAIL + 1))
+fi
+
+# WordPress is installed (wp_options table populated)
+if sudo -u www-data "$WP_CLI_BIN" --path="$WP_DIR" core is-installed 2>/dev/null; then
+    echo "  [PASS] WordPress is installed (wp core is-installed returned 0)"
+    VERIFY_PASS=$((VERIFY_PASS + 1))
+else
+    echo "  [FAIL] WordPress is NOT installed (wp core is-installed failed)"
+    VERIFY_FAIL=$((VERIFY_FAIL + 1))
+fi
+
+# blog_public is 0 (discourage search engines = checked)
+BP=$(sudo -u www-data "$WP_CLI_BIN" --path="$WP_DIR" option get blog_public 2>/dev/null || echo "")
+if [ "$BP" = "0" ]; then
+    echo "  [PASS] Search engine visibility set to 'discourage' (blog_public=0)"
+    VERIFY_PASS=$((VERIFY_PASS + 1))
+else
+    echo "  [FAIL] blog_public is '$BP', expected '0' (search engines should be discouraged)"
+    VERIFY_FAIL=$((VERIFY_FAIL + 1))
+fi
+
 echo ""
 echo "  Verification: $VERIFY_PASS passed, $VERIFY_FAIL failed"
 echo ""
@@ -654,31 +754,31 @@ echo "==================================================================="
 cat <<EOF
 
   1. Confirm CREDENTIALS.txt is saved in your password manager.
-     The WordPress DB password is in BACKEND PASSWORDS.
+     The WordPress admin password is in section 5 (WORDPRESS ADMIN);
+     the WordPress DB password is in BACKEND PASSWORDS.
 
-  2. In a browser, complete the WordPress install wizard:
-       https://$DOMAIN/wp-admin/install.php
+  2. Log in to WordPress:
+       URL:      https://$DOMAIN/wp-admin/
+       Username: $WP_ADMIN_USERNAME
+       Password: see CREDENTIALS.txt section 5 (WP_ADMIN_PW)
 
-     - Site Title: anything you want (you can change later)
-     - Username:   $WP_ADMIN_USERNAME  (NOT 'admin' - heavily attacked)
-     - Password:   let WP generate a strong one, save to password manager
-     - Email:      $WP_ADMIN_EMAIL
-     - Discourage search engines: leave unchecked (you want Kamatera to find it)
+     The site is already installed (Step 7 ran the wizard via wp-cli).
+     Search engine visibility is set to 'discourage' (placeholder/template
+     content shouldn't be indexed). Toggle that off in Settings > Reading
+     once the site is publicly ready.
 
-  3. Log in at: https://$DOMAIN/wp-admin/
-
-  4. Theme/configure the site to look like a real Docent project page,
+  3. Theme/configure the site to look like a real Docent project page,
      using whatever template/approach you've used before. The goal is
      a real-looking site so Kamatera will approve PTR.
 
-  5. Once the site is "real-looking enough":
+  4. Once the site is "real-looking enough":
      - Submit (or re-submit) the PTR request to Kamatera, asking for:
          PTR $SERVER_IP -> mail.$DOMAIN
      - Without PTR, outbound mail to Gmail/Outlook/etc. will land in spam.
        Inbound and webmail still work fine - PTR only affects outbound
        deliverability reputation.
 
-  6. Clear scrollback:  clear && history -c
+  5. Clear scrollback:  clear && history -c
 
 EOF
 echo "==================================================================="

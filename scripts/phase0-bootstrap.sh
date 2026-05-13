@@ -395,6 +395,8 @@ DOMAIN_STEM="${DOMAIN%%.*}"
 HOSTNAME_SHORT="$DOMAIN_STEM"
 WP_DB_NAME="wordpress_${DOMAIN_STEM}"
 WP_DB_USER="wp_$(echo "$DOMAIN_STEM" | head -c 2)_user"
+WP_ADMIN_USERNAME="wpadmin"
+WP_SITE_TITLE="Docent IMS"
 TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${DOMAIN}"
 
 cat <<EOF
@@ -406,6 +408,8 @@ ${DIM}The following are auto-derived from your primary domain:${RESET}
   Test mailbox:           ${CYAN}${TEST_MAILBOX}${RESET}
   WordPress database:     ${CYAN}${WP_DB_NAME}${RESET}
   WordPress DB user:      ${CYAN}${WP_DB_USER}${RESET}
+  WordPress admin user:   ${CYAN}${WP_ADMIN_USERNAME}${RESET}
+  WordPress site title:   ${CYAN}${WP_SITE_TITLE}${RESET}
 
 EOF
 
@@ -422,8 +426,9 @@ TEST_MAILBOX_PW=$(gen_pw 22)
 ROUNDCUBE_DB_PW=$(gen_pw 28)
 ROUNDCUBE_DES_KEY=$(gen_pw 24)
 WP_DB_PW=$(gen_pw 28)
+WP_ADMIN_PW=$(gen_pw 22)
 
-echo "${GREEN}Generated 8 random passwords (22-28 chars each)${RESET}"
+echo "${GREEN}Generated 9 random passwords (22-28 chars each)${RESET}"
 
 # ============================================================================
 # CONFIRMATION
@@ -444,7 +449,7 @@ ${BOLD}Tenant config to be written:${RESET}
 ${BOLD}Secrets to be written:${RESET}
   RC+ license key:         ${CYAN}${RC_PLUS_LICENSE_KEY}${RESET}
   AI API key:              ${CYAN}${XAI_API_KEY:-(skipped)}${RESET}
-  Plus 8 auto-generated passwords.
+  Plus 9 auto-generated passwords.
 
 EOF
 
@@ -488,6 +493,8 @@ MAIL_HOSTNAME="mail.${DOMAIN}"
 WP_DOMAIN_ALT="www.${DOMAIN}"
 WP_DB_NAME="${WP_DB_NAME}"
 WP_DB_USER="${WP_DB_USER}"
+WP_ADMIN_USERNAME="${WP_ADMIN_USERNAME}"
+WP_SITE_TITLE="${WP_SITE_TITLE}"
 TEST_MAILBOX="${TEST_MAILBOX}"
 
 CERTBOT_EMAIL="${NOTIFICATION_EMAIL}"
@@ -531,6 +538,7 @@ TEST_MAILBOX_PW="${TEST_MAILBOX_PW}"
 ROUNDCUBE_DB_PW="${ROUNDCUBE_DB_PW}"
 ROUNDCUBE_DES_KEY="${ROUNDCUBE_DES_KEY}"
 WP_DB_PW="${WP_DB_PW}"
+WP_ADMIN_PW="${WP_ADMIN_PW}"
 SECRETS_LOCAL_EOF
 
 chmod 600 "$SECRETS_FILE"
@@ -617,6 +625,18 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
   Password:      ${TEST_MAILBOX_PW}
 
 ==============================================================
+  5. WORDPRESS ADMIN  (logging into wp-admin)
+==============================================================
+  WHAT IT'S FOR:    Logging into WordPress to edit the site.
+                    Phase 6 runs the install wizard
+                    automatically, so this account is ready
+                    to use as soon as phase 6 finishes.
+  WHERE YOU USE IT: https://${DOMAIN}/wp-admin/
+
+  Username: ${WP_ADMIN_USERNAME}
+  Password: ${WP_ADMIN_PW}
+
+==============================================================
   BACKEND PASSWORDS (you don't type these — software uses them)
 ==============================================================
   These are used by software internally. You don't ever type
@@ -678,8 +698,10 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
     Username: ${TEST_MAILBOX_LOCAL}    (or full: ${TEST_MAILBOX})
     Password: ${TEST_MAILBOX_PW}
 
-  WordPress admin (after install wizard):
+  WordPress admin:
     https://${DOMAIN}/wp-admin/
+    Username: ${WP_ADMIN_USERNAME}
+    Password: ${WP_ADMIN_PW}
 
   Kamatera console (when SSH is broken):
     https://console.kamatera.com
