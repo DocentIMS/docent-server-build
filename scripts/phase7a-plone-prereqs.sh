@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# phase7a-plone-prereqs.sh - Phase 7a: OS prerequisites for Plone 6.1 classic
+# phase7a-plone-prereqs.sh - Phase 7a: OS prerequisites for Plone 6.2 classic
 #
 # Installs system packages and creates the working environment that Plone
 # needs, but does NOT install Plone itself. After this phase runs, the
@@ -28,15 +28,21 @@ set -u
 # ============================================================================
 PLONE_USER="plone"
 PLONE_HOME="/home/plone"
-PLONE_INSTANCE_DIR=""  # Set later, after tenant.local is sourced
+PLONE_INSTANCE_DIR="/home/plone/instance"
 PLONE_SHELL="/bin/bash"
 
-# Python version requirements for Plone 6.1 (per official Plone docs)
+# Python version requirements for Plone 6.2 (per official Plone docs).
+# Plone 6.2.0rc2 was released 2026-05-08 and supports Python 3.10 through 3.14.
+# Ubuntu 26.04 ships with Python 3.14 as the system Python, so the system
+# python3 binary works out of the box without deadsnakes/pyenv.
+#
+# (Plone 6.1 supports only 3.10-3.13. We deliberately target 6.2 to avoid
+# needing a separate Python install for 3.13 or earlier.)
 PYTHON_MIN_MAJOR=3
 PYTHON_MIN_MINOR=10
 PYTHON_MAX_MINOR=14
 
-# System packages required by Plone 6.1 classic + DocentIMS.ActionItems
+# System packages required by Plone 6.2 classic + DocentIMS.ActionItems
 # install_requires (numpy, pandas, openpyxl, python-docx-oss, etc.)
 SYSTEM_PACKAGES=(
     # Build toolchain
@@ -52,7 +58,7 @@ SYSTEM_PACKAGES=(
     libjpeg-dev
     libtiff-dev
     libwebp-dev
-    libfreetype6-dev
+    libfreetype-dev   # Ubuntu 26.04 renamed libfreetype6-dev to libfreetype-dev
     # Compression (Pillow, ZODB)
     zlib1g-dev
     # Python dev + venv (Plone buildout creates a venv)
@@ -82,14 +88,6 @@ if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
 fi
 unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
-
-# Compute Plone path values now that tenant.local has been sourced.
-if [ -z "${MAIL_DOMAIN:-}" ]; then
-    echo "FATAL: MAIL_DOMAIN is not set. tenant.local must define it before phase 7a runs."
-    exit 1
-fi
-PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$MAIL_DOMAIN" | cut -d. -f1)}"
-PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 
 # ============================================================================
 # REPORT TRACKING
@@ -134,7 +132,7 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # ============================================================================
-# STEP 1: Verify Python version is in Plone 6.1's supported range
+# STEP 1: Verify Python version is in Plone 6.2's supported range
 # ============================================================================
 step "Step 1: Verifying system Python version"
 
@@ -153,19 +151,19 @@ PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
 if [ "$PYTHON_MAJOR" -ne "$PYTHON_MIN_MAJOR" ] \
    || [ "$PYTHON_MINOR" -lt "$PYTHON_MIN_MINOR" ] \
    || [ "$PYTHON_MINOR" -gt "$PYTHON_MAX_MINOR" ]; then
-    log_fail "Python $PYTHON_VERSION is outside Plone 6.1's supported range (3.10-3.13)"
+    log_fail "Python $PYTHON_VERSION is outside Plone 6.2's supported range (3.10-3.14)"
     echo ""
-    echo "  Plone 6.1 requires Python 3.10, 3.11, 3.12, or 3.13."
+    echo "  Plone 6.2 requires Python 3.10, 3.11, 3.12, 3.13, or 3.14."
     echo "  Detected: $PYTHON_VERSION"
     echo ""
-    echo "  On Ubuntu 26.04 the system ships with a Python in this range, so this"
-    echo "  failure suggests the system was upgraded or modified. Either:"
-    echo "    - install python3.12 from deadsnakes PPA, or"
+    echo "  On Ubuntu 26.04 the system Python is 3.14, which is in range. If"
+    echo "  this check is failing, the system was upgraded or modified. Either:"
+    echo "    - install a supported Python from deadsnakes PPA, or"
     echo "    - investigate why python3 is reporting an unsupported version."
     exit 1
 fi
 
-log_done "System Python is $PYTHON_VERSION (in Plone 6.1's supported range)"
+log_done "System Python is $PYTHON_VERSION (in Plone 6.2's supported range)"
 
 # ============================================================================
 # STEP 2: Install system packages
@@ -285,14 +283,21 @@ verify() {
     fi
 }
 
-# Python in supported range
+# Python in supported range.
+# NOTE: this check uses the same PYTHON_MIN_MINOR / PYTHON_MAX_MINOR variables
+# as Step 1, so the two can never disagree. (Earlier version of this script
+# had hard-coded 10/13 here while Step 1 used the variables; when 6.2 widened
+# the range to 14, Step 1 was updated but this check was not, causing Step 1
+# to pass and verification to fail for the same Python version.)
 PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)
 PY_MAJOR=$(echo "$PY_VER" | cut -d. -f1)
 PY_MINOR=$(echo "$PY_VER" | cut -d. -f2)
-if [ "$PY_MAJOR" = "3" ] && [ "$PY_MINOR" -ge 10 ] && [ "$PY_MINOR" -le 13 ]; then
-    verify "Python $PY_VER is in Plone 6.1 supported range" "PASS"
+if [ "$PY_MAJOR" = "$PYTHON_MIN_MAJOR" ] \
+   && [ "$PY_MINOR" -ge "$PYTHON_MIN_MINOR" ] \
+   && [ "$PY_MINOR" -le "$PYTHON_MAX_MINOR" ]; then
+    verify "Python $PY_VER is in Plone 6.2 supported range" "PASS"
 else
-    verify "Python $PY_VER is in Plone 6.1 supported range" "FAIL"
+    verify "Python $PY_VER is in Plone 6.2 supported range" "FAIL"
 fi
 
 # Each system package
@@ -382,13 +387,15 @@ echo "     - create a separate deployment buildout that pulls"
 echo "       DocentIMS.ActionItems as an egg, OR"
 echo "     - whatever approach works best for the project"
 echo ""
-echo "  2. As the plone user (NOT root), set up Plone:"
+echo "  2. As the plone user (NOT root), set up Plone 6.2.0rc2:"
 echo "       sudo su - plone"
 echo "       cd ~/instance"
-echo "       # ... clone or create your buildout here ..."
 echo "       python3 -m venv ."
-echo "       bin/pip install -r https://dist.plone.org/release/6.1-latest/requirements.txt"
-echo "       bin/buildout"
+echo "       bin/pip install --upgrade pip setuptools wheel"
+echo "       # --pre is required because 6.2.0rc2 is a pre-release."
+echo "       # -c pins all dependency versions to the official 6.2.0rc2 set."
+echo "       bin/pip install --pre -c https://dist.plone.org/release/6.2.0rc2/constraints.txt Plone"
+echo "       # ... then clone or create your buildout, or proceed with pip-only install ..."
 echo ""
 echo "  3. Test the instance in foreground:"
 echo "       bin/instance fg"
@@ -397,6 +404,10 @@ echo ""
 echo "  4. Once the install approach is stable, ask for phase 7b which will"
 echo "     automate the buildout, install a systemd service, and configure"
 echo "     Apache reverse-proxy to https://<your-domain>/."
+echo ""
+echo "  NOTE on Plone 6.2.0rc2: this is a release candidate, not stable final."
+echo "  Final 6.2.0 expected very soon. When final ships, update this script"
+echo "  to pin to the final version (replace 6.2.0rc2 with 6.2.0)."
 echo ""
 echo "==================================================================="
 echo ""
