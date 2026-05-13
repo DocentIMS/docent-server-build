@@ -15,7 +15,7 @@ set -u
 # CONFIGURATION
 # ============================================================================
 # Non-domain-dependent constants. These are the same regardless of tenant.
-MAIL_DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
+DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
 MAIL_HOSTNAME="mail.docenttemplate.com"  # default - overridden by tenant.local
 TEST_MAILBOX_LOCAL="test"             # default - tenant.local sets TEST_MAILBOX
 
@@ -48,13 +48,13 @@ unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
 
 # Domain-dependent paths and values. These MUST be computed AFTER sourcing
-# tenant.local so they pick up the correct MAIL_DOMAIN/MAIL_HOSTNAME values.
+# tenant.local so they pick up the correct DOMAIN/MAIL_HOSTNAME values.
 # (If we set them before sourcing, bash evaluates the variables immediately
 # and they keep the docenttemplate.com defaults even after tenant.local
-# overrides MAIL_DOMAIN.)
-TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${MAIL_DOMAIN}"
-DKIM_KEY_DIR="/etc/opendkim/keys/${MAIL_DOMAIN}"
-CERT_DIR="/etc/letsencrypt/live/${MAIL_DOMAIN}"
+# overrides DOMAIN.)
+TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${DOMAIN}"
+DKIM_KEY_DIR="/etc/opendkim/keys/${DOMAIN}"
+CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
 
 # ============================================================================
 # REPORT TRACKING
@@ -119,7 +119,7 @@ if [ ! -d "$CERT_DIR" ]; then
 fi
 
 echo "==================================================================="
-echo "  Phase 4 - Mail server for $MAIL_DOMAIN"
+echo "  Phase 4 - Mail server for $DOMAIN"
 echo "  Hostname: $MAIL_HOSTNAME"
 echo "  $(date)"
 echo "==================================================================="
@@ -140,17 +140,17 @@ else
         exit 1
     fi
 
-    # Detect the active webroot for $MAIL_DOMAIN. After Phase 6 (WordPress)
-    # the active vhost serves /srv/www/$MAIL_DOMAIN/. Before Phase 6 it's
+    # Detect the active webroot for $DOMAIN. After Phase 6 (WordPress)
+    # the active vhost serves /srv/www/$DOMAIN/. Before Phase 6 it's
     # /srv/www/default/. We test by writing a marker file and curling it.
     WEBROOT=""
-    for candidate in "/srv/www/$MAIL_DOMAIN" "/srv/www/default"; do
+    for candidate in "/srv/www/$DOMAIN" "/srv/www/default"; do
         if [ -d "$candidate" ]; then
             mkdir -p "$candidate/.well-known/acme-challenge"
             MARKER="phase4-webroot-test-$$"
             echo "$MARKER" > "$candidate/.well-known/acme-challenge/test"
             chmod 644 "$candidate/.well-known/acme-challenge/test"
-            FETCHED=$(curl -sL --max-time 5 "http://$MAIL_DOMAIN/.well-known/acme-challenge/test" 2>/dev/null || true)
+            FETCHED=$(curl -sL --max-time 5 "http://$DOMAIN/.well-known/acme-challenge/test" 2>/dev/null || true)
             rm -f "$candidate/.well-known/acme-challenge/test"
             if [ "$FETCHED" = "$MARKER" ]; then
                 WEBROOT="$candidate"
@@ -160,7 +160,7 @@ else
     done
 
     if [ -z "$WEBROOT" ]; then
-        log_fail "Could not determine active webroot for $MAIL_DOMAIN. Check Apache vhost."
+        log_fail "Could not determine active webroot for $DOMAIN. Check Apache vhost."
         exit 1
     fi
     echo "  (using webroot: $WEBROOT)"
@@ -171,10 +171,10 @@ else
         --non-interactive \
         --agree-tos \
         --email "wglover@docentims.com" \
-        --cert-name "$MAIL_DOMAIN" \
+        --cert-name "$DOMAIN" \
         --expand \
-        -d "$MAIL_DOMAIN" \
-        -d "www.$MAIL_DOMAIN" \
+        -d "$DOMAIN" \
+        -d "www.$DOMAIN" \
         -d "$MAIL_HOSTNAME" 2>&1 | tail -10; then
         log_done "Cert extended to cover $MAIL_HOSTNAME"
         systemctl reload apache2 2>/dev/null || true
@@ -334,13 +334,13 @@ SQL
 fi
 
 DOMAIN_EXISTS=$(mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -Nse \
-    "SELECT COUNT(*) FROM virtual_domains WHERE name='$MAIL_DOMAIN';" 2>/dev/null || echo "0")
+    "SELECT COUNT(*) FROM virtual_domains WHERE name='$DOMAIN';" 2>/dev/null || echo "0")
 if [ "$DOMAIN_EXISTS" -gt 0 ]; then
-    log_skip "Domain $MAIL_DOMAIN already in virtual_domains"
+    log_skip "Domain $DOMAIN already in virtual_domains"
 else
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -e \
-        "INSERT INTO virtual_domains (name) VALUES ('$MAIL_DOMAIN');"
-    log_done "Inserted $MAIL_DOMAIN into virtual_domains"
+        "INSERT INTO virtual_domains (name) VALUES ('$DOMAIN');"
+    log_done "Inserted $DOMAIN into virtual_domains"
 fi
 
 MBOX_EXISTS=$(mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -Nse \
@@ -362,7 +362,7 @@ else
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -e \
         "INSERT INTO virtual_mailboxes (domain_id, email, password)
-         SELECT id, '$TEST_MAILBOX', '$HASHED_PW' FROM virtual_domains WHERE name='$MAIL_DOMAIN';"
+         SELECT id, '$TEST_MAILBOX', '$HASHED_PW' FROM virtual_domains WHERE name='$DOMAIN';"
     log_done "Created test mailbox $TEST_MAILBOX"
 fi
 
@@ -412,7 +412,7 @@ write_postfix_mysql_cf /etc/postfix/mysql-virtual-alias-maps.cf \
 log_done "Wrote Postfix MariaDB lookup configs"
 
 postconf -e "myhostname = $MAIL_HOSTNAME"
-postconf -e "mydomain = $MAIL_DOMAIN"
+postconf -e "mydomain = $DOMAIN"
 postconf -e "myorigin = \$mydomain"
 postconf -e "inet_interfaces = all"
 postconf -e "inet_protocols = ipv4"
@@ -537,7 +537,7 @@ protocol imap {
 }
 
 protocol lmtp {
-    postmaster_address = postmaster@${MAIL_DOMAIN}
+    postmaster_address = postmaster@${DOMAIN}
     # Sieve runs at LMTP delivery time. The 'global' sieve_script (defined
     # below) routes spam-flagged messages to the Junk folder.
     mail_plugins {
@@ -712,7 +712,7 @@ if [ -f "$DKIM_KEY_DIR/$DKIM_SELECTOR.private" ]; then
 else
     mkdir -p "$DKIM_KEY_DIR"
     cd "$DKIM_KEY_DIR"
-    opendkim-genkey -b 2048 -d "$MAIL_DOMAIN" -s "$DKIM_SELECTOR" 2>/dev/null
+    opendkim-genkey -b 2048 -d "$DOMAIN" -s "$DKIM_SELECTOR" 2>/dev/null
     chown -R opendkim:opendkim /etc/opendkim
     chmod 700 "$DKIM_KEY_DIR"
     chmod 600 "$DKIM_KEY_DIR/$DKIM_SELECTOR.private"
@@ -723,11 +723,11 @@ fi
 mkdir -p /etc/opendkim
 cat > /etc/opendkim/key.table <<EOF
 # phase4-marker - managed by phase4.sh
-${DKIM_SELECTOR}._domainkey.${MAIL_DOMAIN} ${MAIL_DOMAIN}:${DKIM_SELECTOR}:${DKIM_KEY_DIR}/${DKIM_SELECTOR}.private
+${DKIM_SELECTOR}._domainkey.${DOMAIN} ${DOMAIN}:${DKIM_SELECTOR}:${DKIM_KEY_DIR}/${DKIM_SELECTOR}.private
 EOF
 cat > /etc/opendkim/signing.table <<EOF
 # phase4-marker - managed by phase4.sh
-*@${MAIL_DOMAIN}    ${DKIM_SELECTOR}._domainkey.${MAIL_DOMAIN}
+*@${DOMAIN}    ${DKIM_SELECTOR}._domainkey.${DOMAIN}
 EOF
 cat > /etc/opendkim/trusted.hosts <<'EOF'
 # phase4-marker - managed by phase4.sh
@@ -892,7 +892,7 @@ done
 # STEP 9b: Generate BIND zone file for DNS provider import
 # ============================================================================
 # Produces a complete, ready-to-import BIND zone file at
-# /root/server_setup/dns/<MAIL_DOMAIN>.zone. This file can be uploaded
+# /root/server_setup/dns/<DOMAIN>.zone. This file can be uploaded
 # directly to Cloudflare DNS (Records -> Import and Export -> Import) or
 # used as a reference when entering records manually at IONOS or any other
 # DNS provider. The DKIM key is read from the live OpenDKIM key file so
@@ -900,7 +900,7 @@ done
 step "Step 9b: Generating BIND zone file for DNS import"
 
 ZONE_DIR="/root/server_setup/dns"
-ZONE_FILE="$ZONE_DIR/${MAIL_DOMAIN}.zone"
+ZONE_FILE="$ZONE_DIR/${DOMAIN}.zone"
 mkdir -p "$ZONE_DIR"
 chmod 700 "$ZONE_DIR"
 
@@ -947,7 +947,7 @@ if [ -z "$DKIM_RECORD" ]; then
 fi
 
 cat > "$ZONE_FILE" <<EOF
-; BIND zone file for ${MAIL_DOMAIN}
+; BIND zone file for ${DOMAIN}
 ; Generated by phase4.sh on $(date '+%Y-%m-%d %H:%M:%S %Z')
 ;
 ; To import at Cloudflare:
@@ -956,7 +956,7 @@ cat > "$ZONE_FILE" <<EOF
 ; To use at another DNS provider that supports BIND import,
 ; consult that provider's documentation.
 
-\$ORIGIN ${MAIL_DOMAIN}.
+\$ORIGIN ${DOMAIN}.
 \$TTL 3600
 
 ; ----- Web server (Phase 2) -----
@@ -965,7 +965,7 @@ www      IN  A      ${SERVER_IP}
 
 ; ----- Mail server (Phase 4) -----
 mail     IN  A      ${SERVER_IP}
-@        IN  MX 10  mail.${MAIL_DOMAIN}.
+@        IN  MX 10  mail.${DOMAIN}.
 
 ; ----- SPF: only this server (via MX) is allowed to send for the domain -----
 @        IN  TXT    "v=spf1 mx ~all"
@@ -1090,7 +1090,7 @@ echo "  DNS RECORDS TO ADD AT IONOS"
 echo "==================================================================="
 cat <<EOF
 
-  After this script completes, add these records at IONOS for $MAIL_DOMAIN:
+  After this script completes, add these records at IONOS for $DOMAIN:
 
   1. MX record
        Host:  @
@@ -1286,10 +1286,10 @@ for port in 465 995; do
     fi
 done
 
-if postmap -q "$MAIL_DOMAIN" mysql:/etc/postfix/mysql-virtual-mailbox-domains.cf 2>/dev/null | grep -q 1; then
-    vp "Postfix can resolve $MAIL_DOMAIN via MariaDB"
+if postmap -q "$DOMAIN" mysql:/etc/postfix/mysql-virtual-mailbox-domains.cf 2>/dev/null | grep -q 1; then
+    vp "Postfix can resolve $DOMAIN via MariaDB"
 else
-    vf "Postfix cannot resolve $MAIL_DOMAIN via MariaDB"
+    vf "Postfix cannot resolve $DOMAIN via MariaDB"
 fi
 
 if postmap -q "$TEST_MAILBOX" mysql:/etc/postfix/mysql-virtual-mailbox-maps.cf 2>/dev/null | grep -q 1; then
@@ -1365,8 +1365,8 @@ cat <<EOF
        echo "test body" | mail -s "test subject" $TEST_MAILBOX
 
   3. Confirm it landed in the maildir:
-       sudo find $VMAIL_HOME/$MAIL_DOMAIN -name 'new' -type d
-       sudo ls -la $VMAIL_HOME/$MAIL_DOMAIN/$TEST_MAILBOX_LOCAL/new/
+       sudo find $VMAIL_HOME/$DOMAIN -name 'new' -type d
+       sudo ls -la $VMAIL_HOME/$DOMAIN/$TEST_MAILBOX_LOCAL/new/
 
   4. Check the mail logs for any errors:
        sudo tail -50 /var/log/mail.log
@@ -1374,7 +1374,7 @@ cat <<EOF
   EXTERNAL CONFIGURATION (DNS - choose ONE method):
 
   5a. MANUAL at IONOS:
-      Add the four DNS records listed above at IONOS DNS for $MAIL_DOMAIN.
+      Add the four DNS records listed above at IONOS DNS for $DOMAIN.
       Remove the IONOS-managed mail records before/while adding the new ones.
       See dns-reference.docx for the full list.
 
@@ -1389,10 +1389,10 @@ cat <<EOF
        to Cloudflare" for the migration steps.)
 
   6. After DNS has propagated (usually < 1 minute), verify:
-       dig @8.8.8.8 MX $MAIL_DOMAIN
-       dig @8.8.8.8 TXT $MAIL_DOMAIN
-       dig @8.8.8.8 TXT ${DKIM_SELECTOR}._domainkey.$MAIL_DOMAIN
-       dig @8.8.8.8 TXT _dmarc.$MAIL_DOMAIN
+       dig @8.8.8.8 MX $DOMAIN
+       dig @8.8.8.8 TXT $DOMAIN
+       dig @8.8.8.8 TXT ${DKIM_SELECTOR}._domainkey.$DOMAIN
+       dig @8.8.8.8 TXT _dmarc.$DOMAIN
 
   EXTERNAL TESTING (limited until PTR is set):
 

@@ -22,7 +22,7 @@ set -u
 # CONFIGURATION
 # ============================================================================
 # Non-domain-dependent constants.
-MAIL_DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
+DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
 MAIL_HOSTNAME="mail.docenttemplate.com"  # default - overridden by tenant.local
 ROUNDCUBE_DIR="/usr/share/roundcube"   # package install location
 ROUNDCUBE_URL_PATH="/mail"             # served at https://<domain>/mail/
@@ -48,9 +48,9 @@ unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
 
 # Domain-dependent paths. Computed AFTER sourcing so they pick up the
-# correct MAIL_DOMAIN value.
-APACHE_VHOST="/etc/apache2/sites-available/${MAIL_DOMAIN}-le-ssl.conf"
-CERT_DIR="/etc/letsencrypt/live/${MAIL_DOMAIN}"
+# correct DOMAIN value.
+APACHE_VHOST="/etc/apache2/sites-available/${DOMAIN}-le-ssl.conf"
+CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
 
 # ============================================================================
 # REPORT TRACKING
@@ -124,8 +124,8 @@ if ! systemctl is-active --quiet postfix; then
 fi
 
 echo "==================================================================="
-echo "  Phase 5 - Roundcube webmail for $MAIL_DOMAIN"
-echo "  Will be served at: https://$MAIL_DOMAIN$ROUNDCUBE_URL_PATH/"
+echo "  Phase 5 - Roundcube webmail for $DOMAIN"
+echo "  Will be served at: https://$DOMAIN$ROUNDCUBE_URL_PATH/"
 echo "  $(date)"
 echo "==================================================================="
 
@@ -336,7 +336,7 @@ else
 
 // Site / branding
 \$config['support_url']  = '';
-\$config['product_name'] = 'Webmail - ${MAIL_DOMAIN}';
+\$config['product_name'] = 'Webmail - ${DOMAIN}';
 
 // 24-char DES key used to encrypt cached IMAP password in session.
 // Random per-server. Don't share. Don't change after deployment - users
@@ -358,7 +358,7 @@ else
 \$config['address_book_type'] = 'sql';
 
 // Username: require full email address always.
-// (Earlier builds set \$config['username_domain'] = '\${MAIL_DOMAIN}' so users
+// (Earlier builds set \$config['username_domain'] = '\${DOMAIN}' so users
 // could type just 'wglover'. Removed because the login form does not make it
 // clear which mode is active, leading users to think their password was wrong
 // when they actually typed an unrecognized short username.)
@@ -696,11 +696,11 @@ fi
 
 # Test that Roundcube responds at https://<domain>/mail/
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    "https://${MAIL_DOMAIN}${ROUNDCUBE_URL_PATH}/" 2>/dev/null || echo "000")
+    "https://${DOMAIN}${ROUNDCUBE_URL_PATH}/" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
-    vp "Roundcube responds at https://${MAIL_DOMAIN}${ROUNDCUBE_URL_PATH}/ (HTTP $HTTP_CODE)"
+    vp "Roundcube responds at https://${DOMAIN}${ROUNDCUBE_URL_PATH}/ (HTTP $HTTP_CODE)"
 else
-    vf "Roundcube does NOT respond at https://${MAIL_DOMAIN}${ROUNDCUBE_URL_PATH}/ (HTTP $HTTP_CODE)"
+    vf "Roundcube does NOT respond at https://${DOMAIN}${ROUNDCUBE_URL_PATH}/ (HTTP $HTTP_CODE)"
 fi
 
 # Test that Roundcube can connect to its database
@@ -729,8 +729,8 @@ else
     vf "bootstrap.php NOT patched - Roundcube will fail on PHP 8.5"
 fi
 
-if [ -r /etc/letsencrypt/live/${MAIL_DOMAIN}/fullchain.pem ] && \
-   sudo -u www-data test -r /etc/letsencrypt/live/${MAIL_DOMAIN}/fullchain.pem 2>/dev/null; then
+if [ -r /etc/letsencrypt/live/${DOMAIN}/fullchain.pem ] && \
+   sudo -u www-data test -r /etc/letsencrypt/live/${DOMAIN}/fullchain.pem 2>/dev/null; then
     vp "www-data can read Let's Encrypt cert (TLS to Dovecot will work)"
 else
     vf "www-data CANNOT read Let's Encrypt cert - TLS to Dovecot will fail"
@@ -754,12 +754,12 @@ echo "==================================================================="
 cat <<EOF
 
   1. Open a web browser and go to:
-       https://${MAIL_DOMAIN}${ROUNDCUBE_URL_PATH}/
+       https://${DOMAIN}${ROUNDCUBE_URL_PATH}/
 
      You should see the Roundcube login page.
 
   2. Log in with the test mailbox credentials from Phase 4:
-       Username:  wglover@${MAIL_DOMAIN}  (full email address required)
+       Username:  wglover@${DOMAIN}  (full email address required)
        Password:  (the test mailbox password from Phase 4)
 
   3. You should land in the inbox and see your existing messages

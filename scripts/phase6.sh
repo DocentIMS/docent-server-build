@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# phase6.sh - Phase 6: WordPress core install on $WP_DOMAIN
+# phase6.sh - Phase 6: WordPress core install on $DOMAIN
 #
 # This script installs vanilla WordPress core, creates its database, and
-# configures Apache to serve it at https://$WP_DOMAIN/. After this script
-# runs, you finish setup interactively at https://$WP_DOMAIN/wp-admin/install.php
+# configures Apache to serve it at https://$DOMAIN/. After this script
+# runs, you finish setup interactively at https://$DOMAIN/wp-admin/install.php
 # (set the site title, admin user, password, etc.) and then theme/configure
 # the site by hand.
 #
@@ -19,7 +19,7 @@ set -u
 # CONFIGURATION
 # ============================================================================
 # Non-domain-dependent constants and defaults.
-WP_DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
+DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
 WP_DOMAIN_ALT="www.docenttemplate.com"  # default - overridden by tenant.local
 WP_DB_NAME="wordpress_docenttemplate"   # default - overridden by tenant.local
 WP_DB_USER="wp_dt_user"             # default - overridden by tenant.local
@@ -45,9 +45,9 @@ unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
 
 # Domain-dependent paths. Computed AFTER sourcing so they pick up the
-# correct WP_DOMAIN value.
-WP_DIR="/srv/www/$WP_DOMAIN"
-WP_VHOST_FILE="/etc/apache2/sites-available/${WP_DOMAIN}.conf"
+# correct DOMAIN value.
+WP_DIR="/srv/www/$DOMAIN"
+WP_VHOST_FILE="/etc/apache2/sites-available/${DOMAIN}.conf"
 WP_CONFIG="$WP_DIR/wp-config.php"
 
 # ============================================================================
@@ -107,7 +107,7 @@ if [ ! -f "$ROOT_DEFAULTS_FILE" ]; then
 fi
 
 echo "==================================================================="
-echo "  Phase 6 - WordPress core install for $WP_DOMAIN"
+echo "  Phase 6 - WordPress core install for $DOMAIN"
 echo "  $(date)"
 echo "==================================================================="
 
@@ -336,28 +336,28 @@ step "Step 6: Configuring Apache vhost"
 # Phase 2 wrote two vhost files for us:
 #   - 000-default.conf            (catch-all, ServerName _default_)
 #   - 000-default-le-ssl.conf     (catch-all, ServerName _default_, on :443)
-#   - $WP_DOMAIN.conf             (placeholder for the primary domain on :80)
-#   - $WP_DOMAIN-le-ssl.conf      (placeholder SSL vhost on :443, generated
+#   - $DOMAIN.conf             (placeholder for the primary domain on :80)
+#   - $DOMAIN-le-ssl.conf      (placeholder SSL vhost on :443, generated
 #                                  by certbot install in phase 2 step 7b)
 #
 # We do NOT disable the 000-default* catch-alls - they handle requests
-# for unknown hostnames (like mail.$WP_DOMAIN). We just overwrite the
+# for unknown hostnames (like mail.$DOMAIN). We just overwrite the
 # primary-domain vhost files with the WordPress configuration.
 
 # Write our WP-specific vhost (covers both :80 and :443; redirect HTTP -> HTTPS)
-CERT_DIR="/etc/letsencrypt/live/$WP_DOMAIN"
+CERT_DIR="/etc/letsencrypt/live/$DOMAIN"
 cat > "$WP_VHOST_FILE" <<EOF
 # phase6-marker - managed by phase6.sh
 <VirtualHost *:80>
-    ServerName $WP_DOMAIN
+    ServerName $DOMAIN
     ServerAlias $WP_DOMAIN_ALT
     RewriteEngine On
     RewriteCond %{HTTPS} !=on
-    RewriteRule ^/?(.*) https://$WP_DOMAIN/\$1 [R=301,L]
+    RewriteRule ^/?(.*) https://$DOMAIN/\$1 [R=301,L]
 </VirtualHost>
 
 <VirtualHost *:443>
-    ServerName $WP_DOMAIN
+    ServerName $DOMAIN
     ServerAlias $WP_DOMAIN_ALT
     DocumentRoot $WP_DIR
 
@@ -379,16 +379,16 @@ cat > "$WP_VHOST_FILE" <<EOF
         Require all denied
     </Files>
 
-    ErrorLog \${APACHE_LOG_DIR}/$WP_DOMAIN-error.log
-    CustomLog \${APACHE_LOG_DIR}/$WP_DOMAIN-access.log combined
+    ErrorLog \${APACHE_LOG_DIR}/$DOMAIN-error.log
+    CustomLog \${APACHE_LOG_DIR}/$DOMAIN-access.log combined
 </VirtualHost>
 EOF
-log_done "Wrote $WP_VHOST_FILE (WordPress vhost for $WP_DOMAIN, both :80 and :443)"
+log_done "Wrote $WP_VHOST_FILE (WordPress vhost for $DOMAIN, both :80 and :443)"
 
-# Phase 2's certbot install may have generated $WP_DOMAIN-le-ssl.conf as a
+# Phase 2's certbot install may have generated $DOMAIN-le-ssl.conf as a
 # separate file. We now have everything in $WP_VHOST_FILE, so disable any
 # stale -le-ssl twin so we don't have duplicate :443 vhosts for the domain.
-LE_SSL_TWIN="$WP_DOMAIN-le-ssl"
+LE_SSL_TWIN="$DOMAIN-le-ssl"
 if [ -L "/etc/apache2/sites-enabled/${LE_SSL_TWIN}.conf" ]; then
     a2dissite -q "$LE_SSL_TWIN" >/dev/null 2>&1
     log_done "Disabled certbot's stale -le-ssl twin (replaced by $WP_VHOST_FILE)"
@@ -447,7 +447,7 @@ echo "  Suggested WP admin username: $WP_ADMIN_USERNAME"
 echo "  Suggested WP admin email:    $WP_ADMIN_EMAIL"
 echo ""
 echo "  (You'll set the actual admin username/password/email next at"
-echo "   https://$WP_DOMAIN/wp-admin/install.php — see manual steps below)"
+echo "   https://$DOMAIN/wp-admin/install.php — see manual steps below)"
 
 # ============================================================================
 # AUTOMATED VERIFICATION
@@ -597,18 +597,18 @@ else
 fi
 
 # HTTPS responds
-HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$WP_DOMAIN/" 2>/dev/null || echo "000")
+HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/" 2>/dev/null || echo "000")
 # WP install screen returns 200 (or 302 to install.php). Both are fine.
 if [ "$HTTPS_CODE" = "200" ] || [ "$HTTPS_CODE" = "302" ]; then
-    echo "  [PASS] https://$WP_DOMAIN/ returned HTTP $HTTPS_CODE"
+    echo "  [PASS] https://$DOMAIN/ returned HTTP $HTTPS_CODE"
     VERIFY_PASS=$((VERIFY_PASS + 1))
 else
-    echo "  [FAIL] https://$WP_DOMAIN/ returned HTTP $HTTPS_CODE"
+    echo "  [FAIL] https://$DOMAIN/ returned HTTP $HTTPS_CODE"
     VERIFY_FAIL=$((VERIFY_FAIL + 1))
 fi
 
 # wp-login.php reachable (proves PHP is executing)
-LOGIN_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$WP_DOMAIN/wp-login.php" 2>/dev/null || echo "000")
+LOGIN_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/wp-login.php" 2>/dev/null || echo "000")
 if [ "$LOGIN_CODE" = "200" ] || [ "$LOGIN_CODE" = "302" ]; then
     echo "  [PASS] PHP executes correctly (wp-login.php returned $LOGIN_CODE)"
     VERIFY_PASS=$((VERIFY_PASS + 1))
@@ -618,13 +618,13 @@ else
 fi
 
 # wp-config.php is NOT readable from the web (security check)
-WP_CONFIG_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$WP_DOMAIN/wp-config.php" 2>/dev/null || echo "000")
+WP_CONFIG_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/wp-config.php" 2>/dev/null || echo "000")
 if [ "$WP_CONFIG_CODE" = "403" ]; then
     echo "  [PASS] wp-config.php is blocked from web access (403)"
     VERIFY_PASS=$((VERIFY_PASS + 1))
 elif [ "$WP_CONFIG_CODE" = "200" ]; then
     # 200 with empty body is also acceptable (PHP executes the file but it has no output)
-    BODY=$(curl -s --max-time 10 "https://$WP_DOMAIN/wp-config.php" 2>/dev/null | head -c 50)
+    BODY=$(curl -s --max-time 10 "https://$DOMAIN/wp-config.php" 2>/dev/null | head -c 50)
     if [ -z "$BODY" ]; then
         echo "  [PASS] wp-config.php returns empty (PHP executes, no leak)"
         VERIFY_PASS=$((VERIFY_PASS + 1))
@@ -657,7 +657,7 @@ cat <<EOF
      The WordPress DB password is in BACKEND PASSWORDS.
 
   2. In a browser, complete the WordPress install wizard:
-       https://$WP_DOMAIN/wp-admin/install.php
+       https://$DOMAIN/wp-admin/install.php
 
      - Site Title: anything you want (you can change later)
      - Username:   $WP_ADMIN_USERNAME  (NOT 'admin' - heavily attacked)
@@ -665,7 +665,7 @@ cat <<EOF
      - Email:      $WP_ADMIN_EMAIL
      - Discourage search engines: leave unchecked (you want Kamatera to find it)
 
-  3. Log in at: https://$WP_DOMAIN/wp-admin/
+  3. Log in at: https://$DOMAIN/wp-admin/
 
   4. Theme/configure the site to look like a real Docent project page,
      using whatever template/approach you've used before. The goal is
@@ -673,7 +673,7 @@ cat <<EOF
 
   5. Once the site is "real-looking enough":
      - Submit (or re-submit) the PTR request to Kamatera, asking for:
-         PTR $SERVER_IP -> mail.$WP_DOMAIN
+         PTR $SERVER_IP -> mail.$DOMAIN
      - Without PTR, outbound mail to Gmail/Outlook/etc. will land in spam.
        Inbound and webmail still work fine - PTR only affects outbound
        deliverability reputation.

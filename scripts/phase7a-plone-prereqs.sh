@@ -5,7 +5,7 @@
 # Installs system packages and creates the working environment that Plone
 # needs, but does NOT install Plone itself. After this phase runs, the
 # 'plone' user can run buildout from /home/plone/<sitename>/ (derived from
-# MAIL_DOMAIN) to install whichever Plone configuration the user (or their
+# DOMAIN) to install whichever Plone configuration the user (or their
 # Plone programmer) prefers.
 #
 # Specifically this phase does NOT:
@@ -29,7 +29,7 @@ set -u
 # ============================================================================
 PLONE_USER="plone"
 PLONE_HOME="/home/plone"
-PLONE_INSTANCE_DIR=""  # Derived from MAIL_DOMAIN below, after tenant.local is sourced
+PLONE_INSTANCE_DIR=""  # Derived from DOMAIN below, after tenant.local is sourced
 PLONE_SHELL="/bin/bash"
 
 # Python version requirements for Plone 6.2 (per official Plone docs).
@@ -90,17 +90,17 @@ fi
 unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
 
-# Derive PLONE_INSTANCE_DIR from MAIL_DOMAIN (matches phase 7b/7c convention).
-# Each tenant gets a Plone instance at /home/plone/<first-label-of-MAIL_DOMAIN>/
-# e.g. MAIL_DOMAIN=docentclienttest.com -> /home/plone/docentclienttest/
+# Derive PLONE_INSTANCE_DIR from DOMAIN (matches phase 7b/7c convention).
+# Each tenant gets a Plone instance at /home/plone/<first-label-of-DOMAIN>/
+# e.g. DOMAIN=docentclienttest.com -> /home/plone/docentclienttest/
 # This way one server can in principle host multiple tenants' Plone instances
 # in sibling directories under /home/plone/, even though the current build
 # assumes single-tenant.
-if [ -z "${MAIL_DOMAIN:-}" ]; then
-    echo "FATAL: MAIL_DOMAIN is not set. tenant.local must define it before phase 7a runs."
+if [ -z "${DOMAIN:-}" ]; then
+    echo "FATAL: DOMAIN is not set. tenant.local must define it before phase 7a runs."
     exit 1
 fi
-PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$MAIL_DOMAIN" | cut -d. -f1)}"
+PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$DOMAIN" | cut -d. -f1)}"
 PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 
 # ============================================================================
@@ -402,7 +402,7 @@ echo ""
 echo "  To proceed:"
 echo "    sudo bash /root/server-build/scripts/phase7b-plone-buildout.sh"
 echo ""
-echo "  (Phase 7c then exposes Plone at https://team.<MAIL_DOMAIN>/ via"
+echo "  (Phase 7c then exposes Plone at https://team.<DOMAIN>/ via"
 echo "   Apache reverse proxy, and creates the Plone Site object inside the"
 echo "   Zope instance with distribution='classic'.)"
 echo ""

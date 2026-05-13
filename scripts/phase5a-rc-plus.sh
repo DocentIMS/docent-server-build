@@ -34,7 +34,7 @@ set -u
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-MAIL_DOMAIN="docenttemplate.com"
+DOMAIN="docenttemplate.com"
 ROUNDCUBE_CONFIG=/etc/roundcube/config.inc.php
 ROUNDCUBE_PLUGINS_DIR=/usr/share/roundcube/plugins
 ROUNDCUBE_SKINS_DIR=/usr/share/roundcube/skins
@@ -472,7 +472,7 @@ if [ -f "$XSKIN_CONFIG" ]; then
     apply_setting "$XSKIN_CONFIG" "disable_menu_skins" "true"
     apply_setting "$XSKIN_CONFIG" "disable_menu_languages" "true"
     apply_setting "$XSKIN_CONFIG" "preview_branding" \
-        "'https://${MAIL_DOMAIN}/branding/docent-watermark.png'"
+        "'https://${DOMAIN}/branding/docent-watermark.png'"
 
     # Brand color (Docent teal). Must match a precompiled .xcolor-XXXXXX
     # class in the active skin. We set both the global default and the
@@ -538,12 +538,12 @@ if ! grep -q "skin_logo" "$ROUNDCUBE_CONFIG"; then
 //                        Use the square icon - the wide wordmark gets crushed.
 //   *:login            = fallback for any other skin's login page
 //   *                  = global fallback (compact icon)
-// Images live at /srv/www/${MAIL_DOMAIN}/branding/.
+// Images live at /srv/www/${DOMAIN}/branding/.
 \$config['skin_logo'] = [
-    'outlook_plus:login' => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
-    'outlook_plus:*'     => 'https://${MAIL_DOMAIN}/branding/docent-icon.svg',
-    '*:login'            => 'https://${MAIL_DOMAIN}/branding/docent-logo.svg',
-    '*'                  => 'https://${MAIL_DOMAIN}/branding/docent-icon.svg',
+    'outlook_plus:login' => 'https://${DOMAIN}/branding/docent-logo.svg',
+    'outlook_plus:*'     => 'https://${DOMAIN}/branding/docent-icon.svg',
+    '*:login'            => 'https://${DOMAIN}/branding/docent-logo.svg',
+    '*'                  => 'https://${DOMAIN}/branding/docent-icon.svg',
 ];
 EOF
     echo "  Appended \$config['skin_logo']"
@@ -687,15 +687,15 @@ step "Step 6f: Installing branding assets"
 # at /srv/www/<DOMAIN>/branding/. Sources are in this repo at
 # branding/<DOMAIN>/ so each server can have its own brand identity.
 
-BRANDING_REPO="$REPO_ROOT/branding/$MAIL_DOMAIN"
+BRANDING_REPO="$REPO_ROOT/branding/$DOMAIN"
 BRANDING_DEFAULT="$REPO_ROOT/branding/_default"
-BRANDING_INSTALL="/srv/www/$MAIL_DOMAIN/branding"
+BRANDING_INSTALL="/srv/www/$DOMAIN/branding"
 
 # Pick per-domain branding if it exists, otherwise fall back to _default.
 # Per-domain dirs override _default file-by-file via a two-pass rsync below.
 if [ -d "$BRANDING_REPO" ]; then
     BRANDING_SRC="$BRANDING_REPO"
-    BRANDING_SRC_LABEL="per-domain ($MAIL_DOMAIN)"
+    BRANDING_SRC_LABEL="per-domain ($DOMAIN)"
 elif [ -d "$BRANDING_DEFAULT" ]; then
     BRANDING_SRC="$BRANDING_DEFAULT"
     BRANDING_SRC_LABEL="_default"
@@ -777,7 +777,7 @@ INTER_FILES=(
 INTER_BASE_URL="https://rsms.me/inter/font-files"
 
 # Download Inter font files if not already present in the repo
-INTER_REPO_DIR="$REPO_ROOT/branding/$MAIL_DOMAIN/fonts"
+INTER_REPO_DIR="$REPO_ROOT/branding/$DOMAIN/fonts"
 INTER_DEFAULT_DIR="$REPO_ROOT/branding/_default/fonts"
 
 # Pick per-domain fonts if present, else _default. Both can be empty
@@ -822,7 +822,7 @@ fi
 
 # Install the CSS override file. It lives in xskin's assets dir so xskin's
 # relative-path resolver finds it. Per-domain CSS overrides _default.
-CSS_REPO="$REPO_ROOT/branding/$MAIL_DOMAIN/docent-overrides.css"
+CSS_REPO="$REPO_ROOT/branding/$DOMAIN/docent-overrides.css"
 CSS_DEFAULT="$REPO_ROOT/branding/_default/docent-overrides.css"
 CSS_INSTALL="$ROUNDCUBE_PLUGINS_DIR/xskin/assets/styles/docent-overrides.css"
 
@@ -996,7 +996,7 @@ echo "  MANUAL VERIFICATION & NEXT STEPS"
 echo "==================================================================="
 cat <<EOF
 
-  1. Open https://${MAIL_DOMAIN}/mail/ in your browser (or hard-refresh
+  1. Open https://${DOMAIN}/mail/ in your browser (or hard-refresh
      if you already had it open) and log in.
 
   2. The interface should now use the "outlook_plus" skin (Outlook-style

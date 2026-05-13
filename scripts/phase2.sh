@@ -13,7 +13,7 @@ set -u
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
-PRIMARY_DOMAIN="docenttemplate.com"
+DOMAIN="docenttemplate.com"
 ALT_DOMAINS=("www.docenttemplate.com")
 CERTBOT_EMAIL="wglover@docentims.com"
 
@@ -97,7 +97,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 echo "==================================================================="
-echo "  Phase 2 - Web server + TLS foundation for $PRIMARY_DOMAIN"
+echo "  Phase 2 - Web server + TLS foundation for $DOMAIN"
 echo "  $(date)"
 echo "==================================================================="
 
@@ -211,7 +211,7 @@ else
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>$PRIMARY_DOMAIN</title>
+<title>$DOMAIN</title>
 <style>
   body { font-family: system-ui, sans-serif; max-width: 600px; margin: 4em auto; padding: 1em; color: #333; }
   h1 { color: #2a4d7a; }
@@ -219,7 +219,7 @@ else
 </style>
 </head>
 <body>
-<h1>$PRIMARY_DOMAIN</h1>
+<h1>$DOMAIN</h1>
 <p>This server is online and serving HTTPS.</p>
 <p>Status: template server, ready for site provisioning.</p>
 </body>
@@ -237,22 +237,22 @@ fi
 #   000-default.conf   = catch-all (ServerName _default_)
 #                        Serves the placeholder page for any request whose
 #                        Host header doesn't match a more specific vhost
-#                        (e.g., 'mail.${PRIMARY_DOMAIN}' which has no Apache
+#                        (e.g., 'mail.${DOMAIN}' which has no Apache
 #                        service - mail goes through Postfix/Dovecot).
 #                        Stays enabled forever; phase 6 should NOT disable
 #                        this when it takes over the primary domain for WP.
 #
-#   ${PRIMARY_DOMAIN}.conf   = placeholder for the primary domain.
+#   ${DOMAIN}.conf   = placeholder for the primary domain.
 #                        Serves the same placeholder page until phase 6
 #                        overwrites this file with the WordPress vhost.
 #                        certbot will use this vhost to install the SSL
-#                        version (${PRIMARY_DOMAIN}-le-ssl.conf).
+#                        version (${DOMAIN}-le-ssl.conf).
 # ============================================================================
 step "Step 6: Configuring Apache vhosts (catch-all + primary domain placeholder)"
 
 DEFAULT_VHOST="/etc/apache2/sites-available/000-default.conf"
 DEFAULT_VHOST_BACKUP="/etc/apache2/sites-available/000-default.conf.phase2.bak"
-DOMAIN_VHOST="/etc/apache2/sites-available/${PRIMARY_DOMAIN}.conf"
+DOMAIN_VHOST="/etc/apache2/sites-available/${DOMAIN}.conf"
 
 # Backup the original once
 if [ ! -f "$DEFAULT_VHOST_BACKUP" ] && [ -f "$DEFAULT_VHOST" ]; then
@@ -296,7 +296,7 @@ else
 # Placeholder vhost for the primary domain. Phase 6 overwrites this
 # file with the WordPress vhost.
 <VirtualHost *:80>
-    ServerName $PRIMARY_DOMAIN
+    ServerName $DOMAIN
     ServerAlias ${ALT_DOMAINS[*]}
     DocumentRoot $DEFAULT_SITE_DIR
 
@@ -321,10 +321,10 @@ else
     log_done "Enabled catch-all vhost"
 fi
 
-if [ -L "/etc/apache2/sites-enabled/${PRIMARY_DOMAIN}.conf" ]; then
+if [ -L "/etc/apache2/sites-enabled/${DOMAIN}.conf" ]; then
     log_skip "Primary domain placeholder vhost already enabled"
 else
-    a2ensite -q "${PRIMARY_DOMAIN}" >/dev/null 2>&1
+    a2ensite -q "${DOMAIN}" >/dev/null 2>&1
     log_done "Enabled primary domain placeholder vhost"
 fi
 
@@ -353,15 +353,15 @@ fi
 # document root and lets Apache serve it (which we already confirmed works).
 step "Step 7a: Acquiring Let's Encrypt certificate (webroot method)"
 
-CERT_DIR="/etc/letsencrypt/live/$PRIMARY_DOMAIN"
+CERT_DIR="/etc/letsencrypt/live/$DOMAIN"
 
 if [ -d "$CERT_DIR" ] && [ -f "$CERT_DIR/fullchain.pem" ]; then
-    log_skip "Certificate for $PRIMARY_DOMAIN already exists"
+    log_skip "Certificate for $DOMAIN already exists"
     EXPIRY=$(openssl x509 -enddate -noout -in "$CERT_DIR/fullchain.pem" | cut -d= -f2)
     echo "         (expires: $EXPIRY)"
 else
     # Build the -d arguments
-    DOMAIN_ARGS="-d $PRIMARY_DOMAIN"
+    DOMAIN_ARGS="-d $DOMAIN"
     for alt in "${ALT_DOMAINS[@]}"; do
         DOMAIN_ARGS="$DOMAIN_ARGS -d $alt"
     done
@@ -373,7 +373,7 @@ else
         --agree-tos \
         --email "$CERTBOT_EMAIL" \
         $DOMAIN_ARGS; then
-        log_done "Certificate issued for $PRIMARY_DOMAIN${ALT_DOMAINS:+ + ${ALT_DOMAINS[*]}}"
+        log_done "Certificate issued for $DOMAIN${ALT_DOMAINS:+ + ${ALT_DOMAINS[*]}}"
     else
         log_fail "certbot certonly failed - see output above. Check DNS, firewall, and try again."
     fi
@@ -388,12 +388,12 @@ step "Step 7b: Installing certificate into Apache"
 # matches the cert's ServerName) and generates an SSL twin at
 # <domain>-le-ssl.conf with the cert wired in. It also adds an HTTP->HTTPS
 # redirect to <domain>.conf.
-SSL_VHOST_FILE="/etc/apache2/sites-enabled/${PRIMARY_DOMAIN}-le-ssl.conf"
+SSL_VHOST_FILE="/etc/apache2/sites-enabled/${DOMAIN}-le-ssl.conf"
 if [ -f "$SSL_VHOST_FILE" ] && grep -q "$CERT_DIR" "$SSL_VHOST_FILE" 2>/dev/null; then
     log_skip "Certificate already installed in Apache"
 elif [ -f "$CERT_DIR/fullchain.pem" ]; then
     if certbot install \
-        --cert-name "$PRIMARY_DOMAIN" \
+        --cert-name "$DOMAIN" \
         --apache \
         --redirect \
         --non-interactive 2>&1 | tail -20; then
@@ -411,7 +411,7 @@ fi
 # STEP 7c: Catch-all SSL vhost for unknown hostnames on port 443
 # ============================================================================
 # Without this, an HTTPS request for an unknown hostname (e.g.,
-# https://mail.${PRIMARY_DOMAIN}/) falls through to the FIRST :443 vhost
+# https://mail.${DOMAIN}/) falls through to the FIRST :443 vhost
 # Apache loaded - which is the one for the real domain. Better to have
 # an explicit catch-all that serves the placeholder page. The cert is the
 # real domain's cert (browsers will warn on hostname mismatch, which is
@@ -646,11 +646,11 @@ if [ -f "$CERT_DIR/fullchain.pem" ] && [ -f "$CERT_DIR/privkey.pem" ]; then
 
     # Cert covers primary domain
     if openssl x509 -in "$CERT_DIR/fullchain.pem" -noout -text 2>/dev/null | \
-       grep -qE "DNS:$PRIMARY_DOMAIN(,|$)"; then
-        echo "  [PASS] Certificate covers $PRIMARY_DOMAIN"
+       grep -qE "DNS:$DOMAIN(,|$)"; then
+        echo "  [PASS] Certificate covers $DOMAIN"
         VERIFY_PASS=$((VERIFY_PASS + 1))
     else
-        echo "  [FAIL] Certificate does NOT cover $PRIMARY_DOMAIN"
+        echo "  [FAIL] Certificate does NOT cover $DOMAIN"
         VERIFY_FAIL=$((VERIFY_FAIL + 1))
     fi
 
@@ -689,17 +689,17 @@ else
 fi
 
 # HTTPS responds locally with valid cert
-HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$PRIMARY_DOMAIN/" 2>/dev/null || echo "000")
+HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://$DOMAIN/" 2>/dev/null || echo "000")
 if [ "$HTTPS_CODE" = "200" ]; then
-    echo "  [PASS] HTTPS request to https://$PRIMARY_DOMAIN/ returned 200"
+    echo "  [PASS] HTTPS request to https://$DOMAIN/ returned 200"
     VERIFY_PASS=$((VERIFY_PASS + 1))
 else
-    echo "  [FAIL] HTTPS request to https://$PRIMARY_DOMAIN/ returned $HTTPS_CODE"
+    echo "  [FAIL] HTTPS request to https://$DOMAIN/ returned $HTTPS_CODE"
     VERIFY_FAIL=$((VERIFY_FAIL + 1))
 fi
 
 # HTTP redirects to HTTPS
-HTTP_REDIRECT=$(curl -s -o /dev/null -w "%{http_code} %{redirect_url}" --max-time 10 "http://$PRIMARY_DOMAIN/" 2>/dev/null || echo "000")
+HTTP_REDIRECT=$(curl -s -o /dev/null -w "%{http_code} %{redirect_url}" --max-time 10 "http://$DOMAIN/" 2>/dev/null || echo "000")
 if echo "$HTTP_REDIRECT" | grep -qE "^30[12]"; then
     echo "  [PASS] HTTP redirects to HTTPS (got: $HTTP_REDIRECT)"
     VERIFY_PASS=$((VERIFY_PASS + 1))
@@ -728,19 +728,19 @@ cat <<EOF
   These steps require an external connection / human eyes and CANNOT
   be checked by this script. Do them from your Windows machine.
 
-  1. Open https://$PRIMARY_DOMAIN/ in a web browser.
+  1. Open https://$DOMAIN/ in a web browser.
      - You should see the placeholder page with the domain name.
      - The lock icon next to the URL should be CLOSED (green/secure).
      - No certificate warnings.
 
-  2. Open http://$PRIMARY_DOMAIN/ (no https) in the browser.
+  2. Open http://$DOMAIN/ (no https) in the browser.
      - The browser should automatically redirect you to https://.
 
-  3. Open https://www.$PRIMARY_DOMAIN/ in the browser.
+  3. Open https://www.$DOMAIN/ in the browser.
      - Should also work, with no cert warnings.
 
   4. (Optional) Run an SSL check at:
-       https://www.ssllabs.com/ssltest/analyze.html?d=$PRIMARY_DOMAIN
+       https://www.ssllabs.com/ssltest/analyze.html?d=$DOMAIN
      A grade of A or A+ is expected for a default Let's Encrypt setup.
 
   Once these checks pass, Phase 2 is fully complete and you are ready

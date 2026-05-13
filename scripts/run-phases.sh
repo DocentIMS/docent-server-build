@@ -259,13 +259,13 @@ echo ""
 
 # ----------------------------------------------------------------------------
 # Source tenant.local so the checklist below can reference real values
-# (PRIMARY_DOMAIN, SERVER_IP, NOTIFICATION_EMAIL, etc.) instead of placeholders
+# (DOMAIN, SERVER_IP, NOTIFICATION_EMAIL, etc.) instead of placeholders
 # ----------------------------------------------------------------------------
 if [ -f "$TENANT_FILE" ]; then
     # shellcheck disable=SC1090
     source "$TENANT_FILE"
 fi
-DOMAIN="${PRIMARY_DOMAIN:-<your-domain>}"
+DOMAIN="${DOMAIN:-<your-domain>}"
 IP="${SERVER_IP:-<server-ip>}"
 NOTIF="${NOTIFICATION_EMAIL:-<notification-email>}"
 

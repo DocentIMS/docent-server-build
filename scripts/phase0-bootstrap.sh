@@ -183,7 +183,7 @@ ask_server_ip() {
 #   - Using a registrar that's slow to publish
 #
 # Common reasons to STOP and fix:
-#   - Typo in PRIMARY_DOMAIN
+#   - Typo in DOMAIN
 #   - Typo in SERVER_IP
 #   - DNS still pointing at an old server
 #
@@ -332,13 +332,13 @@ fi
 # ============================================================================
 step "Tenant identity"
 
-PRIMARY_DOMAIN=$(ask_domain "Primary domain (e.g., acmemuseum.com)")
+DOMAIN=$(ask_domain "Primary domain (e.g., acmemuseum.com)")
 SERVER_IP=$(ask_server_ip)
 
 # Sanity-check that DNS is set up before we go on. This catches typos
 # in the domain or IP, and DNS that's still pointing at an old server.
 # Advisory: user can override with a yes if they're building before DNS.
-check_dns_resolution "$PRIMARY_DOMAIN" "$SERVER_IP"
+check_dns_resolution "$DOMAIN" "$SERVER_IP"
 
 step "Purpose"
 
@@ -391,18 +391,18 @@ XAI_API_KEY=$(ask "AI API key (e.g., sk-...)" "")
 # ============================================================================
 step "Auto-deriving values from primary domain"
 
-DOMAIN_STEM="${PRIMARY_DOMAIN%%.*}"
+DOMAIN_STEM="${DOMAIN%%.*}"
 HOSTNAME_SHORT="$DOMAIN_STEM"
 WP_DB_NAME="wordpress_${DOMAIN_STEM}"
 WP_DB_USER="wp_$(echo "$DOMAIN_STEM" | head -c 2)_user"
-TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${PRIMARY_DOMAIN}"
+TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${DOMAIN}"
 
 cat <<EOF
 
 ${DIM}The following are auto-derived from your primary domain:${RESET}
   Hostname (short):       ${CYAN}${HOSTNAME_SHORT}${RESET}
-  Mail hostname:          ${CYAN}mail.${PRIMARY_DOMAIN}${RESET}
-  WWW alias:              ${CYAN}www.${PRIMARY_DOMAIN}${RESET}
+  Mail hostname:          ${CYAN}mail.${DOMAIN}${RESET}
+  WWW alias:              ${CYAN}www.${DOMAIN}${RESET}
   Test mailbox:           ${CYAN}${TEST_MAILBOX}${RESET}
   WordPress database:     ${CYAN}${WP_DB_NAME}${RESET}
   WordPress DB user:      ${CYAN}${WP_DB_USER}${RESET}
@@ -432,7 +432,7 @@ step "Review"
 
 cat <<EOF
 ${BOLD}Tenant config to be written:${RESET}
-  Primary domain:          ${CYAN}${PRIMARY_DOMAIN}${RESET}
+  Primary domain:          ${CYAN}${DOMAIN}${RESET}
   Server IP:               ${CYAN}${SERVER_IP}${RESET}
   Personal admin user:     ${CYAN}${ADMIN_USER}${RESET}
   Shareable admin user:    ${CYAN}${SHARED_ADMIN_USER}${RESET}
@@ -467,7 +467,7 @@ cat > "$TENANT_FILE" << TENANT_LOCAL_EOF
 # This file is gitignored - safe to keep here.
 # ============================================================================
 
-PRIMARY_DOMAIN="${PRIMARY_DOMAIN}"
+DOMAIN="${DOMAIN}"
 SERVER_IP="${SERVER_IP}"
 SERVER_PURPOSE="${SERVER_PURPOSE}"
 ADMIN_USER="${ADMIN_USER}"
@@ -481,13 +481,11 @@ TEST_MAILBOX_LOCAL="${TEST_MAILBOX_LOCAL}"
 # (resolves to the shareable admin so existing logic keeps working)
 STAFF_USER="${SHARED_ADMIN_USER}"
 
-HOSTNAME_FQDN="${PRIMARY_DOMAIN}"
+HOSTNAME_FQDN="${DOMAIN}"
 HOSTNAME_SHORT="${HOSTNAME_SHORT}"
-ALT_DOMAINS=("www.${PRIMARY_DOMAIN}")
-MAIL_DOMAIN="${PRIMARY_DOMAIN}"
-MAIL_HOSTNAME="mail.${PRIMARY_DOMAIN}"
-WP_DOMAIN="${PRIMARY_DOMAIN}"
-WP_DOMAIN_ALT="www.${PRIMARY_DOMAIN}"
+ALT_DOMAINS=("www.${DOMAIN}")
+MAIL_HOSTNAME="mail.${DOMAIN}"
+WP_DOMAIN_ALT="www.${DOMAIN}"
 WP_DB_NAME="${WP_DB_NAME}"
 WP_DB_USER="${WP_DB_USER}"
 TEST_MAILBOX="${TEST_MAILBOX}"
@@ -536,7 +534,7 @@ XAI_DISPLAY="${XAI_API_KEY}"
 
 cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
 ==============================================================
-  CREDENTIALS FOR ${PRIMARY_DOMAIN} (${SERVER_IP})
+  CREDENTIALS FOR ${DOMAIN} (${SERVER_IP})
   Generated: $(date '+%Y-%m-%d %H:%M %Z')
 ==============================================================
 
@@ -605,7 +603,7 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
 ==============================================================
   WHAT IT'S FOR:    Logging into the Roundcube webmail to
                     test that email works.
-  WHERE YOU USE IT: https://${PRIMARY_DOMAIN}/mail/
+  WHERE YOU USE IT: https://${DOMAIN}/mail/
 
   Email address: ${TEST_MAILBOX}
   Password:      ${TEST_MAILBOX_PW}
@@ -645,7 +643,7 @@ echo "${GREEN}Wrote $CREDENTIALS_FILE (mode 0600)${RESET}"
 # ============================================================================
 cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
 ==============================================================
-  QUICK REFERENCE - ${PRIMARY_DOMAIN}
+  QUICK REFERENCE - ${DOMAIN}
   Generated: $(date -u "+%Y-%m-%d %H:%M UTC")
 ==============================================================
   Day-to-day commands and recovery procedures.
@@ -665,15 +663,15 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
     Password: ${SHARED_ADMIN_PW}
 
   Web (placeholder/WordPress site):
-    https://${PRIMARY_DOMAIN}/
+    https://${DOMAIN}/
 
   Webmail (Roundcube):
-    https://${PRIMARY_DOMAIN}/mail/
+    https://${DOMAIN}/mail/
     Username: ${TEST_MAILBOX_LOCAL}    (or full: ${TEST_MAILBOX})
     Password: ${TEST_MAILBOX_PW}
 
   WordPress admin (after install wizard):
-    https://${PRIMARY_DOMAIN}/wp-admin/
+    https://${DOMAIN}/wp-admin/
 
   Kamatera console (when SSH is broken):
     https://console.kamatera.com
@@ -787,8 +785,8 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
     echo "test body" | mail -s "test subject" ${TEST_MAILBOX}
 
   Confirm it arrived:
-    sudo find /var/vmail/${PRIMARY_DOMAIN} -name 'new' -type d
-    sudo ls -la /var/vmail/${PRIMARY_DOMAIN}/${TEST_MAILBOX_LOCAL}/new/
+    sudo find /var/vmail/${DOMAIN} -name 'new' -type d
+    sudo ls -la /var/vmail/${DOMAIN}/${TEST_MAILBOX_LOCAL}/new/
 
   GTUBE spam test (should land in Junk folder, not Inbox):
     Send to ${TEST_MAILBOX} from any external account with this in
@@ -803,16 +801,16 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
 ==============================================================
 
   From your Windows PowerShell:
-    nslookup ${PRIMARY_DOMAIN}
-    nslookup www.${PRIMARY_DOMAIN}
-    nslookup mail.${PRIMARY_DOMAIN}
+    nslookup ${DOMAIN}
+    nslookup www.${DOMAIN}
+    nslookup mail.${DOMAIN}
 
   From the server (more detail):
-    dig @8.8.8.8 ${PRIMARY_DOMAIN}
-    dig @8.8.8.8 MX ${PRIMARY_DOMAIN}
-    dig @8.8.8.8 TXT ${PRIMARY_DOMAIN}
-    dig @8.8.8.8 TXT default._domainkey.${PRIMARY_DOMAIN}
-    dig @8.8.8.8 TXT _dmarc.${PRIMARY_DOMAIN}
+    dig @8.8.8.8 ${DOMAIN}
+    dig @8.8.8.8 MX ${DOMAIN}
+    dig @8.8.8.8 TXT ${DOMAIN}
+    dig @8.8.8.8 TXT default._domainkey.${DOMAIN}
+    dig @8.8.8.8 TXT _dmarc.${DOMAIN}
 
 ==============================================================
   BACKEND PASSWORDS (used by software, listed for recovery)
@@ -971,9 +969,9 @@ Downloaded copies (saved during the action-required step):
 ${BOLD}NEXT STEPS:${RESET}
 
 1. Add DNS records at your DNS provider (if not already done):
-     A     ${PRIMARY_DOMAIN}       -> ${SERVER_IP}
-     A     www.${PRIMARY_DOMAIN}   -> ${SERVER_IP}
-     A     mail.${PRIMARY_DOMAIN}  -> ${SERVER_IP}
+     A     ${DOMAIN}       -> ${SERVER_IP}
+     A     www.${DOMAIN}   -> ${SERVER_IP}
+     A     mail.${DOMAIN}  -> ${SERVER_IP}
 
 2. Run the build. RECOMMENDED: chain all phases at once
    (stops on first failure):

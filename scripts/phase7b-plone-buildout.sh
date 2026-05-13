@@ -3,7 +3,7 @@
 # phase7b-plone-buildout.sh - Phase 7b: Install Plone 6.2 via buildout
 #
 # Prerequisites: phase 7a has run (plone user exists, OS packages installed,
-# /home/plone/<sitename>/ directory exists owned by plone). MAIL_DOMAIN must
+# /home/plone/<sitename>/ directory exists owned by plone). DOMAIN must
 # be set in tenant.local.
 #
 # What this phase does:
@@ -66,11 +66,11 @@ unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
 
 # Compute Plone path values now that tenant.local has been sourced.
-if [ -z "${MAIL_DOMAIN:-}" ]; then
-    echo "FATAL: MAIL_DOMAIN is not set. tenant.local must define it before phase 7b runs."
+if [ -z "${DOMAIN:-}" ]; then
+    echo "FATAL: DOMAIN is not set. tenant.local must define it before phase 7b runs."
     exit 1
 fi
-PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$MAIL_DOMAIN" | cut -d. -f1)}"
+PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$DOMAIN" | cut -d. -f1)}"
 PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 
 # Apply Plone version: tenant.local override > script default
@@ -394,7 +394,7 @@ echo "  Run phase 7c next - it will:"
 echo "    - rewrite buildout.cfg http-address to 127.0.0.1:8080"
 echo "    - install a systemd unit so Plone runs in the background"
 echo "    - install an Apache reverse-proxy vhost at"
-echo "      https://team.$MAIL_DOMAIN/"
+echo "      https://team.$DOMAIN/"
 echo "    - reuse the Let's Encrypt cert (phase 3 should have issued it"
 echo "      for the team.<domain> subdomain alongside the bare domain)"
 echo "    - create the Plone Site object at /Plone with the Classic UI"
@@ -405,7 +405,7 @@ echo "  To run phase 7c:"
 echo "    sudo bash /root/server-build/scripts/phase7c-plone-frontend.sh"
 echo ""
 echo "  After phase 7c, log in at:"
-echo "    https://team.$MAIL_DOMAIN/login"
+echo "    https://team.$DOMAIN/login"
 echo "    Username: admin"
 echo "    Password: (in $CREDENTIALS_FILE under PLONE_ADMIN_PW)"
 echo ""

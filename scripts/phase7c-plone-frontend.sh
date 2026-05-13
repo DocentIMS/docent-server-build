@@ -22,10 +22,10 @@
 #
 # End state:
 #   - Plone running as a systemd service, bound to 127.0.0.1:8080 only
-#   - https://team.<MAIL_DOMAIN>/ serves the Plone site (NO manual setup step
+#   - https://team.<DOMAIN>/ serves the Plone site (NO manual setup step
 #     remaining - just log in at /login)
-#   - WordPress at https://<MAIL_DOMAIN>/ is untouched
-#   - Roundcube at https://<MAIL_DOMAIN>/mail/ is untouched
+#   - WordPress at https://<DOMAIN>/ is untouched
+#   - Roundcube at https://<DOMAIN>/mail/ is untouched
 #
 # Idempotent. Safe to re-run. Each step checks current state before acting.
 # Run as root via run-phases.sh, or directly: sudo bash phase7c-plone-frontend.sh
@@ -57,8 +57,8 @@ unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
 
 # Compute Plone path values now that tenant.local has been sourced.
-if [ -z "${MAIL_DOMAIN:-}" ]; then
-    echo "FATAL: MAIL_DOMAIN is not set. tenant.local must define it before phase 7c runs."
+if [ -z "${DOMAIN:-}" ]; then
+    echo "FATAL: DOMAIN is not set. tenant.local must define it before phase 7c runs."
     exit 1
 fi
 if [ -z "${NOTIFICATION_EMAIL:-}" ]; then
@@ -66,11 +66,11 @@ if [ -z "${NOTIFICATION_EMAIL:-}" ]; then
     exit 1
 fi
 
-PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$MAIL_DOMAIN" | cut -d. -f1)}"
+PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$DOMAIN" | cut -d. -f1)}"
 PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 
 # Subdomain Plone is published at
-PLONE_PUBLIC_HOST="team.${MAIL_DOMAIN}"
+PLONE_PUBLIC_HOST="team.${DOMAIN}"
 
 # systemd unit name
 PLONE_SYSTEMD_UNIT="plone-${PLONE_SITE_NAME}"
@@ -289,7 +289,7 @@ fi
 log_done "Plone is responding on 127.0.0.1:$ZOPE_LOOPBACK_PORT (took ${WAIT}s)"
 
 # ============================================================================
-# STEP 5: Obtain Let's Encrypt cert for team.<MAIL_DOMAIN>
+# STEP 5: Obtain Let's Encrypt cert for team.<DOMAIN>
 # ============================================================================
 step "Step 5: Obtaining Let's Encrypt cert for $PLONE_PUBLIC_HOST"
 
@@ -320,7 +320,7 @@ else
 fi
 
 # ============================================================================
-# STEP 6: Install Apache vhost for team.<MAIL_DOMAIN>
+# STEP 6: Install Apache vhost for team.<DOMAIN>
 # ============================================================================
 step "Step 6: Installing Apache vhost $APACHE_VHOST_FILE"
 
@@ -857,8 +857,8 @@ echo "  (The same password also works for /manage - the Zope Management"
 echo "   Interface - via the Zope-root admin user, which is a different"
 echo "   account in a different user folder, just sharing the password.)"
 echo ""
-echo "  WordPress at https://$MAIL_DOMAIN/ is untouched."
-echo "  Roundcube at https://$MAIL_DOMAIN/mail/ is untouched."
+echo "  WordPress at https://$DOMAIN/ is untouched."
+echo "  Roundcube at https://$DOMAIN/mail/ is untouched."
 echo ""
 echo "  Useful commands going forward:"
 echo "    sudo systemctl status  $PLONE_SYSTEMD_UNIT"
