@@ -1,0 +1,28 @@
+# Plone 6.2 systemd service
+# Runs the WSGI server (bin/runwsgi) as the plone user, binding to 127.0.0.1:8080.
+# Apache reverse-proxies external requests to this socket.
+# Restart on failure (auto-recovery). Start at boot.
+
+[Unit]
+Description=Plone 6.2 (Zope/WSGI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=plone
+Group=plone
+WorkingDirectory=/home/plone/instance
+ExecStart=/home/plone/instance/bin/runwsgi /home/plone/instance/etc/zope.ini
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/plone/instance/var
+
+[Install]
+WantedBy=multi-user.target
