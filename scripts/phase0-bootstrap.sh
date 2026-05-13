@@ -625,29 +625,20 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
   Password:      ${TEST_MAILBOX_PW}
 
 ==============================================================
-  5. WORDPRESS ADMIN  (logging into wp-admin)
+  BACKEND PASSWORDS (mostly software-only, listed for recovery)
 ==============================================================
-  WHAT IT'S FOR:    Logging into WordPress to edit the site.
-                    Phase 6 runs the install wizard
-                    automatically, so this account is ready
-                    to use as soon as phase 6 finishes.
-  WHERE YOU USE IT: https://${DOMAIN}/wp-admin/
-
-  Username: ${WP_ADMIN_USERNAME}
-  Password: ${WP_ADMIN_PW}
-
-==============================================================
-  BACKEND PASSWORDS (you don't type these — software uses them)
-==============================================================
-  These are used by software internally. You don't ever type
-  these into a login screen. Listed here only so they exist
-  in your password manager in case you need to recover them.
+  Most of these are used by software internally and you'll never
+  type them into a login screen. The exception is WordPress admin,
+  which IS a login you'll use - it lives here for convenience so all
+  generated passwords are in one place.
 
   MariaDB root:        ${ROOT_DB_PW}
   Mail database:       ${MAIL_DB_PW}
   Roundcube database:  ${ROUNDCUBE_DB_PW}
   Roundcube DES key:   ${ROUNDCUBE_DES_KEY}
   WordPress database:  ${WP_DB_PW}
+  WordPress admin:     ${WP_ADMIN_PW}    (user: ${WP_ADMIN_USERNAME})
+                                          login: https://${DOMAIN}/wp-admin/
 
 ==============================================================
   PURCHASED LICENSE KEYS

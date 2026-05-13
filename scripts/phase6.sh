@@ -754,13 +754,13 @@ echo "==================================================================="
 cat <<EOF
 
   1. Confirm CREDENTIALS.txt is saved in your password manager.
-     The WordPress admin password is in section 5 (WORDPRESS ADMIN);
-     the WordPress DB password is in BACKEND PASSWORDS.
+     Both WordPress passwords (admin and database) are in
+     BACKEND PASSWORDS.
 
   2. Log in to WordPress:
        URL:      https://$DOMAIN/wp-admin/
        Username: $WP_ADMIN_USERNAME
-       Password: see CREDENTIALS.txt section 5 (WP_ADMIN_PW)
+       Password: see CREDENTIALS.txt BACKEND PASSWORDS (WordPress admin)
 
      The site is already installed (Step 7 ran the wizard via wp-cli).
      Search engine visibility is set to 'discourage' (placeholder/template
