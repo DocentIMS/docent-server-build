@@ -441,19 +441,19 @@ step "Step 8: Creating Plone Site (distribution=classic) and admin user"
 PLONE_SITE_TITLE="Docent"
 CREATE_SCRIPT="/tmp/phase7c-create-site.py"
 
-# Check if the site already exists. If yes, skip creation (idempotent).
-# We do this with a small read-only script that doesn't need to stop Plone -
-# we use curl against the running instance instead.
+# Check if the site already exists. We always run the create script (it's
+# idempotent and detects broken sites that need recreation), but we log
+# what we're starting from so the script output is readable.
 SITE_CHECK_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
     "http://127.0.0.1:$ZOPE_LOOPBACK_PORT/$PLONE_SITE_ID/" 2>/dev/null || echo "000")
 
 if echo "$SITE_CHECK_CODE" | grep -qE "^(200|302)$"; then
-    log_skip "Plone Site at /$PLONE_SITE_ID already exists (HTTP $SITE_CHECK_CODE)"
-    SITE_NEEDS_CREATE=false
+    log_done "Site at /$PLONE_SITE_ID currently responds HTTP $SITE_CHECK_CODE"
+    log_done "The create script will detect if it's healthy and recreate if not"
 else
     log_done "No site at /$PLONE_SITE_ID yet (HTTP $SITE_CHECK_CODE); will create one"
-    SITE_NEEDS_CREATE=true
 fi
+SITE_NEEDS_CREATE=true
 
 # Read PLONE_ADMIN_PW from CREDENTIALS.txt (phase 7b wrote it there)
 CREDENTIALS_FILE="$REPO_ROOT/CREDENTIALS.txt"
@@ -490,6 +490,18 @@ if [ "$SITE_NEEDS_CREATE" = "true" ]; then
 #   PHASE7C_SITE_TITLE - e.g. "Docent"
 #   PHASE7C_ADMIN_PW   - the Plone-level admin password
 #
+# CRITICAL: the keyword argument is `distribution_name`, NOT `distribution`.
+# Reading the Products.CMFPlone.factory.addPloneSite source in plone 6.2:
+#   def addPloneSite(context, site_id, ..., distribution_name=None, **kwargs):
+#       if distribution_name:
+#           # routes through plone.distribution.api.site._create_site
+#           # which installs the full classic profile chain
+#       ...
+# If you pass distribution= (no _name), it goes into **kwargs and is silently
+# ignored. The site is then created via the legacy bare-Plone path with only
+# Products.CMFPlone:plone applied -> no Folder, no Page, no Add menu. Don't
+# repeat that mistake.
+#
 import os
 import sys
 import transaction
@@ -499,30 +511,67 @@ SITE_ID = os.environ["PHASE7C_SITE_ID"]
 SITE_TITLE = os.environ["PHASE7C_SITE_TITLE"]
 ADMIN_PW = os.environ["PHASE7C_ADMIN_PW"]
 
+
+def site_is_healthy(site):
+    """Return True if the site has the Classic UI content types installed.
+
+    A site created via the wrong distribution path will have only TempFolder
+    and Plone Site in portal_types; a healthy classic site has Folder,
+    Document, News Item, Event, File, Image, Link, and Collection at minimum.
+    Folder alone is a sufficient signal.
+    """
+    try:
+        pt = site.portal_types
+        return "Folder" in pt.objectIds()
+    except Exception as exc:
+        print("WARN: could not inspect portal_types: %s" % exc)
+        return False
+
+
 # `app` is provided by bin/instance run
 if SITE_ID in app.objectIds():
-    print("Site '/%s' already exists; skipping creation" % SITE_ID)
+    existing = app[SITE_ID]
+    if site_is_healthy(existing):
+        print("Site '/%s' already exists and is healthy; skipping creation" % SITE_ID)
+        site = existing
+    else:
+        print("Site '/%s' exists but is missing Classic UI content types (broken)." % SITE_ID)
+        print("Deleting and recreating with distribution_name='classic'.")
+        app.manage_delObjects([SITE_ID])
+        transaction.commit()
+        # Fall through to creation
+        addPloneSite(
+            app,
+            SITE_ID,
+            title=SITE_TITLE,
+            distribution_name="classic",
+        )
+        transaction.commit()
+        print("Recreated Plone Site /%s with distribution_name='classic'" % SITE_ID)
+        site = app[SITE_ID]
 else:
-    print("Creating Plone Site /%s with title '%s', distribution='classic'" % (SITE_ID, SITE_TITLE))
-    # distribution='classic' is the critical bit. Without it, Plone 6.2
-    # defaults to the Volto distribution which installs no Classic UI
-    # content types - the symptom is a site with no Folder/Page/News Item
-    # types and no Add menu.
+    print("Creating Plone Site /%s with title '%s', distribution_name='classic'" % (SITE_ID, SITE_TITLE))
     addPloneSite(
         app,
         SITE_ID,
         title=SITE_TITLE,
-        distribution="classic",
+        distribution_name="classic",
     )
     transaction.commit()
     print("Created Plone Site /%s" % SITE_ID)
+    site = app[SITE_ID]
+
+# Verify the site is now healthy before continuing.
+if not site_is_healthy(site):
+    print("ERROR: site '/%s' was created/recreated but Folder is still not a" % SITE_ID)
+    print("       registered content type. Something went wrong with the classic")
+    print("       distribution profile chain. Inspect manually:")
+    print("         bin/instance run -c 'app.%s.portal_types.objectIds()'" % SITE_ID)
+    sys.exit(2)
+print("Site healthy: Folder is registered.")
 
 # Now create the Plone-level admin user inside the site.
 # This is separate from the Zope-root admin (handled by buildout's user= line).
-site = app[SITE_ID]
-
-# plone.api needs a security manager AND the site set as the current site
-# (so plone.api.content/user/etc. know which portal to operate in).
 from AccessControl.SecurityManagement import newSecurityManager
 from zope.component.hooks import setSite
 
