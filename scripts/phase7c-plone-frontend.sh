@@ -301,7 +301,7 @@ else
     # This matches phase 2's certbot pattern. We avoid the --apache plugin
     # because it has a known bug on certbot 4.x in Ubuntu 26.04 (vhost
     # ambiguity errors in non-interactive mode).
-    WEBROOT_PATH="/srv/www/$MAIL_DOMAIN"
+    WEBROOT_PATH="/srv/www/default"
     if ! certbot certonly \
             --webroot \
             --webroot-path "$WEBROOT_PATH" \
