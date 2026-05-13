@@ -303,7 +303,15 @@ else
     # This matches phase 2's certbot pattern. We avoid the --apache plugin
     # because it has a known bug on certbot 4.x in Ubuntu 26.04 (vhost
     # ambiguity errors in non-interactive mode).
-    WEBROOT_PATH="/srv/www/default"
+    #
+    # DEFAULT_SITE_DIR comes from tenant.local (written by phase 0; phase 2
+    # owns the actual directory). Fallback to the literal path for older
+    # tenant.local files that predate this variable.
+    WEBROOT_PATH="${DEFAULT_SITE_DIR:-/srv/www/default}"
+    if [ ! -d "$WEBROOT_PATH" ]; then
+        log_fail "Webroot $WEBROOT_PATH does not exist - did phase 2 run?"
+        exit 1
+    fi
     if ! certbot certonly \
             --webroot \
             --webroot-path "$WEBROOT_PATH" \

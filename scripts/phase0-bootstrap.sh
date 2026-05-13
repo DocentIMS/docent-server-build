@@ -494,6 +494,14 @@ CERTBOT_EMAIL="${NOTIFICATION_EMAIL}"
 DMARC_RUA_EMAIL="${NOTIFICATION_EMAIL}"
 CAA_IODEF_EMAIL="${NOTIFICATION_EMAIL}"
 WP_ADMIN_EMAIL="${NOTIFICATION_EMAIL}"
+
+# Web-root paths. Phase 2 creates these directories and uses them as Apache's
+# default-vhost docroot and certbot --webroot-path. Later phases that need to
+# place files reachable via HTTP (e.g. phase 7c, when certbot issues the
+# team.<domain> cert) read DEFAULT_SITE_DIR from here. Keep these in sync with
+# phase 2's declarations - they MUST match.
+WEB_ROOT="/srv/www"
+DEFAULT_SITE_DIR="/srv/www/default"
 TENANT_LOCAL_EOF
 
 chmod 644 "$TENANT_FILE"
