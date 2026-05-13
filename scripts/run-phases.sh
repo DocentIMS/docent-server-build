@@ -3,16 +3,20 @@
 # run-phases.sh - Chain all build phases automatically.
 #
 # Use only AFTER phase 0 has been run (so tenant.local and secrets.local
-# exist). This script runs phases 1 -> 2 -> 3 -> 4 -> 5 -> 5a -> 5b -> 5c -> 6
-# in order, stopping at the first failure.
+# exist). This script runs the core phases 1 -> 2 -> 3 -> 4 -> 5 -> 5a ->
+# 5b -> 5c -> 6 in order, stopping at the first failure. After phase 6
+# completes, the script prompts whether to continue with the Plone phases
+# 7a -> 7b -> 7c (typed yes or no, no default).
 #
 # All phases are idempotent, so it's safe to re-run this script after a
 # reboot or after fixing whatever caused a failure.
 #
 # Usage:
-#   sudo bash run-phases.sh                # run all phases
-#   sudo bash run-phases.sh --from 4       # start from phase 4
-#   sudo bash run-phases.sh --only 4       # run only phase 4
+#   sudo bash run-phases.sh                # run 1-6, prompt for 7a/b/c
+#   sudo bash run-phases.sh --from 4       # start from phase 4, prompt for 7
+#   sudo bash run-phases.sh --from 7a      # run 7a, 7b, 7c (no prompt)
+#   sudo bash run-phases.sh --only 4       # run only phase 4 (no prompt)
+#   sudo bash run-phases.sh --only 7b      # run only phase 7b (no prompt)
 #
 # After phase 1 reboots the server, the SSH session will die. After the
 # server comes back up, SSH back in and run this script again - it will
@@ -44,6 +48,10 @@ TENANT_FILE="$REPO_ROOT/tenant.local"
 SECRETS_FILE="$REPO_ROOT/secrets.local"
 
 # Ordered list of phases. Each entry is "label:script-filename".
+# Ordered list of phases. Each entry is "label:script-filename".
+# The Plone phases (7a/7b/7c) are part of this array so that --from and
+# --only can target them, but the default run stops after CORE_LAST_LABEL
+# and prompts the user whether to continue.
 PHASES=(
     "1:phase1.sh"
     "2:phase2.sh"
@@ -54,7 +62,19 @@ PHASES=(
     "5b:phase5b-globaladdressbook.sh"
     "5c:phase5c-email-ai.sh"
     "6:phase6.sh"
+    "7a:phase7a-plone-prereqs.sh"
+    "7b:phase7b-plone-buildout.sh"
+    "7c:phase7c-plone-frontend.sh"
 )
+# After this label completes in the default run, the script prompts before
+# running anything past it. (Phases past this point are the Plone install,
+# which is optional and slow.)
+CORE_LAST_LABEL="6"
+
+# Set of phase labels that belong to the Plone chain. Used to format the
+# prompt and to detect whether an explicit --from or --only is targeting
+# Plone (so we don't prompt redundantly).
+PLONE_LABELS=" 7a 7b 7c "
 
 # ============================================================================
 # Argument parsing
@@ -110,7 +130,20 @@ fi
 # ============================================================================
 # Build the list of phases to actually run
 # ============================================================================
+# - --only X      : run exactly phase X (could be a core phase or a Plone phase).
+# - --from X      : run X and every subsequent phase in PHASES order. If X is
+#                   a core phase (1..6), only the core sub-list runs first;
+#                   the Plone phases are offered via a separate prompt after.
+# - (no flag)     : run the core phases (1..CORE_LAST_LABEL), then prompt
+#                   the user whether to continue with the Plone phases.
+#
+# The Plone prompt is presented separately (after the core chain finishes
+# cleanly) instead of being a single up-front question, so a fresh build
+# operator who has been watching 1-6 succeed can make the call with full
+# information.
 TO_RUN=()
+SHOW_PLONE_PROMPT="no"
+
 if [ -n "$ONLY_PHASE" ]; then
     # --only: a single specific phase
     for entry in "${PHASES[@]}"; do
@@ -122,27 +155,51 @@ if [ -n "$ONLY_PHASE" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --only $ONLY_PHASE: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 5 5a 5b 5c 6"
+        echo "Valid phase labels: 1 2 3 4 5 5a 5b 5c 6 7a 7b 7c"
         exit 1
     fi
 elif [ -n "$START_FROM" ]; then
-    # --from N: start at phase N, run all subsequent
+    # --from N: start at phase N, run all subsequent in PHASES order.
+    # If N is a core phase, stop at CORE_LAST_LABEL and offer Plone prompt.
+    # If N is a Plone phase, run the rest of the Plone phases with no prompt.
     found=0
+    starting_in_plone="no"
+    case "$PLONE_LABELS" in
+        *" $START_FROM "*) starting_in_plone="yes" ;;
+    esac
     for entry in "${PHASES[@]}"; do
         label="${entry%%:*}"
         if [ "$found" -eq 1 ] || [ "$label" = "$START_FROM" ]; then
             found=1
+            # If we started in core and just reached the first Plone phase,
+            # stop adding here - those will be offered via the prompt.
+            if [ "$starting_in_plone" = "no" ]; then
+                case "$PLONE_LABELS" in
+                    *" $label "*) break ;;
+                esac
+            fi
             TO_RUN+=("$entry")
         fi
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --from $START_FROM: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 5 5a 5b 5c 6"
+        echo "Valid phase labels: 1 2 3 4 5 5a 5b 5c 6 7a 7b 7c"
         exit 1
     fi
+    # Only prompt for Plone if we started in core (we'll have stopped before 7a)
+    if [ "$starting_in_plone" = "no" ]; then
+        SHOW_PLONE_PROMPT="yes"
+    fi
 else
-    # No flag: run all phases
-    TO_RUN=("${PHASES[@]}")
+    # No flag: run the core phases. Plone is offered separately after.
+    for entry in "${PHASES[@]}"; do
+        label="${entry%%:*}"
+        case "$PLONE_LABELS" in
+            *" $label "*) continue ;;
+        esac
+        TO_RUN+=("$entry")
+    done
+    SHOW_PLONE_PROMPT="yes"
 fi
 
 # ============================================================================
@@ -239,6 +296,111 @@ for entry in "${TO_RUN[@]}"; do
     echo ""
     echo "${GREEN}  ✓ Phase $label completed.${RESET}"
 done
+
+# ============================================================================
+# Optional: continue into Plone (phases 7a/7b/7c)
+# ============================================================================
+# We only offer Plone if the run that just completed was a core run (default
+# chain or --from inside core). --only and --from 7x skip this.
+if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
+    echo ""
+    echo "${BOLD}${CYAN}============================================================${RESET}"
+    echo "${BOLD}${CYAN}  CORE PHASES COMPLETE - PLONE (phase 7) IS OPTIONAL${RESET}"
+    echo "${BOLD}${CYAN}============================================================${RESET}"
+    echo ""
+    echo "  Phase 7 installs Plone (the CMS used by Docent IMS) in three steps:"
+    echo "    7a  Plone OS prerequisites and per-tenant directory  (~30s)"
+    echo "    7b  Plone buildout (downloads + compiles, 5-15 min)"
+    echo "    7c  systemd unit, Apache vhost, Let's Encrypt cert,"
+    echo "         and the Plone Site itself"
+    echo ""
+    echo "  Skip phase 7 if this server is for mail/WordPress only and won't"
+    echo "  host Plone. You can always run phase 7 later via:"
+    echo "    sudo bash $0 --from 7a"
+    echo ""
+    while true; do
+        read -r -p "Run phase 7 (Plone) now? ${BOLD}(type yes or no)${RESET}: " ans
+        ans_norm=$(echo "$ans" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+        case "$ans_norm" in
+            yes) PLONE_OPT_IN="yes"; break ;;
+            no)  PLONE_OPT_IN="no";  break ;;
+            *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" ;;
+        esac
+    done
+
+    if [ "$PLONE_OPT_IN" = "yes" ]; then
+        # Build a second TO_RUN containing the Plone phases and run them
+        # through the same loop body. Any [FAIL] check in 7a/7b/7c stops
+        # the chain the same way as in core.
+        PLONE_TO_RUN=()
+        for entry in "${PHASES[@]}"; do
+            label="${entry%%:*}"
+            case "$PLONE_LABELS" in
+                *" $label "*) PLONE_TO_RUN+=("$entry") ;;
+            esac
+        done
+
+        for entry in "${PLONE_TO_RUN[@]}"; do
+            label="${entry%%:*}"
+            script="${entry##*:}"
+            script_path="$SCRIPT_DIR/$script"
+            log_path="/tmp/phase${label}-run.log"
+
+            if [ ! -f "$script_path" ]; then
+                echo ""
+                echo "${RED}ERROR: Phase $label script not found at $script_path${RESET}"
+                exit 1
+            fi
+
+            echo ""
+            echo "${BOLD}${CYAN}============================================================${RESET}"
+            echo "${BOLD}${CYAN}  PHASE $label - $script${RESET}"
+            echo "${BOLD}${CYAN}  Log: $log_path${RESET}"
+            echo "${BOLD}${CYAN}============================================================${RESET}"
+            echo ""
+
+            set +e
+            bash "$script_path" 2>&1 | tee "$log_path"
+            rc=${PIPESTATUS[0]}
+            set -e
+
+            if [ "$rc" -ne 0 ]; then
+                echo ""
+                echo "${RED}============================================================${RESET}"
+                echo "${RED}  PHASE $label FAILED (exit code $rc)${RESET}"
+                echo "${RED}============================================================${RESET}"
+                echo ""
+                echo "  Log: $log_path"
+                echo ""
+                echo "  Investigate the log, fix the issue, then resume:"
+                echo "    sudo bash $0 --from $label"
+                exit "$rc"
+            fi
+
+            if grep -qE '^\s*\[FAIL\]' "$log_path"; then
+                echo ""
+                echo "${YELLOW}  WARNING: Phase $label had [FAIL] checks.${RESET}"
+                echo "${YELLOW}  Review the log before continuing.${RESET}"
+                echo ""
+                read -r -p "Continue anyway? Type ${BOLD}yes${RESET} to proceed: " keep_going
+                keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
+                if [ "$keep_going" != "yes" ]; then
+                    echo "Stopped at user request. Resume with:"
+                    echo "  sudo bash $0 --from $label"
+                    exit 1
+                fi
+            fi
+
+            echo ""
+            echo "${GREEN}  ✓ Phase $label completed.${RESET}"
+            TO_RUN+=("$entry")   # so the summary banner includes 7a/7b/7c
+        done
+    else
+        echo ""
+        echo "${YELLOW}  Skipping phase 7 (Plone). Run later with:${RESET}"
+        echo "    sudo bash $0 --from 7a"
+    fi
+fi
 
 # ============================================================================
 # Summary
