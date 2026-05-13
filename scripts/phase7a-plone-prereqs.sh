@@ -4,8 +4,9 @@
 #
 # Installs system packages and creates the working environment that Plone
 # needs, but does NOT install Plone itself. After this phase runs, the
-# 'plone' user can run buildout from /home/plone/instance/ to install
-# whichever Plone configuration the user (or their Plone programmer) prefers.
+# 'plone' user can run buildout from /home/plone/<sitename>/ (derived from
+# MAIL_DOMAIN) to install whichever Plone configuration the user (or their
+# Plone programmer) prefers.
 #
 # Specifically this phase does NOT:
 #   - clone any Plone repo
@@ -28,7 +29,7 @@ set -u
 # ============================================================================
 PLONE_USER="plone"
 PLONE_HOME="/home/plone"
-PLONE_INSTANCE_DIR="/home/plone/instance"
+PLONE_INSTANCE_DIR=""  # Derived from MAIL_DOMAIN below, after tenant.local is sourced
 PLONE_SHELL="/bin/bash"
 
 # Python version requirements for Plone 6.2 (per official Plone docs).
@@ -88,6 +89,19 @@ if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
 fi
 unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
+
+# Derive PLONE_INSTANCE_DIR from MAIL_DOMAIN (matches phase 7b/7c convention).
+# Each tenant gets a Plone instance at /home/plone/<first-label-of-MAIL_DOMAIN>/
+# e.g. MAIL_DOMAIN=docentclienttest.com -> /home/plone/docentclienttest/
+# This way one server can in principle host multiple tenants' Plone instances
+# in sibling directories under /home/plone/, even though the current build
+# assumes single-tenant.
+if [ -z "${MAIL_DOMAIN:-}" ]; then
+    echo "FATAL: MAIL_DOMAIN is not set. tenant.local must define it before phase 7a runs."
+    exit 1
+fi
+PLONE_SITE_NAME="${PLONE_SITE_NAME:-$(echo "$MAIL_DOMAIN" | cut -d. -f1)}"
+PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 
 # ============================================================================
 # REPORT TRACKING
@@ -378,36 +392,23 @@ echo "==================================================================="
 echo "  MANUAL NEXT STEPS"
 echo "==================================================================="
 echo ""
-echo "  Phase 7a only installs OS prerequisites. Plone itself is NOT yet"
-echo "  installed. From here, work with your Plone programmer to:"
+echo "  Phase 7a only installs OS prerequisites and the per-tenant directory"
+echo "  at $PLONE_INSTANCE_DIR. Plone itself is NOT yet installed."
 echo ""
-echo "  1. Decide the install approach:"
-echo "     - clone DocentIMS.ActionItems and run its buildout, OR"
-echo "     - create a separate deployment buildout that pulls"
-echo "       DocentIMS.ActionItems as an egg, OR"
-echo "     - whatever approach works best for the project"
+echo "  Next phase: 7b will run buildout in $PLONE_INSTANCE_DIR, install"
+echo "  Plone (6.2 by default, configurable via PLONE_VERSION in tenant.local),"
+echo "  and record an admin password in CREDENTIALS.txt."
 echo ""
-echo "  2. As the plone user (NOT root), set up Plone 6.2.0rc2:"
-echo "       sudo su - plone"
-echo "       cd ~/instance"
-echo "       python3 -m venv ."
-echo "       bin/pip install --upgrade pip setuptools wheel"
-echo "       # --pre is required because 6.2.0rc2 is a pre-release."
-echo "       # -c pins all dependency versions to the official 6.2.0rc2 set."
-echo "       bin/pip install --pre -c https://dist.plone.org/release/6.2.0rc2/constraints.txt Plone"
-echo "       # ... then clone or create your buildout, or proceed with pip-only install ..."
+echo "  To proceed:"
+echo "    sudo bash /root/server-build/scripts/phase7b-plone-buildout.sh"
 echo ""
-echo "  3. Test the instance in foreground:"
-echo "       bin/instance fg"
-echo "     Default port is 8080, bound to 127.0.0.1 (not exposed externally)."
+echo "  (Phase 7c then exposes Plone at https://team.<MAIL_DOMAIN>/ via"
+echo "   Apache reverse proxy, and creates the Plone Site object inside the"
+echo "   Zope instance with distribution='classic'.)"
 echo ""
-echo "  4. Once the install approach is stable, ask for phase 7b which will"
-echo "     automate the buildout, install a systemd service, and configure"
-echo "     Apache reverse-proxy to https://<your-domain>/."
-echo ""
-echo "  NOTE on Plone 6.2.0rc2: this is a release candidate, not stable final."
-echo "  Final 6.2.0 expected very soon. When final ships, update this script"
-echo "  to pin to the final version (replace 6.2.0rc2 with 6.2.0)."
+echo "  NOTE on Plone 6.2.0rc2 (current default in phase 7b): this is a"
+echo "  release candidate, not stable final. Final 6.2.0 expected late May"
+echo "  2026. When final ships, update phase 7b's DEFAULT_PLONE_VERSION."
 echo ""
 echo "==================================================================="
 echo ""
