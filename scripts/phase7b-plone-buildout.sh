@@ -325,20 +325,19 @@ else
     vf "buildout.cfg missing or not phase7b-managed"
 fi
 
-# Plone egg of the expected version is present
-PLONE_EGG_PATTERN="$PLONE_INSTANCE_DIR/eggs/v5/Plone-${PLONE_VERSION}-*.egg"
-# shellcheck disable=SC2086
-if ls $PLONE_EGG_PATTERN >/dev/null 2>&1; then
-    vp "Plone $PLONE_VERSION egg installed"
+# Plone egg of the expected version is present.
+# Egg layouts vary across buildout versions and Python wheel-style installs:
+#   - older buildout:  eggs/Plone-X.Y.Z-pyA.B.egg/
+#   - newer buildout:  eggs/v5/Plone-X.Y.Z-pyA.B.egg/  (some setups)
+#   - wheel-style:     eggs/Plone-X.Y.Z.dist-info/
+# Rather than guess the layout, just look anywhere under eggs/ for the
+# expected version string. The find is fast enough not to bother optimizing.
+if find "$PLONE_INSTANCE_DIR/eggs" -maxdepth 4 \
+        \( -name "Plone-${PLONE_VERSION}-*.egg" -o -name "Plone-${PLONE_VERSION}.dist-info" \) \
+        2>/dev/null | grep -q .; then
+    vp "Plone $PLONE_VERSION egg/dist-info installed under $PLONE_INSTANCE_DIR/eggs/"
 else
-    # Fall back to checking eggs/ for any Plone-<version> match (eggs/v5 is
-    # buildout 5's egg dir; older buildouts might use eggs/ directly).
-    if ls "$PLONE_INSTANCE_DIR/eggs/"*"/Plone-${PLONE_VERSION}-"*.egg >/dev/null 2>&1 \
-       || ls "$PLONE_INSTANCE_DIR/eggs/Plone-${PLONE_VERSION}-"*.egg >/dev/null 2>&1; then
-        vp "Plone $PLONE_VERSION egg installed (non-standard path)"
-    else
-        vf "Plone $PLONE_VERSION egg not found under $PLONE_INSTANCE_DIR/eggs/"
-    fi
+    vf "Plone $PLONE_VERSION egg/dist-info not found anywhere under $PLONE_INSTANCE_DIR/eggs/"
 fi
 
 # var/ directory exists (will be created by buildout / first run)
