@@ -34,7 +34,7 @@ PLONE_SHELL="/bin/bash"
 # Python version requirements for Plone 6.1 (per official Plone docs)
 PYTHON_MIN_MAJOR=3
 PYTHON_MIN_MINOR=10
-PYTHON_MAX_MINOR=13
+PYTHON_MAX_MINOR=14
 
 # System packages required by Plone 6.1 classic + DocentIMS.ActionItems
 # install_requires (numpy, pandas, openpyxl, python-docx-oss, etc.)
