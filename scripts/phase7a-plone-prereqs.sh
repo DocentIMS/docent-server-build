@@ -58,9 +58,6 @@ SYSTEM_PACKAGES=(
     # Python dev + venv (Plone buildout creates a venv)
     python3-dev
     python3-venv
-    python3.12
-    python3.12-dev
-    python3.12-venv
     # PDF tooling - intentionally an OS dep, listed in DocentIMS.ActionItems
     # install_requires as a hint even though it's not a Python package
     poppler-utils
