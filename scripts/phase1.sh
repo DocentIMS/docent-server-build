@@ -142,7 +142,7 @@ if [ "$NAME" != "Ubuntu" ] || [ "$VERSION_ID" != "26.04" ]; then
 fi
 log_done "OS verified: Ubuntu 26.04 LTS"
 
-# --- Check 2: Show pending updates and prompt before applying ---
+# --- Check 2: Apply any pending OS updates automatically ---
 export DEBIAN_FRONTEND=noninteractive
 wait_for_dpkg_lock
 apt-get update -qq
@@ -155,25 +155,15 @@ else
     SECURITY_COUNT=$(echo "$UPGRADABLE_OUTPUT" | grep -c "security" || true)
     echo ""
     echo "  Pending updates: $UPGRADABLE_COUNT packages ($SECURITY_COUNT security updates)"
+    echo "  Applying now (this may take 1-3 minutes)..."
     echo ""
-    echo "  Phase 1 will now apply these updates. This may take 1-3 minutes."
-    echo ""
-    read -r -p "  Continue and apply updates? (type 'yes' to proceed): " confirm
-    case "$confirm" in
-        yes|YES)
-            wait_for_dpkg_lock
-            if apt-get upgrade -y -qq -o Dpkg::Use-Pty=0 < /dev/null; then
-                log_done "Applied $UPGRADABLE_COUNT package updates"
-            else
-                log_fail "apt-get upgrade failed (exit code $?)"
-                exit 1
-            fi
-            ;;
-        *)
-            echo "  Aborted (you must type 'yes' to proceed). No changes made."
-            exit 1
-            ;;
-    esac
+    wait_for_dpkg_lock
+    if apt-get upgrade -y -qq -o Dpkg::Use-Pty=0 < /dev/null; then
+        log_done "Applied $UPGRADABLE_COUNT package updates"
+    else
+        log_fail "apt-get upgrade failed (exit code $?)"
+        exit 1
+    fi
 fi
 
 # --- Check 3: Detect if reboot is required after updates ---
