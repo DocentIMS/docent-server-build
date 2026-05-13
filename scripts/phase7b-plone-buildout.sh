@@ -15,12 +15,17 @@
 #   6. Verify the install succeeded
 #
 # What this phase does NOT do (deferred to phase 7c):
-#   - bind Plone to 127.0.0.1 (still on 0.0.0.0:8080 here; 7c will lock down)
+#   - bind Plone to 127.0.0.1 (left on 0.0.0.0:8080 here; 7c locks it down)
 #   - install systemd unit
 #   - install Apache reverse-proxy vhost
-#   - configure ufw rule for port 8080
 #   - create the Plone Site object inside the Zope instance
-#     (the operator does this once via the web UI after 7c exposes it)
+#     (7c does this automatically via bin/instance run, with
+#      distribution_name='classic' so Folder/Page/etc. are installed)
+#
+# Note: phase 1 already installs ufw with port 8080 blocked, so even
+# though buildout configures Plone to listen on 0.0.0.0, external traffic
+# can't reach it between 7b and 7c. Phase 7c then changes the listen
+# address to 127.0.0.1 belt-and-suspenders.
 #
 # Idempotent. Safe to re-run. Each step checks current state before acting.
 # Run as root via run-phases.sh, or directly: sudo bash phase7b-plone-buildout.sh
@@ -238,10 +243,15 @@ Plone = $PLONE_VERSION
 [instance]
 recipe = plone.recipe.zope2instance
 user = admin:$PLONE_ADMIN_PW
-# NOTE: phase 7b leaves this as 0.0.0.0:8080 because phase 7c has not
-# installed Apache yet. Phase 7c will rewrite this to 127.0.0.1:8080 and
-# put Apache in front. Do NOT expose this port on a public IP without
-# Apache + TLS in front (or a firewall rule).
+# Listen on port 8080. The plone.recipe.zope2instance default for a
+# bare port number ('8080') is to bind to all interfaces (0.0.0.0:8080),
+# which means anyone with network access to this host can reach Plone
+# directly. Phase 7c rewrites this to '127.0.0.1:8080' to lock it down
+# to loopback only - after which Apache reverse-proxies to it.
+#
+# Between phase 7b finishing and phase 7c running, Plone IS reachable
+# on the public IP at port 8080. Run phase 7c immediately after 7b,
+# or rely on ufw blocking 8080 (the default phase 1 firewall posture).
 http-address = 8080
 eggs =
     Plone
@@ -378,23 +388,33 @@ echo "  MANUAL NEXT STEPS"
 echo "==================================================================="
 echo ""
 echo "  Plone is installed but the Zope instance is not yet running and"
-echo "  there is no Plone Site object inside it yet. Phase 7c will:"
+echo "  there is no Plone Site object inside it yet."
+echo ""
+echo "  Run phase 7c next - it will:"
 echo "    - rewrite buildout.cfg http-address to 127.0.0.1:8080"
 echo "    - install a systemd unit so Plone runs in the background"
-echo "    - install an Apache reverse-proxy vhost (https://$MAIL_DOMAIN/)"
-echo "    - reuse the Let's Encrypt cert that phase 2 obtained"
-echo "    - configure ufw to keep port 8080 firewalled (Apache talks to it"
-echo "      over loopback)"
+echo "    - install an Apache reverse-proxy vhost at"
+echo "      https://team.$MAIL_DOMAIN/"
+echo "    - reuse the Let's Encrypt cert (phase 3 should have issued it"
+echo "      for the team.<domain> subdomain alongside the bare domain)"
+echo "    - create the Plone Site object at /Plone with the Classic UI"
+echo "      distribution (so Folder, Page, News Item, etc. are installed)"
+echo "    - create the Plone-level admin user with PLONE_ADMIN_PW"
 echo ""
-echo "  Once phase 7c has run, point your browser at https://$MAIL_DOMAIN/"
-echo "  and click 'Create Classic UI Plone Site'. Log in as:"
-echo "      Username: admin"
-echo "      Password: (in $CREDENTIALS_FILE under PLONE_ADMIN_PW)"
+echo "  To run phase 7c:"
+echo "    sudo bash /root/server-build/scripts/phase7c-plone-frontend.sh"
 echo ""
-echo "  Until phase 7c exists, you can test the install manually:"
+echo "  After phase 7c, log in at:"
+echo "    https://team.$MAIL_DOMAIN/login"
+echo "    Username: admin"
+echo "    Password: (in $CREDENTIALS_FILE under PLONE_ADMIN_PW)"
+echo ""
+echo "  If you want to smoke-test the install before running phase 7c,"
+echo "  start Plone in foreground:"
 echo "    sudo -u $PLONE_USER bash -c 'cd $PLONE_INSTANCE_DIR && bin/instance fg'"
 echo "  Then hit http://127.0.0.1:8080/ via SSH tunnel:"
 echo "    ssh -L 8080:127.0.0.1:8080 -p 2222 wayne@<server-ip>"
+echo "  Stop the foreground instance (Ctrl-C) before running phase 7c."
 echo ""
 echo "==================================================================="
 echo ""
