@@ -283,32 +283,7 @@ ${BOLD}=============================================================
   PHASE 0 - SERVER BUILD BOOTSTRAP
 =============================================================${RESET}
 
-This script collects the per-tenant configuration needed to build
-this server. For each prompt, type a value and press Enter.
-
-After this completes, four files will be written on this server
-in ${CYAN}${REPO_ROOT}/${RESET}:
-
-  ${CYAN}${TENANT_FILE}${RESET}
-    non-secret tenant config (used by phase scripts)
-
-  ${CYAN}${SECRETS_FILE}${RESET}
-    passwords (used by phase scripts) - gitignored, mode 600
-
-  ${CYAN}${CREDENTIALS_FILE}${RESET}
-    human-readable credentials summary - gitignored, mode 600
-
-  ${CYAN}${QUICK_REFERENCE_FILE}${RESET}
-    day-to-day commands and password quick reference - mode 600
-
-You can safely abort with Ctrl+C at any time before the final
-write step. Nothing on the system changes until you run phase 1.
-
 EOF
-if ! ask_yes_no "Begin?"; then
-    echo "Aborted. Re-run phase0-bootstrap.sh when ready."
-    exit 0
-fi
 
 # ============================================================================
 # CHECK FOR EXISTING FILES
@@ -347,19 +322,12 @@ echo "This will appear at the top of CREDENTIALS.txt as a reminder."
 echo ""
 SERVER_PURPOSE=$(ask_required "Purpose")
 
-step "Admin accounts and host settings (hardcoded)"
-
+# Hardcoded admin accounts and host settings (assigned silently;
+# documented in CREDENTIALS.txt after write).
 ADMIN_USER="wayne"
 SHARED_ADMIN_USER="admin"
 SSH_PORT="2222"
 TIMEZONE="America/Los_Angeles"
-
-echo "  Personal admin user:    ${CYAN}${ADMIN_USER}${RESET}"
-echo "  Shareable admin user:   ${CYAN}${SHARED_ADMIN_USER}${RESET}"
-echo "  SSH port:               ${CYAN}${SSH_PORT}${RESET}"
-echo "  Timezone:               ${CYAN}${TIMEZONE}${RESET}"
-echo ""
-echo "  These values are hardcoded. To change, edit phase0-bootstrap.sh."
 
 step "Notification email"
 
@@ -389,7 +357,7 @@ XAI_API_KEY=$(ask "AI API key (e.g., sk-...)" "")
 # ============================================================================
 # AUTO-DERIVE
 # ============================================================================
-step "Auto-deriving values from primary domain"
+# Values auto-derived from primary domain (assigned silently).
 
 DOMAIN_STEM="${DOMAIN%%.*}"
 HOSTNAME_SHORT="$DOMAIN_STEM"
@@ -399,24 +367,10 @@ WP_ADMIN_USERNAME="wpadmin"
 WP_SITE_TITLE="Docent IMS"
 TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${DOMAIN}"
 
-cat <<EOF
-
-${DIM}The following are auto-derived from your primary domain:${RESET}
-  Hostname (short):       ${CYAN}${HOSTNAME_SHORT}${RESET}
-  Mail hostname:          ${CYAN}mail.${DOMAIN}${RESET}
-  WWW alias:              ${CYAN}www.${DOMAIN}${RESET}
-  Test mailbox:           ${CYAN}${TEST_MAILBOX}${RESET}
-  WordPress database:     ${CYAN}${WP_DB_NAME}${RESET}
-  WordPress DB user:      ${CYAN}${WP_DB_USER}${RESET}
-  WordPress admin user:   ${CYAN}${WP_ADMIN_USERNAME}${RESET}
-  WordPress site title:   ${CYAN}${WP_SITE_TITLE}${RESET}
-
-EOF
-
 # ============================================================================
 # GENERATE SECRETS
 # ============================================================================
-step "Generating strong random passwords"
+# 9 strong random passwords (assigned silently).
 
 ADMIN_PW=$(gen_pw 22)
 SHARED_ADMIN_PW=$(gen_pw 22)
@@ -427,36 +381,6 @@ ROUNDCUBE_DB_PW=$(gen_pw 28)
 ROUNDCUBE_DES_KEY=$(gen_pw 24)
 WP_DB_PW=$(gen_pw 28)
 WP_ADMIN_PW=$(gen_pw 22)
-
-echo "${GREEN}Generated 9 random passwords (22-28 chars each)${RESET}"
-
-# ============================================================================
-# CONFIRMATION
-# ============================================================================
-step "Review"
-
-cat <<EOF
-${BOLD}Tenant config to be written:${RESET}
-  Primary domain:          ${CYAN}${DOMAIN}${RESET}
-  Server IP:               ${CYAN}${SERVER_IP}${RESET}
-  Personal admin user:     ${CYAN}${ADMIN_USER}${RESET}
-  Shareable admin user:    ${CYAN}${SHARED_ADMIN_USER}${RESET}
-  SSH port:                ${CYAN}${SSH_PORT}${RESET}
-  Timezone:                ${CYAN}${TIMEZONE}${RESET}
-  Notification email:      ${CYAN}${NOTIFICATION_EMAIL}${RESET}
-  Test mailbox:            ${CYAN}${TEST_MAILBOX}${RESET}
-
-${BOLD}Secrets to be written:${RESET}
-  RC+ license key:         ${CYAN}${RC_PLUS_LICENSE_KEY}${RESET}
-  AI API key:              ${CYAN}${XAI_API_KEY:-(skipped)}${RESET}
-  Plus 9 auto-generated passwords.
-
-EOF
-
-if ! ask_yes_no "Write these files?"; then
-    echo "Aborted. No files written."
-    exit 1
-fi
 
 # ============================================================================
 # WRITE FILES
@@ -973,44 +897,10 @@ done
 # ============================================================================
 cat <<EOF
 
-${BOLD}=============================================================
-  BOOTSTRAP COMPLETE
+${BOLD}${GREEN}=============================================================
+  PHASE 0 COMPLETE
 =============================================================${RESET}
 
-Files written:
-  ${CYAN}${TENANT_FILE}${RESET}
-  ${CYAN}${SECRETS_FILE}${RESET}
-  ${CYAN}${CREDENTIALS_FILE}${RESET}
-  ${CYAN}${QUICK_REFERENCE_FILE}${RESET}
-
-Downloaded copies (saved during the action-required step):
-  ${CYAN}${DOWNLOAD_CRED_FILE}${RESET}
-  ${CYAN}${DOWNLOAD_QREF_FILE}${RESET}
-
-${BOLD}NEXT STEPS:${RESET}
-
-1. Add DNS records at your DNS provider (if not already done):
-     A     ${DOMAIN}       -> ${SERVER_IP}
-     A     www.${DOMAIN}   -> ${SERVER_IP}
-     A     mail.${DOMAIN}  -> ${SERVER_IP}
-
-2. Run the build. RECOMMENDED: chain all phases at once
-   (stops on first failure):
-
-     ${BOLD}sudo bash ${REPO_ROOT}/scripts/run-phases.sh${RESET}
-
-   Or run them one at a time, in order:
-
-     sudo bash ${REPO_ROOT}/scripts/phase1.sh
-     sudo bash ${REPO_ROOT}/scripts/phase2.sh
-     sudo bash ${REPO_ROOT}/scripts/phase3.sh
-     sudo bash ${REPO_ROOT}/scripts/phase4.sh
-     sudo bash ${REPO_ROOT}/scripts/phase5.sh
-     sudo bash ${REPO_ROOT}/scripts/phase5a-rc-plus.sh
-     sudo bash ${REPO_ROOT}/scripts/phase5b-globaladdressbook.sh
-     sudo bash ${REPO_ROOT}/scripts/phase5c-email-ai.sh
-     sudo bash ${REPO_ROOT}/scripts/phase6.sh
-
-   Each phase reads from tenant.local and secrets.local.
+Next:  ${BOLD}sudo bash ${REPO_ROOT}/scripts/run-phases.sh${RESET}
 
 EOF

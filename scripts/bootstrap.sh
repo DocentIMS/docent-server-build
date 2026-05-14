@@ -61,6 +61,16 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+echo ""
+echo "${BOLD}${CYAN}============================================================${RESET}"
+echo "${BOLD}${CYAN}  DOCENT SERVER BUILD${RESET}"
+echo "${BOLD}${CYAN}============================================================${RESET}"
+echo ""
+echo "  ${BOLD}Tip:${RESET} you can safely abort with Ctrl-C any time before"
+echo "  phase 1 finishes. Nothing on the system changes irreversibly"
+echo "  until then."
+echo ""
+
 # ============================================================================
 # Step 1: OS sanity check
 # ============================================================================
@@ -240,29 +250,7 @@ git -C "$REPO_DIR" log --oneline -1 | sed 's/^/    /'
 step "Step 6: Bootstrap complete - launching phase 0"
 
 echo ""
-echo "${GREEN}  Bootstrap finished successfully.${RESET}"
-echo ""
-echo "  Now running phase 0 (config + credentials generation)."
-echo "  Phase 0 will prompt for:"
-echo "    - Primary domain"
-echo "    - Server IP"
-echo "    - Server purpose"
-echo "    - Notification email"
-echo "    - Roundcube Plus license key"
-echo "    - AI API key (optional)"
-echo ""
-
-# Explicit yes/no - bare Enter is too easy to hit by accident.
-while true; do
-    read -r -p "Launch phase 0 now? ${BOLD}(type yes or no)${RESET}: " ans
-    case "$(echo "$ans" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
-        yes) break ;;
-        no)  echo "${YELLOW}Aborted. Re-run bootstrap.sh when ready, or run phase 0 manually:${RESET}"
-             echo "  bash $REPO_DIR/scripts/phase0-bootstrap.sh"
-             exit 0 ;;
-        *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" ;;
-    esac
-done
+echo "${GREEN}  Bootstrap finished successfully. Launching phase 0...${RESET}"
 echo ""
 
 exec bash "$REPO_DIR/scripts/phase0-bootstrap.sh"
