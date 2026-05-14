@@ -326,6 +326,7 @@ SERVER_PURPOSE=$(ask_required "Purpose")
 # documented in CREDENTIALS.txt after write).
 ADMIN_USER="wayne"
 SHARED_ADMIN_USER="admin"
+ESPEN_USER="espen"
 SSH_PORT="2222"
 TIMEZONE="America/Los_Angeles"
 
@@ -370,10 +371,11 @@ TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${DOMAIN}"
 # ============================================================================
 # GENERATE SECRETS
 # ============================================================================
-# 9 strong random passwords (assigned silently).
+# 10 strong random passwords (assigned silently).
 
 ADMIN_PW=$(gen_pw 22)
 SHARED_ADMIN_PW=$(gen_pw 22)
+ESPEN_PW=$(gen_pw 22)
 ROOT_DB_PW=$(gen_pw 28)
 MAIL_DB_PW=$(gen_pw 28)
 TEST_MAILBOX_PW=$(gen_pw 22)
@@ -401,6 +403,7 @@ SERVER_IP="${SERVER_IP}"
 SERVER_PURPOSE="${SERVER_PURPOSE}"
 ADMIN_USER="${ADMIN_USER}"
 SHARED_ADMIN_USER="${SHARED_ADMIN_USER}"
+ESPEN_USER="${ESPEN_USER}"
 SSH_PORT="${SSH_PORT}"
 TIMEZONE="${TIMEZONE}"
 NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL}"
@@ -453,6 +456,7 @@ XAI_API_KEY="${XAI_API_KEY}"
 
 ADMIN_PW="${ADMIN_PW}"
 SHARED_ADMIN_PW="${SHARED_ADMIN_PW}"
+ESPEN_PW="${ESPEN_PW}"
 # Backward compat: STAFF_PW maps to the shareable admin's password
 STAFF_PW="${SHARED_ADMIN_PW}"
 
@@ -538,6 +542,13 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
   need to give someone else access without sharing your ${ADMIN_USER}
   account.
 
+  Username:  ${ESPEN_USER}     (Plone developer access)
+  Password:  ${ESPEN_PW}
+
+  ${ESPEN_USER} has NO sudo. Member of 'plone' group, can do all Plone
+  work in /home/plone/ as themselves (no sudo needed thanks to
+  group-writable setgid permissions on /home/plone/<tenant>/).
+
 ==============================================================
   4. WEBMAIL TEST MAILBOX  (logging into Roundcube)
 ==============================================================
@@ -604,6 +615,10 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
   SSH (alternative shareable account):
     ssh -p ${SSH_PORT} ${SHARED_ADMIN_USER}@${SERVER_IP}
     Password: ${SHARED_ADMIN_PW}
+
+  SSH (Plone developer, no sudo, plone group member):
+    ssh -p ${SSH_PORT} ${ESPEN_USER}@${SERVER_IP}
+    Password: ${ESPEN_PW}
 
   Web (placeholder/WordPress site):
     https://${DOMAIN}/

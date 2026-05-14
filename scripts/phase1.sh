@@ -385,9 +385,36 @@ else
 fi
 
 # ============================================================================
-# STEP 7: SSH hardening - move port, disable root login
+# STEP 7: Create Plone-developer user (no sudo)
 # ============================================================================
-step "Step 7: SSH hardening"
+# Unlike wayne and admin, the Plone-developer user (default 'espen') has
+# NO sudo privileges. The intent: this account handles all Plone-related
+# work via the 'plone' group (added to that group in phase 7a after the
+# group exists). Group membership + setgid + group-writable permissions
+# on /home/plone/<tenant>/ let this user run buildout, restart the
+# systemd unit, edit configs, etc. without sudo.
+step "Step 7: Creating Plone-developer user '${ESPEN_USER:-espen}'"
+
+ESPEN_USER="${ESPEN_USER:-espen}"
+
+if id "$ESPEN_USER" &>/dev/null; then
+    log_skip "User $ESPEN_USER already exists"
+else
+    # No -G sudo here on purpose - this account does not get sudo.
+    useradd -m -s /bin/bash "$ESPEN_USER"
+    # Use ESPEN_PW from secrets.local if available, otherwise generate
+    if [ -z "${ESPEN_PW:-}" ]; then
+        ESPEN_PW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 22)
+        log_warn "No ESPEN_PW in secrets.local - generated a random password (NOT in CREDENTIALS.txt)"
+    fi
+    echo "$ESPEN_USER:$ESPEN_PW" | chpasswd
+    log_done "Created user $ESPEN_USER (NO sudo; plone group will be added by phase 7a)"
+fi
+
+# ============================================================================
+# STEP 8: SSH hardening - move port, disable root login
+# ============================================================================
+step "Step 8: SSH hardening"
 
 SSHD_CONFIG="/etc/ssh/sshd_config"
 SSHD_BACKUP="/etc/ssh/sshd_config.phase1.bak"
@@ -447,9 +474,9 @@ else
 fi
 
 # ============================================================================
-# STEP 8: Configure firewall (ufw)
+# STEP 9: Configure firewall (ufw)
 # ============================================================================
-step "Step 8: Configuring firewall (ufw)"
+step "Step 9: Configuring firewall (ufw)"
 
 # Set defaults
 ufw default deny incoming >/dev/null 2>&1
@@ -488,9 +515,9 @@ else
 fi
 
 # ============================================================================
-# STEP 9: Configure fail2ban
+# STEP 10: Configure fail2ban
 # ============================================================================
-step "Step 9: Configuring fail2ban"
+step "Step 10: Configuring fail2ban"
 
 JAIL_LOCAL="/etc/fail2ban/jail.local"
 if [ -f "$JAIL_LOCAL" ] && grep -q "phase1-marker" "$JAIL_LOCAL"; then
@@ -519,9 +546,9 @@ else
 fi
 
 # ============================================================================
-# STEP 10: Verify unattended-upgrades
+# STEP 11: Verify unattended-upgrades
 # ============================================================================
-step "Step 10: Verifying unattended-upgrades"
+step "Step 11: Verifying unattended-upgrades"
 
 if systemctl is-enabled --quiet unattended-upgrades 2>/dev/null; then
     log_skip "unattended-upgrades already enabled"
@@ -538,9 +565,9 @@ else
 fi
 
 # ============================================================================
-# STEP 11: Restart SSH (carefully - handles Ubuntu 24.04+ socket activation)
+# STEP 12: Restart SSH (carefully - handles Ubuntu 24.04+ socket activation)
 # ============================================================================
-step "Step 11: Restarting SSH"
+step "Step 12: Restarting SSH"
 
 if sshd -t 2>/dev/null; then
     # Ubuntu 24.04+ uses systemd socket activation: ssh.socket listens for
@@ -679,6 +706,23 @@ if id "$SHARED_ADMIN_USER" &>/dev/null; then
         "$(id "$SHARED_ADMIN_USER")" "sudo"
 else
     echo "  [FAIL] Shareable admin user '$SHARED_ADMIN_USER' does not exist"
+    VERIFY_FAIL=$((VERIFY_FAIL + 1))
+fi
+
+# Plone-developer user
+if id "$ESPEN_USER" &>/dev/null; then
+    echo "  [PASS] Plone-developer user '$ESPEN_USER' exists"
+    VERIFY_PASS=$((VERIFY_PASS + 1))
+    # Espen MUST NOT be in sudo - that's the design
+    if id "$ESPEN_USER" | grep -qw "sudo"; then
+        echo "  [FAIL] Plone-developer user '$ESPEN_USER' is in sudo group (should not be)"
+        VERIFY_FAIL=$((VERIFY_FAIL + 1))
+    else
+        echo "  [PASS] Plone-developer user '$ESPEN_USER' is NOT in sudo group"
+        VERIFY_PASS=$((VERIFY_PASS + 1))
+    fi
+else
+    echo "  [FAIL] Plone-developer user '$ESPEN_USER' does not exist"
     VERIFY_FAIL=$((VERIFY_FAIL + 1))
 fi
 

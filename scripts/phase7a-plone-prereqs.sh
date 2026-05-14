@@ -270,8 +270,33 @@ else
     exit 1
 fi
 
-# Set sane permissions on the instance directory
-chmod 755 "$PLONE_INSTANCE_DIR"
+# Set group-writable with setgid bit (2775) on the instance directory.
+# Why: this lets members of the plone group (e.g. the espen Plone-developer
+# user created in phase 1) write into the instance tree without sudo. The
+# setgid bit (the leading 2) ensures files created inside inherit group=plone
+# instead of the creating user's primary group, so the plone systemd service
+# can still read/write its own files no matter who created them.
+chmod 2775 "$PLONE_INSTANCE_DIR"
+log_done "Set $PLONE_INSTANCE_DIR mode 2775 (setgid + group-writable for plone group)"
+
+# Add the Plone-developer user (default 'espen') to the plone group if it
+# exists. Phase 1 creates that user without any extra groups; this is where
+# we wire them up to the plone group, because phase 7a is the first phase
+# that knows the plone group exists.
+ESPEN_USER="${ESPEN_USER:-espen}"
+if id "$ESPEN_USER" >/dev/null 2>&1; then
+    if id "$ESPEN_USER" | grep -qw "$PLONE_USER"; then
+        log_skip "User $ESPEN_USER already in $PLONE_USER group"
+    else
+        if usermod -aG "$PLONE_USER" "$ESPEN_USER"; then
+            log_done "Added $ESPEN_USER to $PLONE_USER group"
+        else
+            log_fail "Failed to add $ESPEN_USER to $PLONE_USER group"
+        fi
+    fi
+else
+    log_skip "User $ESPEN_USER does not exist (phase 1 must have skipped it; nothing to do)"
+fi
 
 # ============================================================================
 # VERIFICATION
@@ -367,6 +392,23 @@ if su - "$PLONE_USER" -c "test -w '$PLONE_INSTANCE_DIR'" 2>/dev/null; then
     verify "User '$PLONE_USER' can write to $PLONE_INSTANCE_DIR" "PASS"
 else
     verify "User '$PLONE_USER' can write to $PLONE_INSTANCE_DIR" "FAIL"
+fi
+
+# Instance directory has setgid + group-writable (mode 2775)
+INSTANCE_MODE=$(stat -c '%a' "$PLONE_INSTANCE_DIR" 2>/dev/null)
+if [ "$INSTANCE_MODE" = "2775" ]; then
+    verify "$PLONE_INSTANCE_DIR has mode 2775 (setgid + group-writable)" "PASS"
+else
+    verify "$PLONE_INSTANCE_DIR has mode 2775 (got: $INSTANCE_MODE)" "FAIL"
+fi
+
+# Plone-developer user (if it exists) is in plone group
+if id "$ESPEN_USER" >/dev/null 2>&1; then
+    if id "$ESPEN_USER" | grep -qw "$PLONE_USER"; then
+        verify "User '$ESPEN_USER' is in '$PLONE_USER' group" "PASS"
+    else
+        verify "User '$ESPEN_USER' is in '$PLONE_USER' group" "FAIL"
+    fi
 fi
 
 # poppler-utils binaries are usable
