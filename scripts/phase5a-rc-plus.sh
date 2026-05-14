@@ -604,12 +604,19 @@ step "Step 6e: Hiding compose-page right-hand options pane"
 # array. We use Python to edit meta.json safely (JSON parse/modify/write)
 # rather than text-mangling it - text edits to JSON break too easily.
 
-CUSTOM_CSS="/usr/share/roundcube/skins/outlook_plus/styles/docent-overrides.css"
-CUSTOM_CSS_REL="/styles/docent-overrides.css"
+CUSTOM_CSS="/usr/share/roundcube/skins/outlook_plus/assets/styles/docent-overrides.css"
+CUSTOM_CSS_REL="/assets/styles/docent-overrides.css"
 SKIN_META="/usr/share/roundcube/skins/outlook_plus/meta.json"
 
+# Note: outlook_plus stores its own CSS in /assets/styles/ (e.g.
+# styles.css), so we put our override file there too. An earlier
+# version of this script tried /usr/share/roundcube/skins/outlook_plus
+# /styles/ - that directory doesn't exist in outlook_plus, only in
+# the parent Elastic skin, so Step 6e silently warned-and-skipped
+# without ever writing the CSS. Diagnosed May 14 2026.
+
 if [ ! -d "$(dirname "$CUSTOM_CSS")" ]; then
-    log_warn "outlook_plus styles dir not found - skipping compose-pane CSS override"
+    log_warn "outlook_plus assets/styles dir not found - skipping compose-pane CSS override"
 elif [ ! -f "$SKIN_META" ]; then
     log_warn "outlook_plus meta.json not found - skipping compose-pane CSS override"
 else
@@ -618,35 +625,53 @@ else
 /* Docent overrides - applied by phase 5a, regenerated on each run.
  * Per-server customizations to the outlook_plus skin.
  *
- * Hide the right-hand "Options and attachments" pane on the compose page.
- * The Attach button in the top toolbar still works (opens upload dialog),
- * so file attachments remain accessible. The options panel contents
+ * Hide the right-hand "Options and attachments" pane on the compose
+ * page and expand the message body into the freed space. The Attach
+ * button in the top toolbar still works (opens upload dialog), so
+ * file attachments remain accessible. The options panel contents
  * (Return receipt, Delivery status, Keep formatting, Priority,
  * Save-sent-folder) and the dashed file-drop zone are deliberately
  * removed to maximize the compose-body area.
  *
- * The outlook_plus skin inherits from larry (NOT Elastic, despite a
- * previous comment in this script). The correct IDs to target, verified
- * by DOM inspection on a live build (May 14 2026):
- *   #composeoptions       - the toggles (Return receipt, Priority, etc.)
- *   #compose-attachments  - the dashed drop-zone "Attach a file" panel
- *   #composebodycontainer - the message body; larry sets right:260px
- *                           to make room for #compose-attachments. We
- *                           override to right:0 so the body fills the
- *                           freed space and there is no vertical dividing
- *                           line where the panel used to be.
+ * Verified by browser DevTools inspection on a live outlook_plus
+ * build (May 14 2026):
+ *   #compose-options      - the toggles (Return receipt, Priority,
+ *                           etc.); NOTE the hyphen - earlier guesses
+ *                           used #composeoptions (no hyphen) which
+ *                           does not exist in the DOM.
+ *   #compose-attachments  - the dashed drop-zone "Attach a file" panel.
+ *   #layout-sidebar       - the outer pane containing the "Options
+ *                           and attachments" header; hidden so that
+ *                           text doesn't remain visible above the
+ *                           now-empty area.
+ *   #layout-content       - the main compose-area container; the
+ *                           skin's CSS leaves space on the right for
+ *                           #layout-sidebar (rect-width 1714 of 2560
+ *                           on a typical desktop). We force this
+ *                           container to fill all the way to the
+ *                           right edge so there is no vertical line
+ *                           where the sidebar used to be. Earlier
+ *                           attempts targeted #composebodycontainer
+ *                           directly with `right: 0` but that element
+ *                           has position:relative (not absolute), so
+ *                           `right` does nothing - the real constraint
+ *                           is on its ancestor #layout-content.
  *
- * Scoped to body.task-mail.action-compose so we only affect the compose
- * page, not inbox or settings.
+ * Scoped to body.task-mail.action-compose so we only affect the
+ * compose page, not inbox or settings.
  */
-body.task-mail.action-compose #composeoptions {
+body.task-mail.action-compose #compose-options {
     display: none !important;
 }
 body.task-mail.action-compose #compose-attachments {
     display: none !important;
 }
-body.task-mail.action-compose #composebodycontainer {
+body.task-mail.action-compose #layout-sidebar {
+    display: none !important;
+}
+body.task-mail.action-compose #layout-content {
     right: 0 !important;
+    width: auto !important;
 }
 EOF
     chown root:www-data "$CUSTOM_CSS"
