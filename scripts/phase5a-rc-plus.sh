@@ -590,12 +590,14 @@ log_done "Updated Roundcube config (skin_logo, sent_mbox, junk_mbox, folder orde
 # ============================================================================
 step "Step 6e: Hiding compose-page right-hand options pane"
 
-# The elastic skin's compose template (which outlook_plus inherits from)
-# renders a right-hand sidebar with #layout-sidebar.sidebar-right containing
-# 'Options and attachments' (return receipt, delivery status, priority,
-# save-sent-message-in dropdown, attach-a-file dropzone). User wants this
-# hidden to maximize compose-area real estate. The Attach button in the
-# top toolbar still works.
+# The outlook_plus skin inherits from the LARRY skin (not Elastic - an
+# earlier version of this comment got this wrong, which led to the CSS
+# targeting nonexistent IDs). Larry's compose template renders a right-
+# hand pane containing 'Options and attachments': Return receipt,
+# Delivery status notification, Keep formatting, Priority dropdown,
+# Save sent message in dropdown, and a dashed file-drop zone. User
+# wants this entire pane hidden to maximize compose-area real estate.
+# The Attach button in the top toolbar still works (opens upload dialog).
 #
 # Approach: drop a custom CSS file into the outlook_plus skin's styles
 # directory, and register it via the skin's meta.json "links.stylesheet"
@@ -617,23 +619,34 @@ else
  * Per-server customizations to the outlook_plus skin.
  *
  * Hide the right-hand "Options and attachments" pane on the compose page.
- * The Attach button in the top toolbar still works (creates an inline
- * attachments area below the message body). The remaining options
- * (return receipt, delivery status, priority, save-sent-folder)
- * are deliberately removed - users can re-enable them by removing
- * this rule if needed.
+ * The Attach button in the top toolbar still works (opens upload dialog),
+ * so file attachments remain accessible. The options panel contents
+ * (Return receipt, Delivery status, Keep formatting, Priority,
+ * Save-sent-folder) and the dashed file-drop zone are deliberately
+ * removed to maximize the compose-body area.
  *
- * Scoped to body.task-mail.action-compose so we only hide the sidebar
- * on the compose page, not on inbox view (where the sidebar IS wanted).
+ * The outlook_plus skin inherits from larry (NOT Elastic, despite a
+ * previous comment in this script). The correct IDs to target, verified
+ * by DOM inspection on a live build (May 14 2026):
+ *   #composeoptions       - the toggles (Return receipt, Priority, etc.)
+ *   #compose-attachments  - the dashed drop-zone "Attach a file" panel
+ *   #composebodycontainer - the message body; larry sets right:260px
+ *                           to make room for #compose-attachments. We
+ *                           override to right:0 so the body fills the
+ *                           freed space and there is no vertical dividing
+ *                           line where the panel used to be.
+ *
+ * Scoped to body.task-mail.action-compose so we only affect the compose
+ * page, not inbox or settings.
  */
-body.task-mail.action-compose #layout-sidebar.sidebar-right {
+body.task-mail.action-compose #composeoptions {
     display: none !important;
 }
-
-/* Let the main compose area expand into the freed space */
-body.task-mail.action-compose #layout-content {
-    margin-right: 0 !important;
-    width: 100% !important;
+body.task-mail.action-compose #compose-attachments {
+    display: none !important;
+}
+body.task-mail.action-compose #composebodycontainer {
+    right: 0 !important;
 }
 EOF
     chown root:www-data "$CUSTOM_CSS"
