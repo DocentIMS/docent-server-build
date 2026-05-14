@@ -291,13 +291,20 @@ else
 fi
 
 # /etc/hosts entry
-if grep -qE "^127\.0\.1\.1\s+$HOSTNAME_FQDN" /etc/hosts; then
-    log_skip "/etc/hosts already has $HOSTNAME_FQDN entry"
+#
+# Ubuntu's standard hostname-resolution shim uses 127.0.1.1 so a process
+# on the box can resolve its own short hostname without depending on DNS.
+# We deliberately do NOT include the customer's public FQDN here - that
+# domain must resolve to the public IP via real DNS, not to localhost.
+# (Earlier versions wrote "127.0.1.1 $HOSTNAME_FQDN $HOSTNAME_SHORT" and
+# caused on-box DNS lookups of the public domain to return 127.0.1.1.)
+if grep -qE "^127\.0\.1\.1\s+$HOSTNAME_SHORT\s*$" /etc/hosts; then
+    log_skip "/etc/hosts already has $HOSTNAME_SHORT entry (short hostname only)"
 else
-    # remove any old 127.0.1.1 line, then add the correct one
+    # remove any old 127.0.1.1 line, then add the corrected one
     sed -i '/^127\.0\.1\.1/d' /etc/hosts
-    echo "127.0.1.1   $HOSTNAME_FQDN $HOSTNAME_SHORT" >> /etc/hosts
-    log_done "/etc/hosts updated with $HOSTNAME_FQDN"
+    echo "127.0.1.1   $HOSTNAME_SHORT" >> /etc/hosts
+    log_done "/etc/hosts updated with $HOSTNAME_SHORT (short hostname only)"
 fi
 
 # ============================================================================
@@ -648,7 +655,7 @@ verify_not_contains() {
 verify "Hostname is $HOSTNAME_SHORT" "$HOSTNAME_SHORT" "$(hostname)"
 
 # /etc/hosts
-verify_contains "/etc/hosts has FQDN entry" "$(cat /etc/hosts)" "$HOSTNAME_FQDN"
+verify_contains "/etc/hosts has short-hostname entry" "$(cat /etc/hosts)" "127.0.1.1   $HOSTNAME_SHORT"
 
 # Timezone
 verify "Timezone is $TIMEZONE" "$TIMEZONE" "$(timedatectl show --property=Timezone --value)"
