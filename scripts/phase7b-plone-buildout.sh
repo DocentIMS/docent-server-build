@@ -186,6 +186,35 @@ else
     log_done "Recorded Plone admin credentials to $CREDENTIALS_FILE"
 fi
 
+# Also insert a human-readable Plone admin entry into the BACKEND PASSWORDS
+# section, right after the WordPress admin line. The machine-readable block
+# above is what phase 7c parses; this insert is purely for the human reading
+# CREDENTIALS.txt.
+#
+# Anchor: the WordPress admin's "login: ...wp-admin/" line (unique in the file).
+# Idempotent: skip if "Plone admin:" already appears in the BACKEND block.
+PLONE_HUMAN_LINE="  Plone admin:         ${PLONE_ADMIN_PW}    (user: admin)"
+PLONE_HUMAN_LOGIN="                                          login: https://team.${DOMAIN}/login"
+if grep -qE "^  Plone admin:" "$CREDENTIALS_FILE" 2>/dev/null; then
+    log_skip "Plone admin line already in human-readable BACKEND PASSWORDS section"
+elif grep -qE "login: https://[^/]+/wp-admin/" "$CREDENTIALS_FILE" 2>/dev/null; then
+    # Found the anchor. Use awk to insert two lines right after it.
+    # awk handles this more reliably than sed for multi-line content with
+    # special characters in the password.
+    TMP=$(mktemp)
+    awk -v line1="$PLONE_HUMAN_LINE" -v line2="$PLONE_HUMAN_LOGIN" '
+        { print }
+        /login: https:\/\/[^/]+\/wp-admin\// {
+            print line1
+            print line2
+        }
+    ' "$CREDENTIALS_FILE" > "$TMP" && mv "$TMP" "$CREDENTIALS_FILE"
+    chmod 600 "$CREDENTIALS_FILE"
+    log_done "Inserted Plone admin into human-readable BACKEND PASSWORDS section"
+else
+    log_warn "No WordPress admin anchor in $CREDENTIALS_FILE - skipping human-readable insert. Plone password is still in the machine-readable section above."
+fi
+
 # ============================================================================
 # STEP 3: Create venv and install buildout prerequisites
 # ============================================================================
