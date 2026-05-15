@@ -35,6 +35,7 @@ set -euo pipefail
 # ----------------------------------------------------------------------------
 SECRETS_FILE="/home/wayne/.docent-secrets.env"
 MONITORS_DIR="/home/wayne/uptimerobot-monitors"
+EXCLUSIONS_FILE="$(dirname "$(readlink -f "$0")")/monitoring-exclusions.txt"
 DEFAULT_INTERVAL=300   # 5 minutes (UR allows 60, 300, 600, 900, 1800, 3600)
 KEYWORD_PREFIX="[auto]"  # All auto-created monitors get this prefix in friendly_name
 UR_API="https://api.uptimerobot.com/v2"
@@ -90,6 +91,23 @@ fi
 if [[ "$DOMAIN" =~ ^https?:// ]] || [[ "$DOMAIN" =~ / ]]; then
   echo "ERROR: domain should be bare hostname (e.g. 'docent.us'), not URL"
   exit 1
+fi
+
+# ----------------------------------------------------------------------------
+# Exclusion check
+# ----------------------------------------------------------------------------
+# If the domain is listed in monitoring-exclusions.txt, exit silently with a
+# clear message. Intended for scratch/test servers that get rebuilt often.
+if [ -f "$EXCLUSIONS_FILE" ]; then
+  # Strip comments and blank lines, then match exact domain
+  if grep -v '^[[:space:]]*#' "$EXCLUSIONS_FILE" \
+      | grep -v '^[[:space:]]*$' \
+      | sed 's/[[:space:]]//g' \
+      | grep -qFx "$DOMAIN"; then
+    echo "Domain '$DOMAIN' is in $EXCLUSIONS_FILE — skipping monitoring setup."
+    echo "(Remove it from that file to enable monitoring.)"
+    exit 0
+  fi
 fi
 
 # ----------------------------------------------------------------------------

@@ -1,0 +1,14 @@
+# UptimeRobot monitoring exclusion list
+#
+# Domains listed here will be SKIPPED by phase8-monitoring.sh.
+# Used for scratch/test servers that get rebuilt frequently and don't
+# need real monitoring.
+#
+# Format:
+#   - one domain per line
+#   - lines starting with # are comments
+#   - blank lines are ignored
+#   - exact match against the domain passed to phase8-monitoring.sh
+#     (so "docent.us" excludes only docent.us, not subdomains)
+
+docent.us
