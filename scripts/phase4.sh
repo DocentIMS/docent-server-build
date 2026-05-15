@@ -892,17 +892,18 @@ done
 # STEP 9b: Generate BIND zone file for DNS provider import
 # ============================================================================
 # Produces a complete, ready-to-import BIND zone file at
-# /root/server_setup/dns/<DOMAIN>.zone. This file can be uploaded
+# /home/${ADMIN_USER}/docent-build/dns/<DOMAIN>.zone. This file can be uploaded
 # directly to Cloudflare DNS (Records -> Import and Export -> Import) or
 # used as a reference when entering records manually at IONOS or any other
 # DNS provider. The DKIM key is read from the live OpenDKIM key file so
 # the output is always in sync with what's actually deployed on the server.
 step "Step 9b: Generating BIND zone file for DNS import"
 
-ZONE_DIR="/root/server_setup/dns"
+ZONE_DIR="/home/${ADMIN_USER}/docent-build/dns"
 ZONE_FILE="$ZONE_DIR/${DOMAIN}.zone"
 mkdir -p "$ZONE_DIR"
-chmod 700 "$ZONE_DIR"
+chown -R "${ADMIN_USER}:${ADMIN_USER}" "/home/${ADMIN_USER}/docent-build"
+chmod 750 "$ZONE_DIR"
 
 # Detect server IP. Prefer the IP that owns the default route (works even
 # on multi-homed hosts).
