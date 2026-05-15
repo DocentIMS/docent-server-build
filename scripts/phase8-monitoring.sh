@@ -135,6 +135,61 @@ if [ "$PROJECTED" -gt "$PLAN_CAP" ]; then
   echo "       Either retire an old tenant, or upgrade UR plan."
   exit 1
 fi
+
+# ----------------------------------------------------------------------------
+# Preflight: discover alert contacts to attach to new monitors
+# ----------------------------------------------------------------------------
+# Pulls the current alert contacts from UR and selects active ones by type.
+# We attach: email (type 2) and SMS (type 8). We skip voice (type 14).
+#
+# Format expected by UR for the "alert_contacts" param on newMonitor:
+#   id1_threshold_recurrence-id2_threshold_recurrence-...
+# threshold and recurrence are typically 0 (use defaults).
+echo "Discovering alert contacts..."
+
+CONTACTS_JSON=$(curl -sS -X POST "$UR_API/getAlertContacts" \
+  -d "api_key=$UPTIMEROBOT_API_KEY" \
+  -d "format=json")
+
+if ! echo "$CONTACTS_JSON" | grep -q '"stat":"ok"'; then
+  echo "ERROR: could not fetch alert contacts."
+  echo "Response: $CONTACTS_JSON"
+  exit 1
+fi
+
+# Extract IDs for active email (type 2) and SMS (type 8) contacts.
+# Uses python because grep/sed against arbitrary JSON is fragile.
+ALERT_CONTACTS_PARAM=$(echo "$CONTACTS_JSON" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+wanted_types = {2: 'email', 8: 'sms'}   # type 14 (voice) excluded by omission
+parts = []
+for c in data.get('alert_contacts', []):
+    t = c.get('type')
+    if t in wanted_types and c.get('status') == 1:
+        parts.append(str(c['id']) + '_0_0')
+print('-'.join(parts))
+")
+
+if [ -z "$ALERT_CONTACTS_PARAM" ]; then
+  echo "ERROR: no active email or SMS alert contacts found."
+  echo "       Set them up in the UR dashboard first."
+  exit 1
+fi
+
+# Friendly summary of which contacts were selected
+SELECTED_SUMMARY=$(echo "$CONTACTS_JSON" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+types = {2: 'email', 8: 'sms'}
+for c in data.get('alert_contacts', []):
+    if c.get('type') in types and c.get('status') == 1:
+        label = types[c['type']]
+        val = c.get('value', '?')
+        cid = c['id']
+        print(f'  {label}: {val} (id {cid})')
+")
+echo "$SELECTED_SUMMARY"
 # ----------------------------------------------------------------------------
 # Preflight: check for existing audit file (idempotency)
 # ----------------------------------------------------------------------------
@@ -172,6 +227,7 @@ create_monitor() {
       echo "      url=$url"
       echo "      interval=$DEFAULT_INTERVAL"
       echo "      friendly_name=$name"
+      echo "      alert_contacts=$ALERT_CONTACTS_PARAM"
       # Show extra params (they come in as alternating -d "key=val" pairs)
       local i
       for ((i=0; i<${#extra[@]}; i+=2)); do
@@ -190,6 +246,7 @@ create_monitor() {
     -d "url=$url" \
     -d "interval=$DEFAULT_INTERVAL" \
     -d "friendly_name=$name" \
+    -d "alert_contacts=$ALERT_CONTACTS_PARAM" \
     "${extra[@]}")
 
   if ! echo "$response" | grep -q '"stat":"ok"'; then
