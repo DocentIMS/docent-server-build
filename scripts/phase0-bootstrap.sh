@@ -866,46 +866,23 @@ echo ""
 cat "$CREDENTIALS_FILE"
 echo ""
 
-# ============================================================================
-# FORCING FUNCTION: block until user confirms download
-# ============================================================================
-# This is intentional friction. Without it, on a long session you might
-# move on, lose the scrollback, and find yourself unable to read
-# /root/CREDENTIALS.txt because you've already lost the wayne password.
-# Phase 0 will not exit until you type DOWNLOADED.
 echo ""
 echo "${BOLD}${YELLOW}=============================================================${RESET}"
-echo "${BOLD}${YELLOW}  ACTION REQUIRED - DOWNLOAD CREDENTIALS BEFORE CONTINUING${RESET}"
+echo "${BOLD}${YELLOW}  IMPORTANT - DOWNLOAD CREDENTIALS BEFORE NUKING THIS SERVER${RESET}"
 echo "${BOLD}${YELLOW}=============================================================${RESET}"
 cat <<EOF
-
   Two files are ready for download. They are readable as
   ${BOLD}${DOWNLOAD_AS_USER}${RESET}:
-
     ${CYAN}${DOWNLOAD_CRED_FILE}${RESET}
     ${CYAN}${DOWNLOAD_QREF_FILE}${RESET}
-
-  ${BOLD}Do this now, before continuing:${RESET}
-
+  ${BOLD}When convenient, do this:${RESET}
     1. Open MobaXterm's left sidebar (SFTP browser).
     2. Navigate to ${CYAN}${DOWNLOAD_DIR}/${RESET}
     3. Right-click each file -> Download. Save them somewhere
        you control (password manager, encrypted folder, etc).
-
-  Phase 0 will not finish until you confirm.
-
+  These files will not be regenerated. Build continues automatically.
 EOF
-
-while true; do
-    read -r -p "  When BOTH files are downloaded, type DOWNLOADED and press Enter: " CONFIRM
-    if [ "$CONFIRM" = "DOWNLOADED" ]; then
-        echo ""
-        echo "${GREEN}  Confirmed. Continuing.${RESET}"
-        echo ""
-        break
-    fi
-    echo "${YELLOW}  (Type the word DOWNLOADED exactly, in capital letters.)${RESET}"
-done
+echo ""
 
 # ============================================================================
 # DONE
