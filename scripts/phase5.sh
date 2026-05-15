@@ -386,6 +386,33 @@ else
 \$config['sent_mbox']   = 'Sent';
 \$config['trash_mbox']  = 'Trash';
 \$config['junk_mbox']   = 'Junk';
+
+// ----------------------------------------------------------------------
+// Docent defaults - applied on first login. Users can still change these
+// in Settings -> Preferences if they want to.
+// ----------------------------------------------------------------------
+
+// Date format: month-first, hyphen-separated (e.g. '05-14-2026'). The
+// default formats Roundcube ships with are all day-first or year-first,
+// neither of which suits US conventions.
+\$config['date_long']  = 'm-d-Y H:i';
+\$config['date_short'] = 'm-d-Y';
+
+// HTML compose by default. 1 = always start with the rich-text editor.
+\$config['htmleditor'] = 1;
+
+// Default font for HTML compose: Verdana, 12pt.
+\$config['default_font']      = 'Verdana';
+\$config['default_font_size'] = '12pt';
+
+// Default address book: the shared 'project_contacts' book created by
+// phase 5b (globaladdressbook plugin). New contacts and autocomplete
+// pull from this by default.
+\$config['default_addressbook'] = 'project_contacts';
+
+// When sending mail, also save recipient addresses into 'project_contacts'
+// so the team builds up a shared address book over time.
+\$config['collected_recipients'] = 'project_contacts';
 EOF
     chown root:www-data "$ROUNDCUBE_CONFIG"
     chmod 640 "$ROUNDCUBE_CONFIG"
