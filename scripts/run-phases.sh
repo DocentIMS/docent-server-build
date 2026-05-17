@@ -511,3 +511,23 @@ echo "          rm $REPO_ROOT/QUICK-REFERENCE.txt"
 echo ""
 echo "  See QUICK-REFERENCE.txt for day-to-day commands and recovery procedures."
 echo ""
+
+# ----------------------------------------------------------------------------
+# Final action banner: phase 8 (UptimeRobot monitoring) must run on
+# docenttemplate, not on the client server. This banner is the last thing
+# the user sees, so it's hard to miss.
+# ----------------------------------------------------------------------------
+echo ""
+echo "${BOLD}${YELLOW}============================================================${RESET}"
+echo "${BOLD}${YELLOW}  NEXT ACTION — RUN ON DOCENTTEMPLATE${RESET}"
+echo "${BOLD}${YELLOW}============================================================${RESET}"
+echo ""
+echo "  Enable UptimeRobot monitoring for this tenant. SSH to docenttemplate,"
+echo "  then copy-paste these two lines:"
+echo ""
+echo "    cd /home/wayne/server-build/scripts"
+echo "    ./phase8-monitoring.sh ${DOMAIN}"
+echo ""
+echo "  Creates 6 monitors (WordPress, Plone, Roundcube, SMTP, submission,"
+echo "  IMAPS) wired to email + SMS alerts."
+echo ""
