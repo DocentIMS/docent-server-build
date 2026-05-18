@@ -23,6 +23,14 @@
 (function () {
     'use strict';
 
+    // CRITICAL: don't run inside iframes. Roundcube loads message content
+    // into an iframe that includes the full skin HTML and this plugin's
+    // assets. Without this guard, we build duplicate header bands and
+    // account corners inside the iframe rendering of every email.
+    if (window.parent !== window) {
+        return;
+    }
+
     // Fluent UI System Icons -> "Compose" / "New mail" icon
     // Source: https://github.com/microsoft/fluentui-system-icons (MIT)
     // Inlined as SVG string to avoid an extra HTTP request and to keep
@@ -474,6 +482,36 @@
 
 
     /**
+     * Inject a small <style> tag into the message preview iframe to hide
+     * the Details/Headers/Plain text/Show summary row inside the email
+     * rendering. Those actions stay available via the parent toolbar's
+     * existing "More" menu (Show source, etc.) so users keep access.
+     *
+     * The iframe's src stays on watermark.html but Roundcube swaps in
+     * the message HTML via DOM manipulation, so we re-inject the style
+     * tag on every poll - the function is idempotent.
+     */
+    function styleIframeContent() {
+        var iframe = document.getElementById('messagecontframe');
+        if (!iframe) return;
+        var doc;
+        try { doc = iframe.contentDocument; } catch (e) { return; }
+        if (!doc || !doc.head) return;
+        if (doc.getElementById('docent-iframe-style')) return;
+
+        var style = doc.createElement('style');
+        style.id = 'docent-iframe-style';
+        style.textContent =
+            '#full-headers,' +
+            ' #message-header .header-links,' +
+            ' #message-header div.header-links {' +
+            '   display: none !important;' +
+            ' }';
+        doc.head.appendChild(style);
+    }
+
+
+    /**
      * Main entry: run all our DOM tweaks, defensively.
      */
     function applyDocentOverrides() {
@@ -482,6 +520,7 @@
         try { injectAccountCorner();    } catch (e) { console.warn('docent: account corner failed', e); }
         try { relocateFolderActions();  } catch (e) { console.warn('docent: folder actions relocate failed', e); }
         try { relocateEmailAddress();   } catch (e) { console.warn('docent: address relocation failed', e); }
+        try { styleIframeContent();     } catch (e) { console.warn('docent: iframe styling failed', e); }
     }
 
     // Hook into Roundcube's init event if available, otherwise fall
@@ -496,4 +535,12 @@
     } else {
         applyDocentOverrides();
     }
+
+    // The iframe content changes when the user clicks an email. To
+    // re-inject our iframe style on each new message, poll every 800ms.
+    // The styleIframeContent function is idempotent (skips if style tag
+    // already present).
+    setInterval(function () {
+        try { styleIframeContent(); } catch (e) { /* ignore */ }
+    }, 800);
 })();

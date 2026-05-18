@@ -969,7 +969,7 @@ body #docent-new-message,
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    height: 80px !important;
+    height: 56px !important;
     z-index: 999 !important;
     display: grid !important;
     grid-template-columns: 300px 1fr 280px !important;
@@ -989,10 +989,10 @@ body #docent-new-message,
 }
 
 #docent-header-logo {
-    height: 54px !important;
+    height: 40px !important;
     width: auto !important;
-    max-height: 54px !important;
-    max-width: 280px !important;
+    max-height: 40px !important;
+    max-width: 200px !important;
     background-color: transparent !important;
     padding: 0 !important;
     border-radius: 0 !important;
@@ -1066,7 +1066,7 @@ body #docent-new-message,
 
 /* Push the existing Roundcube layout down by the band height */
 body.docent-header-band-active #layout {
-    padding-top: 80px !important;
+    padding-top: 56px !important;
 }
 
 /* Hide the original logo in popover-header (we cloned it into the band) */
@@ -1345,4 +1345,118 @@ body.task-mail #layout-sidebar {
 .task-mail #layout-list > .header {
     background-color: var(--docent-sidebar-bg) !important;
     border-bottom: 1px solid var(--docent-divider) !important;
+}
+
+
+/* =====================================================================
+ * SECTION 11 (rev2): Reposition outer toolbar to overlay reading pane
+ * =====================================================================
+ *
+ * The Reply/Reply all/Forward/Delete/Mark buttons live in the outer
+ * page's #layout-content > .header strip. The email content
+ * (subject, sender row, body) renders inside #messagecontframe iframe.
+ *
+ * We want the buttons to visually sit at the top-right of the email
+ * reading area, aligned with the iframe-rendered sender info row.
+ *
+ * Approach: position the existing .header absolutely over the
+ * iframe-wrapper's top-right area, transparent background. Hide the
+ * back-button and "Mail" title text. No DOM moves, no JS overhead.
+ *
+ * This only activates when we're in mail task. The skin's stock CSS
+ * handles the normal full-strip layout for non-mail tasks.
+ */
+
+/* Make layout-content the positioning context */
+body.task-mail #layout-content {
+    position: relative !important;
+}
+
+/* Float the toolbar header over the top-right of the iframe area */
+body.task-mail #layout-content > .header[role="toolbar"] {
+    position: absolute !important;
+    top: 60px !important;
+    right: 16px !important;
+    left: auto !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: transparent !important;
+    border: none !important;
+    border-bottom: none !important;
+    z-index: 50 !important;
+}
+
+/* Hide the back-button and "Mail" title - keep only the action menu */
+body.task-mail #layout-content > .header[role="toolbar"] > a.back-list-button,
+body.task-mail #layout-content > .header[role="toolbar"] > .header-title {
+    display: none !important;
+}
+
+/* The toolbar-menu ul - tighten and ensure horizontal row */
+body.task-mail #layout-content > .header #toolbar-menu {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 2px !important;
+    white-space: nowrap !important;
+}
+
+/* Hide the spacer item that creates a gap between Forward/Delete */
+body.task-mail #layout-content > .header #toolbar-menu > li.spacer {
+    display: none !important;
+}
+
+/* Hide list-view-only items (Select/Threads/Options) when overlaying */
+body.task-mail #layout-content > .header #toolbar-menu > li > a.select.hidden-big,
+body.task-mail #layout-content > .header #toolbar-menu > li > a.threads.hidden-big,
+body.task-mail #layout-content > .header #toolbar-menu > li > a.options.hidden-big {
+    display: none !important;
+}
+
+/* Hide the toolbar-menu-button (mobile hamburger that duplicates the
+ * toolbar) since we're already showing the toolbar inline. */
+body.task-mail #layout-content > .header > a.toolbar-menu-button {
+    display: none !important;
+}
+
+/* Compact button sizing in overlay mode */
+body.task-mail #layout-content > .header #toolbar-menu > li > a,
+body.task-mail #layout-content > .header #toolbar-menu .dropbutton > a {
+    padding: 6px 8px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 4px !important;
+}
+
+/* Hide button text labels - icon only in overlay mode */
+body.task-mail #layout-content > .header #toolbar-menu .inner {
+    position: absolute !important;
+    left: -10000px !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+}
+
+/* But keep the ::before icons visible at proper size */
+body.task-mail #layout-content > .header #toolbar-menu > li > a::before,
+body.task-mail #layout-content > .header #toolbar-menu .dropbutton > a::before {
+    font-size: 18px !important;
+    line-height: 1 !important;
+}
+
+/* Hover state */
+body.task-mail #layout-content > .header #toolbar-menu > li > a:hover {
+    background-color: var(--docent-fluent-blue-faint) !important;
 }
