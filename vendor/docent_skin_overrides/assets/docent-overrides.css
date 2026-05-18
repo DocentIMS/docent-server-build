@@ -1,0 +1,1348 @@
+/* Docent overrides - applied by phase 5a, regenerated on each run.
+ * Per-server customizations to the outlook_plus skin.
+ *
+ * =====================================================================
+ * SECTION 1: Compose page sidebar removal (existing behavior, unchanged)
+ * =====================================================================
+ *
+ * Hide the right-hand "Options and attachments" pane on the compose
+ * page and expand the message body into the freed space. The Attach
+ * button in the top toolbar still works (opens upload dialog), so
+ * file attachments remain accessible. The options panel contents
+ * (Return receipt, Delivery status, Keep formatting, Priority,
+ * Save-sent-folder) and the dashed file-drop zone are deliberately
+ * removed to maximize the compose-body area.
+ *
+ * Verified by browser DevTools inspection on a live outlook_plus
+ * build (May 14 2026):
+ *   #compose-options      - the toggles (Return receipt, Priority,
+ *                           etc.); NOTE the hyphen - earlier guesses
+ *                           used #composeoptions (no hyphen) which
+ *                           does not exist in the DOM.
+ *   #compose-attachments  - the dashed drop-zone "Attach a file" panel.
+ *   #layout-sidebar       - the outer pane containing the "Options
+ *                           and attachments" header; hidden so that
+ *                           text doesn't remain visible above the
+ *                           now-empty area.
+ *   #layout-content       - the main compose-area container; the
+ *                           skin's CSS leaves space on the right for
+ *                           #layout-sidebar (rect-width 1714 of 2560
+ *                           on a typical desktop). We force this
+ *                           container to fill all the way to the
+ *                           right edge so there is no vertical line
+ *                           where the sidebar used to be. Earlier
+ *                           attempts targeted #composebodycontainer
+ *                           directly with `right: 0` but that element
+ *                           has position:relative (not absolute), so
+ *                           `right` does nothing - the real constraint
+ *                           is on its ancestor #layout-content.
+ *
+ * Scoped to body.task-mail.action-compose so we only affect the
+ * compose page, not inbox or settings.
+ */
+body.task-mail.action-compose #compose-options {
+    display: none !important;
+}
+body.task-mail.action-compose #compose-attachments {
+    display: none !important;
+}
+body.task-mail.action-compose #layout-sidebar {
+    display: none !important;
+}
+body.task-mail.action-compose #layout-content {
+    right: 0 !important;
+    width: auto !important;
+}
+
+
+/* =====================================================================
+ * SECTION 2: Outlook-fidelity styling overrides
+ * =====================================================================
+ *
+ * Goal: make outlook_plus visually match Microsoft Outlook on the web
+ * (M365, 2026). Drop the colored top-bar chrome, adopt Fluent palette,
+ * add unread indicator strip, neutralize folder icons, Segoe UI Variable
+ * typography.
+ *
+ * IMPORTANT ARCHITECTURAL NOTES
+ * -----------------------------
+ * RoundcubePlus generates 18 ".xcolor-XXXXXX" theme classes from
+ * _colors.scss. Whichever theme the user picks (Settings -> Look & Feel)
+ * applies a colored background to:
+ *   div.header                                  - the top bar
+ *   #layout-menu .popover-header                - mobile menu header
+ *   .floating-action-buttons a.button           - FAB
+ *   .listing tr.selected td (etc.)              - selection background
+ *   .btn.btn-primary                            - primary buttons
+ *   a, button.xanchor                           - link/anchor text color
+ *   .folderlist li.mailbox .unreadcount         - unread count pill
+ * ...and more, all gated on body.xcolor-XXXXXX.
+ *
+ * To make the skin Outlook-like REGARDLESS of which theme the user
+ * picks, we need selectors that win against ".xcolor-XXXXXX div.header"
+ * etc. The cleanest approach: select on body[class*="xcolor-"] which
+ * matches any theme, and use !important to beat the generated rules.
+ *
+ * We do NOT modify styles.css, styles.scss, or _colors.scss - those are
+ * upstream RoundcubePlus files and will be overwritten by skin updates.
+ * Everything Outlook-related lives here.
+ *
+ * Verified selectors against the live DOM and against the compiled
+ * styles.css from outlook_plus version 5.3.x.
+ */
+
+
+/* ---------- 2.1 Fluent design tokens ---------- */
+:root {
+    --docent-fluent-blue:        #0F6CBD;
+    --docent-fluent-blue-hover:  #115EA3;
+    --docent-fluent-blue-light:  #E5F1FB;
+    --docent-fluent-blue-faint:  #F3F9FD;
+    --docent-chrome-bg:          #FAF9F8;
+    --docent-sidebar-bg:         #F3F2F1;  /* Outlook nav pane gray (Fluent neutral lighter) */
+    --docent-content-bg:         #FAF9F8;  /* Outlook main content off-white (Fluent neutral lightest) */
+    --docent-divider:            #EDEBE9;
+    --docent-text-primary:       #242424;
+    --docent-text-secondary:     #616161;
+}
+
+
+/* ---------- 2.2 Typography: Segoe UI Variable ---------- */
+body,
+.messagelist,
+.folderlist,
+#layout-content,
+#layout-sidebar,
+#layout-list,
+.toolbar,
+.headers-table,
+input, button, select, textarea {
+    font-family: "Segoe UI Variable", "Segoe UI", -apple-system, system-ui, sans-serif !important;
+    color: var(--docent-text-primary);
+}
+
+
+/* ---------- 2.3 Kill the colored top bar (overrides every xcolor theme) ----------
+ * The original SCSS rule at _colors.scss line 44-49 sets:
+ *   .xcolor-XXX div.header:not(.calendar-list-header),
+ *   .xcolor-XXX div.header:not(.calendar-list-header) a,
+ *   .xcolor-XXX div.header .toolbar.open,
+ *   .xcolor-XXX .floating-action-buttons a.button,
+ *   .xcolor-XXX.xsidebar-mobile-visible #xsidebar #xsidebar-mobile-header
+ *     { background-color: $base !important; }
+ *
+ * We need to win against that. Same selectors, higher specificity via
+ * body[class*="xcolor-"] prefix, plus !important to match.
+ */
+body[class*="xcolor-"] div.header:not(.calendar-list-header),
+body[class*="xcolor-"] div.header:not(.calendar-list-header) a,
+body[class*="xcolor-"] div.header .toolbar.open,
+body[class*="xcolor-"] #layout-menu .popover-header,
+body[class*="xcolor-"] .floating-action-buttons a.button {
+    background-color: var(--docent-chrome-bg) !important;
+    background-image: none !important;
+    color: var(--docent-text-primary) !important;
+    border-bottom: 1px solid var(--docent-divider) !important;
+    box-shadow: none !important;
+}
+
+/* styles.scss line 44-48 forces white text on colored header. Reverse it. */
+body[class*="xcolor-"] #layout > div > .header,
+body[class*="xcolor-"] #layout > div > .header a.button,
+#layout > div > .header,
+#layout > div > .header a.button {
+    color: var(--docent-text-primary) !important;
+}
+
+/* All children of the header inherit dark text + dark icons */
+body[class*="xcolor-"] div.header *,
+div.header * {
+    color: var(--docent-text-primary) !important;
+    fill: var(--docent-text-primary) !important;
+}
+
+/* Hover state for top-bar buttons (Reply, Reply all, Forward, etc.) */
+div.header a.button:hover,
+div.header button.btn:hover,
+.toolbar a.button:hover,
+.toolbar button.btn:hover {
+    background-color: var(--docent-fluent-blue-faint) !important;
+    color: var(--docent-fluent-blue) !important;
+}
+div.header a.button:hover *,
+div.header button.btn:hover *,
+.toolbar a.button:hover *,
+.toolbar button.btn:hover * {
+    color: var(--docent-fluent-blue) !important;
+    fill: var(--docent-fluent-blue) !important;
+}
+
+
+/* ---------- 2.4 Left app rail (Compose / Mail / Contacts / Settings) ---------- */
+#taskmenu,
+.taskmenu,
+#layout-menu .menu {
+    background: var(--docent-chrome-bg) !important;
+    border-right: 1px solid var(--docent-divider) !important;
+}
+
+#taskmenu a,
+.taskmenu a {
+    color: var(--docent-text-secondary) !important;
+    background: transparent !important;
+    border-left: 3px solid transparent !important;
+}
+
+#taskmenu a:hover,
+.taskmenu a:hover {
+    background: var(--docent-fluent-blue-faint) !important;
+    color: var(--docent-fluent-blue) !important;
+}
+
+/* Active task: blue left strip + tinted bg - Outlook signature */
+#taskmenu a.selected,
+#taskmenu a.active,
+body.task-mail #taskmenu a.mail,
+body.task-addressbook #taskmenu a.contacts,
+body.task-settings #taskmenu a.settings {
+    background: var(--docent-fluent-blue-light) !important;
+    border-left: 3px solid var(--docent-fluent-blue) !important;
+    color: var(--docent-fluent-blue) !important;
+}
+#taskmenu a.selected *,
+#taskmenu a.active *,
+body.task-mail #taskmenu a.mail *,
+body.task-addressbook #taskmenu a.contacts *,
+body.task-settings #taskmenu a.settings * {
+    color: var(--docent-fluent-blue) !important;
+    fill: var(--docent-fluent-blue) !important;
+}
+
+
+/* ---------- 2.5 Folder list ---------- */
+.folderlist,
+#mailboxlist {
+    background: var(--docent-content-bg) !important;
+    border-right: 1px solid var(--docent-divider) !important;
+}
+
+ul.treelist li > a,
+ul.treelist li > div > a,
+.folderlist li a,
+#mailboxlist li a {
+    color: var(--docent-text-primary) !important;
+    background: transparent !important;
+    border-left: 3px solid transparent !important;
+}
+
+/* Neutralize folder icons - Outlook uses gray, accent only on selected */
+.folderlist li a .icon,
+.folderlist li a svg,
+#mailboxlist li a .icon,
+#mailboxlist li a svg,
+ul.treelist li > a .icon,
+ul.treelist li > a svg {
+    color: var(--docent-text-secondary) !important;
+    fill: var(--docent-text-secondary) !important;
+    stroke: var(--docent-text-secondary) !important;
+}
+
+ul.treelist li > a:hover,
+ul.treelist li > div > a:hover,
+.folderlist li a:hover,
+#mailboxlist li a:hover {
+    background: var(--docent-fluent-blue-faint) !important;
+}
+
+/* Selected folder - override .xcolor-XXX selection bg */
+body[class*="xcolor-"] ul.treelist li.selected > a,
+body[class*="xcolor-"] ul.treelist li.selected > div > a,
+body[class*="xcolor-"] .folderlist li.selected > a,
+body[class*="xcolor-"] #mailboxlist li.selected > a,
+ul.treelist li.selected > a,
+ul.treelist li.selected > div > a,
+.folderlist li.selected > a,
+#mailboxlist li.selected > a {
+    background-color: var(--docent-fluent-blue-light) !important;
+    border-left: 3px solid var(--docent-fluent-blue) !important;
+    color: var(--docent-fluent-blue) !important;
+    font-weight: 600 !important;
+}
+body[class*="xcolor-"] ul.treelist li.selected > a .icon,
+body[class*="xcolor-"] ul.treelist li.selected > a svg,
+body[class*="xcolor-"] .folderlist li.selected > a .icon,
+body[class*="xcolor-"] .folderlist li.selected > a svg {
+    color: var(--docent-fluent-blue) !important;
+    fill: var(--docent-fluent-blue) !important;
+    stroke: var(--docent-fluent-blue) !important;
+}
+
+/* Unread count pill in folder list - rebrand from teal to Fluent blue */
+body[class*="xcolor-"] .folderlist li.mailbox .unreadcount,
+.folderlist li.mailbox .unreadcount {
+    background-color: var(--docent-fluent-blue) !important;
+    color: #FFFFFF !important;
+}
+
+
+/* ---------- 2.6 Message list - Outlook unread strip + selection ---------- */
+.messagelist tr,
+.messagelist .message {
+    border-bottom: 1px solid var(--docent-divider) !important;
+}
+
+.messagelist tr:hover,
+.messagelist .message:hover {
+    background-color: var(--docent-fluent-blue-faint) !important;
+}
+
+/* Selected row - override .xcolor-XXX selection bg */
+body[class*="xcolor-"] .listing tr.selected td,
+.messagelist tr.selected,
+.messagelist .message.selected,
+.messagelist tr.focused.selected {
+    background-color: var(--docent-fluent-blue-light) !important;
+    color: var(--docent-text-primary) !important;
+}
+
+/* THE Outlook signature: 3px blue strip on unread messages */
+.messagelist tr.unread,
+.messagelist .message.unread {
+    border-left: 3px solid var(--docent-fluent-blue) !important;
+}
+.messagelist tr.unread .subject,
+.messagelist tr.unread .fromto,
+.messagelist .message.unread .subject,
+.messagelist .message.unread .fromto {
+    font-weight: 600 !important;
+    color: var(--docent-text-primary) !important;
+}
+
+.messagelist tr:not(.unread) .subject,
+.messagelist tr:not(.unread) .fromto {
+    color: var(--docent-text-primary) !important;
+    font-weight: 400 !important;
+}
+
+.messagelist .date {
+    color: var(--docent-text-secondary) !important;
+    font-size: 0.85em !important;
+}
+
+
+/* ---------- 2.7 Reading pane ---------- */
+#layout-content,
+#messagecontent,
+.message-content {
+    background: var(--docent-content-bg) !important;
+}
+
+#message-header,
+.message-header {
+    border-bottom: 1px solid var(--docent-divider) !important;
+    padding: 12px 16px !important;
+}
+
+.message-subject,
+h1.subject,
+.subject-line {
+    font-size: 20px !important;
+    font-weight: 600 !important;
+    color: var(--docent-text-primary) !important;
+}
+
+/* Soften the Details / Headers / Plain text / Show summary row */
+.headers-table,
+.message-headers,
+#full-headers,
+.header-links {
+    font-size: 13px !important;
+    color: var(--docent-text-secondary) !important;
+}
+.header-links a,
+.headers-table a {
+    color: var(--docent-fluent-blue) !important;
+    text-decoration: none !important;
+}
+.header-links a:hover,
+.headers-table a:hover {
+    text-decoration: underline !important;
+}
+
+
+/* ---------- 2.8 Link color - rebrand from xcolor accent to Fluent blue ---------- */
+body[class*="xcolor-"] a:not(.button):not(.btn):not(.icon-button):not(#taskmenu a):not(.folderlist a):not(#mailboxlist a),
+body[class*="xcolor-"] button.xanchor {
+    color: var(--docent-fluent-blue) !important;
+}
+
+
+/* ---------- 2.9 Search bar ---------- */
+#quicksearchbar,
+.searchbar,
+form.search-form {
+    background: #FFFFFF !important;
+    border: 1px solid var(--docent-divider) !important;
+    border-radius: 4px !important;
+}
+#quicksearchbar:focus-within,
+.searchbar:focus-within,
+form.search-form:focus-within {
+    border-color: var(--docent-fluent-blue) !important;
+    box-shadow: 0 0 0 1px var(--docent-fluent-blue) !important;
+}
+
+
+/* ---------- 2.10 Hide bottom pager (Outlook uses infinite scroll feel) ----------
+ * Comment this block if your users prefer pagination.
+ */
+#messagelistfooter,
+.pagenav,
+.listing-pager {
+    display: none !important;
+}
+
+
+/* ---------- 2.11 Primary buttons - Fluent blue regardless of xcolor theme ---------- */
+body[class*="xcolor-"] .btn.btn-primary,
+body[class*="xcolor-"] .btn.btn-success,
+.btn.btn-primary,
+.btn.btn-success,
+.formbuttons button.mainaction {
+    background-color: var(--docent-fluent-blue) !important;
+    border-color: var(--docent-fluent-blue) !important;
+    color: #FFFFFF !important;
+    border-radius: 4px !important;
+}
+body[class*="xcolor-"] .btn.btn-primary:hover,
+body[class*="xcolor-"] .btn.btn-success:hover,
+.btn.btn-primary:hover,
+.btn.btn-success:hover,
+.formbuttons button.mainaction:hover {
+    background-color: var(--docent-fluent-blue-hover) !important;
+    border-color: var(--docent-fluent-blue-hover) !important;
+    filter: none !important;
+}
+
+
+/* ---------- 2.12 Login page - swap teal background for Fluent neutral ----------
+ * Original styles.scss line 8-15 hardcodes background: #0075c8 for login.
+ */
+body.xelastic.task-login {
+    background: var(--docent-chrome-bg) !important;
+}
+body.xelastic.task-login.login-page #login-footer {
+    background: rgba(0, 0, 0, 0.1) !important;
+    color: var(--docent-text-primary) !important;
+}
+
+
+/* ---------- 2.13 Logo area - drop colored bg ---------- */
+#logo,
+.logo,
+.header-logo {
+    background: var(--docent-chrome-bg) !important;
+    background-image: none !important;
+    border-bottom: 1px solid var(--docent-divider) !important;
+}
+
+
+/* ---------- 2.14 Form focus rings - Fluent blue instead of xcolor ---------- */
+body[class*="xcolor-"] .form-control:focus:not(.is-invalid),
+body[class*="xcolor-"] .custom-file-label:focus:not(.is-invalid),
+body[class*="xcolor-"] .recipient-input.focus,
+.form-control:focus:not(.is-invalid) {
+    border-color: var(--docent-fluent-blue) !important;
+    box-shadow: 0 0 0 1px var(--docent-fluent-blue) !important;
+}
+
+
+/* ---------- 2.15 Custom switch toggles - Fluent blue when on ---------- */
+body[class*="xcolor-"] .custom-switch .custom-control-input:checked ~ .custom-control-label::before {
+    background-color: var(--docent-fluent-blue) !important;
+    border-color: var(--docent-fluent-blue) !important;
+}
+
+
+/* ---------- 2.16 Misc dividers ---------- */
+.popover,
+.popupmenu,
+#layout-sidebar,
+#layout-list,
+.formcontent,
+fieldset {
+    border-color: var(--docent-divider) !important;
+}
+
+
+/* =====================================================================
+ * SECTION 3: User-requested behavioral changes (May 17 2026, v2)
+ * =====================================================================
+ *
+ * Updated with exact selectors after DOM inspection. The taskmenu
+ * structure is:
+ *   #taskmenu
+ *     span.action-buttons > a.compose
+ *     a.mail
+ *     a.contacts
+ *     a.settings           (already hidden in v1)
+ *     a.apps               (the 3x3 grid - "multi-dot icon")
+ *     span.special-buttons > a.theme.dark, a.about, a.logout
+ *
+ * Selected app: gets class="... selected"
+ */
+
+
+/* ---------- 3.1 Selected app on left rail (blue strip + blue icon) ----------
+ * Need higher specificity than RoundcubePlus's selected-state rules. Use
+ * #taskmenu prefix and !important. Cover both the plain ".selected"
+ * variant and the task-specific selectors.
+ */
+#taskmenu a.selected,
+#taskmenu a.mail.selected,
+#taskmenu a.contacts.selected,
+#taskmenu a.settings.selected,
+body.task-mail #taskmenu a.mail,
+body.task-addressbook #taskmenu a.contacts,
+body.task-settings #taskmenu a.settings,
+body[class*="xcolor-"] #taskmenu a.selected,
+body[class*="xcolor-"] body.task-mail #taskmenu a.mail {
+    background-color: var(--docent-fluent-blue-light) !important;
+    border-left: 4px solid var(--docent-fluent-blue) !important;
+    color: var(--docent-fluent-blue) !important;
+    position: relative !important;
+}
+
+/* Force the icon/glyph color inside the selected app */
+#taskmenu a.selected::before,
+#taskmenu a.selected *,
+body.task-mail #taskmenu a.mail::before,
+body.task-mail #taskmenu a.mail *,
+body.task-addressbook #taskmenu a.contacts::before,
+body.task-addressbook #taskmenu a.contacts * {
+    color: var(--docent-fluent-blue) !important;
+    fill: var(--docent-fluent-blue) !important;
+    stroke: var(--docent-fluent-blue) !important;
+}
+
+
+/* ---------- 3.1b Hide app-launcher (the 3x3 grid "multi-dot icon") ----------
+ * Per user request. The icon is #taskmenu a.apps (or #button-apps).
+ * Hide both the launcher button and the popup it would have opened.
+ */
+#taskmenu a.apps,
+#button-apps,
+#apps-menu {
+    display: none !important;
+}
+
+
+/* ---------- 3.2 Hide gear (settings) icon - retained from v1 ---------- */
+#taskmenu a.settings {
+    display: none !important;
+}
+
+
+/* ---------- 3.3 Three-dot "more" menu next to email address ----------
+ * Retained from v1. (Selectors are speculative; if it still shows in the
+ * top bar, inspect that specific element and tighten.)
+ */
+.header .more-options,
+.header a.more,
+.header button.more,
+.header a.dropdown-toggle,
+.header button.dropdown-toggle,
+.header .identity-menu-button,
+.header > a[aria-haspopup="true"]:not(.button) {
+    display: none !important;
+}
+
+/* Additional aggressive hide: the three-dot "more" button next to the
+ * email address in the top popover-header. In outlook_plus the markup
+ * is .popover-header a[data-popup] or a.sidebar-menu - target both, and
+ * also catch any unstyled "⋮" content as a fallback. */
+#layout-menu .popover-header a[data-popup],
+#layout-menu .popover-header a.sidebar-menu,
+#layout-menu .popover-header a.more,
+#layout-menu .popover-header .icon.more,
+#layout-menu .popover-header a[aria-haspopup="true"]:not(#docent-new-message) {
+    display: none !important;
+}
+
+
+/* ---------- 3.4 Hide Select / Threads / Options / Refresh group ----------
+ * In Mail view, the toolbar is #toolbar-menu and items are <li> with an
+ * <a class="..."> inside. Hide the listitem (whole button) so spacing
+ * collapses.
+ */
+#toolbar-menu li:has(> a.select),
+#toolbar-menu li:has(> a.threads),
+#toolbar-menu li:has(> a.options),
+#toolbar-menu li:has(> a.refresh),
+#toolbar-list-menu li:has(> a.select),
+#toolbar-list-menu li:has(> a.threads),
+#toolbar-list-menu li:has(> a.options),
+#toolbar-list-menu li:has(> a.refresh),
+/* Fallback for browsers/older engines without :has() */
+#toolbar-menu a.select,
+#toolbar-menu a.threads,
+#toolbar-menu a.options,
+#toolbar-menu a.refresh,
+#toolbar-list-menu a.select,
+#toolbar-list-menu a.threads,
+#toolbar-list-menu a.options,
+#toolbar-list-menu a.refresh {
+    display: none !important;
+}
+
+
+/* ---------- 3.5 New Message button - SKIPPED per user direction ----------
+ * Compose stays in left rail as-is. Section retained as a comment so a
+ * future "we want it back" change has a place to land.
+ */
+
+
+/* ---------- 3.6 Email address: move above the message-list column ----------
+ * The email address sits in #layout-menu .popover-header in the current
+ * markup. Per user request, move it above the message-list (#layout-list)
+ * column. We do this with CSS by repositioning the .header-title element
+ * inside the layout-list container. Since we cannot reparent DOM with
+ * pure CSS, we use absolute positioning instead.
+ *
+ * Strategy: hide the address from its current home, and surface it as
+ * a CSS-generated label at the top of #layout-list using a content
+ * attribute - but ::before can only use static content, not user data.
+ *
+ * Practical compromise: hide the existing address element in the rail/
+ * top-bar area, and instead use the document title or a fixed string.
+ * If the user wants the dynamic email address shown there, this needs
+ * a small JS or template edit (out of scope for CSS-only).
+ *
+ * For now: hide the existing email-address display in the top bar so it
+ * doesn't compete; leave a placeholder note here. If you want the
+ * address dynamically inserted above the list column, request and we'll
+ * add a tiny rcube_plugin or inline <script> via header.html.
+ */
+/* Placeholder: do nothing destructive. Document the limitation. */
+
+
+/* ---------- 3.7 Selected email row: visible blue vertical strip ----------
+ * In the message list, rows have class .selected and .focused.selected.
+ * The Roundcube table uses td-level backgrounds, so the row-level
+ * border-left often gets clipped. Apply to the first td.
+ */
+.messagelist tr.selected > td:first-child,
+.messagelist .message.selected > td:first-child,
+.messagelist tr.focused.selected > td:first-child,
+.listing tr.selected > td:first-child,
+.contactlist tr.selected > td:first-child,
+body[class*="xcolor-"] .messagelist tr.selected > td:first-child,
+body[class*="xcolor-"] .listing tr.selected > td:first-child {
+    border-left: 4px solid var(--docent-fluent-blue) !important;
+    box-shadow: inset 4px 0 0 0 var(--docent-fluent-blue) !important;
+}
+
+/* Background fill for the selected row */
+.messagelist tr.selected,
+.messagelist .message.selected,
+.messagelist tr.focused.selected,
+.listing tr.selected,
+body[class*="xcolor-"] .messagelist tr.selected,
+body[class*="xcolor-"] .listing tr.selected {
+    background-color: var(--docent-fluent-blue-light) !important;
+}
+
+/* Selected + unread: keep subject bold */
+.messagelist tr.unread.selected .subject,
+.messagelist tr.unread.selected .fromto {
+    font-weight: 600 !important;
+    color: var(--docent-text-primary) !important;
+}
+
+
+/* =====================================================================
+ * SECTION 4: New Message button + email address relocation (v3)
+ * =====================================================================
+ *
+ * The JS in docent-overrides.js does the heavy lifting (inserts a
+ * "New Message" button at the top-left of the toolbar, moves the
+ * email-address element to sit above the message-list column). These
+ * CSS rules style what the JS injects/moves.
+ *
+ * Also: hide Refresh button (was missed in v2 because it lives outside
+ * the toolbar group we targeted).
+ */
+
+
+/* ---------- 4.1 Hide the Refresh button (missed in section 3.4) ----------
+ * Refresh in outlook_plus lives in #toolbar-menu or .toolbar with
+ * class "refresh". Same pattern as the Select/Threads/Options group.
+ */
+.toolbar a.refresh,
+.toolbar li:has(> a.refresh),
+#toolbar-menu a.refresh,
+#toolbar-menu li:has(> a.refresh),
+.header a.button.refresh,
+.header a.refresh {
+    display: none !important;
+}
+
+
+/* ---------- 4.2 New Message button (JS-injected) ----------
+ * The JS creates a button with id="docent-new-message" and places it
+ * at the leftmost position in the top toolbar. We style it as the
+ * Outlook "New mail" mega-button: Fluent blue background, white icon
+ * + white text label, prominent size.
+ */
+#docent-new-message {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 8px 16px !important;
+    margin: 6px 12px 6px 6px !important;
+    background-color: var(--docent-fluent-blue) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    text-decoration: none !important;
+    line-height: 1 !important;
+    min-height: 32px !important;
+}
+
+#docent-new-message:hover {
+    background-color: var(--docent-fluent-blue-hover) !important;
+    color: #FFFFFF !important;
+}
+
+#docent-new-message svg {
+    width: 16px !important;
+    height: 16px !important;
+    fill: #FFFFFF !important;
+    flex-shrink: 0 !important;
+}
+
+#docent-new-message .label {
+    color: #FFFFFF !important;
+    white-space: nowrap !important;
+}
+
+
+/* ---------- 4.3 Relocated email address (JS-moved) ----------
+ * The JS clones the email-address element and places it inside the
+ * message-list column header with class "docent-relocated-address".
+ * Style it as a subtle column-header label so it reads as the inbox
+ * owner identifier.
+ */
+.docent-relocated-address {
+    display: block !important;
+    padding: 8px 16px 4px 16px !important;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    color: var(--docent-text-secondary) !important;
+    border-bottom: 1px solid var(--docent-divider) !important;
+    background-color: var(--docent-content-bg) !important;
+}
+
+/* Hide the original email-address location (the JS sets it to display:none,
+ * but adding the CSS rule too means cache-stale JS won't leave a duplicate). */
+body.docent-address-moved #layout-menu .popover-header .identity-name,
+body.docent-address-moved .header .username-display {
+    display: none !important;
+}
+
+
+/* ---------- Logo sizing ----------
+ * The new docent-icon.svg is the full horizontal logo with tagline.
+ * Size to 72px tall - tagline is fully readable, prominent branding.
+ * Width auto-scales (3:1 aspect ratio so ~216px wide).
+ */
+#layout-menu .popover-header #logo,
+#layout-menu .popover-header img#logo,
+#logo {
+    height: 72px !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: 72px !important;
+}
+
+/* The popover-header default width is 78px - widen and heighten to
+ * accommodate the new larger logo. */
+#layout-menu .popover-header {
+    min-width: 240px !important;
+    min-height: 88px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+}
+
+
+/* =====================================================================
+ * SECTION 5: Account corner + Compose icon hide (v4)
+ * =====================================================================
+ *
+ * Top-right floating cluster: email-address text + avatar circle, with
+ * a click-to-open dropdown containing Dark mode / About / Logout (the
+ * three icons that were at the bottom of the left rail).
+ *
+ * Also: hide the Compose pencil icon at the top of the left rail (the
+ * "New Message" button in the top bar replaces it).
+ */
+
+
+/* ---------- 5.1 Hide Compose icon on left rail ----------
+ * We have a prominent "New message" button in the top bar now; the rail
+ * version would be a duplicate.
+ */
+#taskmenu a.compose,
+#taskmenu .action-buttons {
+    display: none !important;
+}
+
+
+/* ---------- 5.2 Hide the three bottom-rail icons in their original spot ----------
+ * The JS moves them into the account-corner dropdown. If the JS hasn't
+ * run yet (very brief render flash), hide them via CSS too so they
+ * don't appear at the bottom-left of the rail.
+ */
+body.docent-account-corner-active #taskmenu .special-buttons {
+    display: none !important;
+}
+
+
+/* ---------- 5.3 Account corner container ---------- */
+#docent-account-corner {
+    position: fixed !important;
+    top: 8px !important;
+    right: 12px !important;
+    z-index: 1000 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif !important;
+}
+
+
+/* ---------- 5.4 Email label next to avatar ---------- */
+#docent-account-corner .docent-account-email {
+    font-size: 13px !important;
+    color: var(--docent-text-primary) !important;
+    font-weight: 400 !important;
+    white-space: nowrap !important;
+    user-select: text !important;
+}
+
+
+/* ---------- 5.5 Avatar circle ---------- */
+#docent-account-avatar {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+    background-color: var(--docent-fluent-blue) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    line-height: 32px !important;
+    text-align: center !important;
+    padding: 0 !important;
+    cursor: pointer !important;
+    font-family: inherit !important;
+}
+
+#docent-account-avatar:hover {
+    background-color: var(--docent-fluent-blue-hover) !important;
+}
+
+#docent-account-avatar:focus {
+    outline: 2px solid var(--docent-fluent-blue-hover) !important;
+    outline-offset: 2px !important;
+}
+
+
+/* ---------- 5.6 Dropdown menu under avatar ---------- */
+#docent-account-menu {
+    position: absolute !important;
+    top: 44px !important;
+    right: 0 !important;
+    min-width: 180px !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid var(--docent-divider) !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+    padding: 4px 0 !important;
+    overflow: hidden !important;
+}
+
+.docent-account-menu-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    padding: 8px 14px !important;
+    cursor: pointer !important;
+    color: var(--docent-text-primary) !important;
+}
+
+.docent-account-menu-item:hover {
+    background-color: var(--docent-fluent-blue-faint) !important;
+}
+
+/* Re-style the moved <a> button inside the menu - normalize its sizing */
+.docent-account-menu-item > a {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 20px !important;
+    height: 20px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    color: var(--docent-text-secondary) !important;
+    border: none !important;
+    flex-shrink: 0 !important;
+}
+
+.docent-account-menu-item > a:hover {
+    color: var(--docent-fluent-blue) !important;
+    background: transparent !important;
+}
+
+/* Hide the .inner accessible-only label that lives inside Roundcube
+ * rail buttons; we have a visible label next to it now. */
+.docent-account-menu-item > a .inner {
+    position: absolute !important;
+    left: -9999px !important;
+}
+
+.docent-account-menu-label {
+    font-size: 13px !important;
+    color: var(--docent-text-primary) !important;
+}
+
+
+/* ---------- 5.7 Protect the New Message button ----------
+ * The general "hide popover-header popups" rule in section 3.3 was too
+ * broad and may catch our button (since it now lives in popover-header).
+ * Explicitly un-hide #docent-new-message with maximal specificity to
+ * beat any vendor or generated rule, and force layout properties.
+ */
+html body #layout-menu .popover-header #docent-new-message,
+html body #docent-new-message,
+body #docent-new-message,
+#docent-new-message {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    clip: auto !important;
+    overflow: visible !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 120px !important;
+}
+
+
+/* =====================================================================
+ * SECTION 6: Outlook-style top header band
+ * =====================================================================
+ *
+ * Adds a fixed-position horizontal band at the top of the page with
+ * three slots: logo (left), search bar (center), account (right).
+ * Below the band sits the existing toolbar (Reply/Forward/Delete/etc.)
+ * and below that the three-pane layout.
+ *
+ * JS in buildHeaderBand() injects #docent-header-band and moves the
+ * search bar into it. We push the existing #layout down via
+ * padding-top on body.docent-header-band-active.
+ */
+
+#docent-header-band {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 80px !important;
+    z-index: 999 !important;
+    display: grid !important;
+    grid-template-columns: 300px 1fr 280px !important;
+    align-items: center !important;
+    gap: 16px !important;
+    padding: 0 16px !important;
+    background-color: #D1E8ED !important;
+    border-bottom: 1px solid #B5D5DC !important;
+    box-sizing: border-box !important;
+}
+
+.docent-header-logo-slot {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    overflow: hidden !important;
+}
+
+#docent-header-logo {
+    height: 54px !important;
+    width: auto !important;
+    max-height: 54px !important;
+    max-width: 280px !important;
+    background-color: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-sizing: content-box !important;
+}
+
+.docent-header-search-slot {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    max-width: 640px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+}
+
+/* The moved search bar - normalize and constrain width */
+.docent-header-search-slot .searchbar,
+.docent-header-search-slot [role="search"] {
+    width: 100% !important;
+    max-width: 560px !important;
+    height: 36px !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid var(--docent-divider) !important;
+    border-radius: 4px !important;
+    margin: 0 !important;
+    padding: 0 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.docent-header-search-slot .searchbar:focus-within,
+.docent-header-search-slot [role="search"]:focus-within {
+    border-color: var(--docent-fluent-blue) !important;
+    box-shadow: 0 0 0 1px var(--docent-fluent-blue) !important;
+}
+
+.docent-header-search-slot input[type="text"],
+.docent-header-search-slot input:not([type]),
+.docent-header-search-slot input[name="_q"] {
+    border: none !important;
+    background: transparent !important;
+    outline: none !important;
+    flex: 1 !important;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif !important;
+    font-size: 14px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+}
+
+.docent-header-account-slot {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+}
+
+/* The account corner is moved into this slot - reset its fixed
+ * positioning to live inside the band normally. */
+.docent-header-account-slot #docent-account-corner {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+}
+
+/* Email text color in account corner - dark text since band is now
+ * the light tinted teal #D1E8ED. */
+.docent-header-account-slot #docent-account-corner .docent-account-email {
+    color: var(--docent-text-primary) !important;
+}
+
+/* Push the existing Roundcube layout down by the band height */
+body.docent-header-band-active #layout {
+    padding-top: 80px !important;
+}
+
+/* Hide the original logo in popover-header (we cloned it into the band) */
+body.docent-header-band-active #layout-menu .popover-header #logo {
+    display: none !important;
+}
+
+/* Hide the original popover-header itself - it's now just an empty
+ * 78x58 cell since logo is moved. Reclaim that space. */
+body.docent-header-band-active #layout-menu .popover-header {
+    display: none !important;
+}
+
+/* The search bar's original location (inside #layout-list) is now
+ * empty. The skin's CSS reserves vertical space for it; reclaim that
+ * by hiding the empty search wrapper if it remained. */
+body.docent-header-band-active #layout-list > .searchbar:empty {
+    display: none !important;
+}
+
+/* Override the section 5.3 fixed-positioning of account corner when
+ * band is active. */
+body.docent-header-band-active #docent-account-corner {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+}
+
+
+/* =====================================================================
+ * SECTION 7: New Message button - placement and Cancel mode
+ * =====================================================================
+ *
+ * Button lives at the top of #layout-sidebar (above the folder list).
+ * Block-style layout - full width of the folder column - matches
+ * Outlook's prominent "New mail" button placement.
+ *
+ * Two visual modes:
+ *   - Default (new message): blue solid, envelope icon
+ *   - Cancel (on compose page): gray outline, X icon
+ */
+
+/* The button injection landing site is now the sidebar, not the
+ * popover-header. Override section 5.7's positioning rules. */
+html body #layout-sidebar #docent-new-message,
+#layout-sidebar > #docent-new-message {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    margin: 4px 12px 6px !important;
+    padding: 8px 14px !important;
+    width: auto !important;
+    max-width: 153px !important;
+    box-sizing: border-box !important;
+    background-color: var(--docent-fluent-blue) !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    line-height: 1 !important;
+    min-height: 32px !important;
+}
+
+html body #layout-sidebar #docent-new-message:hover {
+    background-color: var(--docent-fluent-blue-hover) !important;
+    color: #FFFFFF !important;
+}
+
+html body #layout-sidebar #docent-new-message svg {
+    width: 18px !important;
+    height: 18px !important;
+    fill: #FFFFFF !important;
+    flex-shrink: 0 !important;
+}
+
+html body #layout-sidebar #docent-new-message .label {
+    color: #FFFFFF !important;
+}
+
+
+/* ---------- Cancel mode (on compose page) ----------
+ * Gray outline, X icon. Less alarming than red - clear "X out" affordance.
+ */
+html body #layout-sidebar #docent-new-message.docent-cancel-mode {
+    background-color: transparent !important;
+    color: var(--docent-text-primary) !important;
+    border: 1px solid var(--docent-divider) !important;
+}
+
+html body #layout-sidebar #docent-new-message.docent-cancel-mode:hover {
+    background-color: var(--docent-fluent-blue-faint) !important;
+    color: var(--docent-text-primary) !important;
+    border-color: var(--docent-text-secondary) !important;
+}
+
+html body #layout-sidebar #docent-new-message.docent-cancel-mode svg {
+    fill: var(--docent-text-primary) !important;
+}
+
+html body #layout-sidebar #docent-new-message.docent-cancel-mode .label {
+    color: var(--docent-text-primary) !important;
+}
+
+
+/* ---------- Cancel button in compose toolbar ----------
+ * Cancel button uses Roundcube's native .discard icon class so the
+ * glyph and styling match the other toolbar buttons (Save, Attach,
+ * Signature, etc.) automatically. Minimal overrides here - we just
+ * need to make sure the label "Cancel" shows like other buttons.
+ */
+
+/* Match the icon size to the other toolbar buttons - Roundcube's icon
+ * font glyphs scale with font-size on the ::before pseudo-element.
+ *
+ * Explicitly set the .discard glyph (trash can, \f2ed) because the
+ * generic a::before rule was overriding it with content:" ". */
+#docent-new-message.docent-cancel-mode::before {
+    content: "\f2ed" !important;
+    font-family: "Icons" !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+    display: block !important;
+    width: auto !important;
+    font-weight: 400 !important;
+    color: var(--docent-text-primary) !important;
+}
+
+#docent-new-message.docent-cancel-mode {
+    /* Inherit Roundcube's icon button conventions; reset our sidebar
+     * block styling. */
+    display: inline-flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 4px !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 6px 10px !important;
+    background-color: transparent !important;
+    color: var(--docent-text-primary) !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    line-height: 1.2 !important;
+    min-height: auto !important;
+    text-decoration: none !important;
+}
+
+#docent-new-message.docent-cancel-mode:hover {
+    background-color: var(--docent-fluent-blue-faint) !important;
+    color: var(--docent-text-primary) !important;
+}
+
+/* Show the label text below the icon (the icon comes from ::before
+ * pseudo via Roundcube's .discard class). */
+#docent-new-message.docent-cancel-mode .inner {
+    color: var(--docent-text-primary) !important;
+    font-size: 12px !important;
+    font-weight: 400 !important;
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    left: auto !important;
+    width: auto !important;
+    height: auto !important;
+    clip: auto !important;
+    white-space: nowrap !important;
+}
+
+
+/* =====================================================================
+ * SECTION 8: Outlook-style gray nav pane
+ * =====================================================================
+ *
+ * Apply Outlook's Fluent nav-pane gray (#F3F2F1) to the sidebar so the
+ * New Message button and the folder list visually group as one
+ * navigation panel, distinct from the white message-list area.
+ */
+
+/* Sidebar container gets the Outlook gray, constrained width to
+ * match Outlook nav pane proportions (~200px). */
+#layout-sidebar,
+body.task-mail #layout-sidebar {
+    background-color: var(--docent-sidebar-bg) !important;
+    width: 200px !important;
+    min-width: 200px !important;
+    max-width: 200px !important;
+    flex: 0 0 200px !important;
+}
+
+/* The sidebar has an empty .header strip that used to contain the
+ * email address and back button. With our account corner up top and
+ * email moved there, this strip is empty but still reserves height,
+ * pushing the folder list down. Hide it. */
+#layout-sidebar > .header {
+    display: none !important;
+}
+
+/* The folder list inside inherits the gray (override section 2.5 which
+ * set it to content-bg white). */
+#layout-sidebar .folderlist,
+#layout-sidebar #mailboxlist,
+.folderlist,
+#mailboxlist {
+    background-color: var(--docent-sidebar-bg) !important;
+}
+
+/* Folder list scroll container also inherits gray (some skin builds
+ * wrap the list in a .scroller). */
+#layout-sidebar .scroller,
+#layout-sidebar > div {
+    background-color: transparent !important;
+}
+
+/* Selected folder keeps the light blue tint we set earlier - it should
+ * still pop against the gray. The Outlook selection blue is the same
+ * shade on both white and gray backgrounds. */
+
+
+/* =====================================================================
+ * SECTION 9: Column dividers + unified content background
+ * =====================================================================
+ *
+ * Outlook on the web uses 1px vertical dividers in #EDEBE9 between its
+ * three/four columns (rail | nav pane | message list | reading pane).
+ * It also uses the same off-white #FAF9F8 for both message list and
+ * reading pane - the divider provides the separation, not a color shift.
+ */
+
+/* Make ALL content columns use the same off-white. Reading pane was
+ * white; harmonize it with the message list. */
+#layout-list,
+#layout-content,
+.content-frame,
+#mailcontframe {
+    background-color: var(--docent-content-bg) !important;
+}
+
+/* Right border on each column = vertical divider between columns. */
+#layout-menu {
+    border-right: 1px solid var(--docent-divider) !important;
+}
+
+#layout-sidebar {
+    border-right: 1px solid var(--docent-divider) !important;
+}
+
+#layout-list {
+    border-right: 1px solid var(--docent-divider) !important;
+}
+
+/* The reading-pane column (#layout-content) is the rightmost - no
+ * border-right needed. */
+
+
+/* =====================================================================
+ * SECTION 10: Extend sidebar gray across the top toolbar row
+ * =====================================================================
+ *
+ * Outlook treats the New Mail button area + the toolbar above the
+ * message list as one continuous gray surface, forming an L-shape with
+ * the nav pane below. We do the same: the toolbar row (with Reply,
+ * Forward, Delete, Mark) gets the same #F3F2F1 sidebar gray.
+ */
+
+#layout-content > .header,
+#layout-list > .header,
+.task-mail #layout-content > .header,
+.task-mail #layout-list > .header {
+    background-color: var(--docent-sidebar-bg) !important;
+    border-bottom: 1px solid var(--docent-divider) !important;
+}

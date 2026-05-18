@@ -47,7 +47,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 VENDOR_DIR="$REPO_ROOT/vendor/roundcube-plus"
 
 # RC+ plugins installed here (xai is in phase 5c, not here)
-RC_PLUS_PLUGINS=(xsignature)
+RC_PLUS_PLUGINS=(xsignature docent_skin_overrides)
 
 # === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
 # Source per-tenant config and secrets if they exist. These files are created
@@ -321,6 +321,38 @@ for skin_tb_dir in "$STAGING/skin_outlook" "$STAGING/skin_outlook_plus"; do
 done
 
 # ============================================================================
+# ============================================================================
+# STEP 5b: Install docent_skin_overrides plugin (Docent branding/overrides)
+# ============================================================================
+step "Step 5b: Installing docent_skin_overrides plugin"
+
+DOCENT_SKIN_SRC="$REPO_ROOT/vendor/docent_skin_overrides"
+DOCENT_SKIN_TARGET="$ROUNDCUBE_PLUGINS_DIR/docent_skin_overrides"
+
+if [ ! -d "$DOCENT_SKIN_SRC" ]; then
+    log_fail "docent_skin_overrides source not found at $DOCENT_SKIN_SRC"
+    exit 1
+fi
+
+if [ -d "$DOCENT_SKIN_TARGET" ]; then
+    log_skip "docent_skin_overrides already installed - updating files"
+    rsync -a "$DOCENT_SKIN_SRC/" "$DOCENT_SKIN_TARGET/"
+else
+    cp -a "$DOCENT_SKIN_SRC" "$ROUNDCUBE_PLUGINS_DIR/"
+    log_done "Copied docent_skin_overrides to $DOCENT_SKIN_TARGET/"
+fi
+
+chown -R root:www-data "$DOCENT_SKIN_TARGET"
+find "$DOCENT_SKIN_TARGET" -type d -exec chmod 755 {} \;
+find "$DOCENT_SKIN_TARGET" -type f -exec chmod 644 {} \;
+
+if [ ! -L /var/lib/roundcube/plugins/docent_skin_overrides ] && \
+   [ ! -d /var/lib/roundcube/plugins/docent_skin_overrides ]; then
+    ln -sfn "$DOCENT_SKIN_TARGET" /var/lib/roundcube/plugins/docent_skin_overrides
+    log_done "Symlinked docent_skin_overrides to /var/lib/roundcube/plugins/"
+else
+    log_skip "Symlink already exists at /var/lib/roundcube/plugins/docent_skin_overrides"
+fi
 # STEP 6: Update Roundcube config to enable plugins, set skin, set license
 # ============================================================================
 step "Step 6: Updating Roundcube config"
