@@ -52,6 +52,7 @@ HETZNER_FILE="$REPO_ROOT/hetzner.local"
 # double-loading via __HETZNER_API_SH_LOADED.
 # shellcheck source=lib/hetzner-api.sh
 source "$LIB_DIR/hetzner-api.sh"
+HCLOUD_LAST_STATUS=""
 
 # ============================================================================
 # COLORS
@@ -201,13 +202,13 @@ export HETZNER_CLOUD_TOKEN
 
 # Validate.
 echo "  Validating token..."
-if hcloud_validate_token; then
-    log_done "Token is valid"
+resp=$(curl -sS -H "Authorization: Bearer $HETZNER_CLOUD_TOKEN" "https://api.hetzner.cloud/v1/locations" 2>/dev/null)
+if echo "$resp" | jq -e ".locations" >/dev/null 2>&1; then
+    echo "  ✓ Token valid"
 else
-    log_fail "Token rejected by API"
+    echo "  ✗ Token rejected by API"
     exit 1
 fi
-
 # ============================================================================
 # INPUTS
 # ============================================================================
@@ -366,13 +367,12 @@ else
     echo "  Submitting create request..."
     RESP=$(hcloud_post "/servers" "$BODY")
 
-    if [ "$HCLOUD_LAST_STATUS" != "201" ]; then
-        log_fail "Server create failed (HTTP $HCLOUD_LAST_STATUS)"
+    SERVER_ID=$(echo "$RESP" | jq -r '.server.id // empty')
+    if [ -z "$SERVER_ID" ]; then
+        log_fail "Server create failed"
         echo "$RESP" | jq -r '.error.message // .' >&2
         exit 1
     fi
-
-    SERVER_ID=$(echo "$RESP" | jq -r '.server.id')
     ACTION_ID=$(echo "$RESP" | jq -r '.action.id')
 
     log_done "Server create accepted (id $SERVER_ID, action $ACTION_ID)"
