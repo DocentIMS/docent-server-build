@@ -99,14 +99,15 @@ ask_required() {
 }
 
 ask_yes_no() {
-    local prompt="$1" default="${2:-y}" response
+    # Requires the user to type the full word "yes" or "no".
+    # Single letters y/n and a blank Enter are NOT accepted.
+    local prompt="$1" response
     while true; do
-        read -r -p "${YELLOW}${prompt}${RESET} [${CYAN}${default}${RESET}] (y/n): " response
-        response="${response:-$default}"
+        read -r -p "${YELLOW}${prompt}${RESET} ${CYAN}(type yes or no)${RESET}: " response
         case "$response" in
-            [Yy]|[Yy][Ee][Ss]) return 0 ;;
-            [Nn]|[Nn][Oo])     return 1 ;;
-            *) echo "Please answer yes or no." >&2 ;;
+            [Yy][Ee][Ss]) return 0 ;;
+            [Nn][Oo])     return 1 ;;
+            *) echo "Please type the full word: yes or no." >&2 ;;
         esac
     done
 }
@@ -214,20 +215,38 @@ fi
 # ============================================================================
 step "Tenant identity"
 
-DOMAIN=$(ask_required "Primary domain (e.g., acmemuseum.com)")
+# Ask for the domain, clean common mistakes, validate, and confirm.
+while true; do
+    DOMAIN=$(ask_required "Primary domain (e.g., acmemuseum.com)")
 
-# Light sanity check: must contain a dot, must not start with a dot.
-if ! echo "$DOMAIN" | grep -qE '^[a-zA-Z0-9][a-zA-Z0-9.-]*\.[a-zA-Z]{2,}$'; then
-    log_fail "Domain '$DOMAIN' does not look like a valid FQDN"
-    echo "  Expected something like: acmemuseum.com"
-    exit 1
-fi
+    DOMAIN=$(echo "$DOMAIN" | tr -d '[:space:]')
+    DOMAIN="${DOMAIN#http://}"
+    DOMAIN="${DOMAIN#https://}"
+    DOMAIN="${DOMAIN#www.}"
+    DOMAIN="${DOMAIN%/}"
+    DOMAIN=$(echo "$DOMAIN" | tr '[:upper:]' '[:lower:]')
+
+    if ! echo "$DOMAIN" | grep -qE '^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$'; then
+        echo "  '$DOMAIN' does not look like a valid domain. Expected: acmemuseum.com"
+        continue
+    fi
+
+    echo ""
+    echo "  Domain will be: ${BOLD}${DOMAIN}${RESET}"
+    if ask_yes_no "Is this domain correct?"; then
+        break
+    fi
+    echo "  Okay, let's try again."
+done
 
 DOMAIN_STEM="${DOMAIN%%.*}"
 
 step "Server configuration"
 
-SERVER_NAME=$(ask "Server name (label in Hetzner Console)" "${DOMAIN_STEM}-docent")
+# Server name is derived automatically from the domain - no prompt,
+# so it can never be mistyped (e.g. answering a yes/no by accident).
+SERVER_NAME="${DOMAIN_STEM}-docent"
+echo "Server name (in Hetzner Console): ${SERVER_NAME}"
 
 echo ""
 echo "Available locations:"
@@ -241,12 +260,15 @@ echo ""
 SERVER_LOCATION=$(ask "Location" "hil")
 
 echo ""
-echo "Common server types (shared vCPU, x86):"
-echo "  cx22  - 2 vCPU / 4 GB / 40 GB   (~€4/mo)  - minimum for this stack"
-echo "  cx32  - 4 vCPU / 8 GB / 80 GB   (~€7/mo)  - recommended"
-echo "  cx42  - 8 vCPU / 16 GB / 160 GB (~€14/mo)"
+echo "Server types available in ${SERVER_LOCATION}:"
+if hcloud_print_server_types "$SERVER_LOCATION"; then
+    echo ""
+    echo "  (4 GB RAM is the minimum for this stack; 8 GB recommended.)"
+else
+    echo "  (could not fetch live list - enter a type name manually)"
+fi
 echo ""
-SERVER_TYPE=$(ask "Server type" "cx32")
+SERVER_TYPE=$(ask_required "Server type")
 
 SERVER_IMAGE=$(ask "OS image" "ubuntu-26.04")
 
@@ -282,10 +304,17 @@ SSH_PUBKEY_FINGERPRINT=$(ssh-keygen -lf "$SSH_PUBKEY_PATH" -E md5 | awk '{print 
 
 # Confirm
 echo ""
-echo "${BOLD}About to create:${RESET}"
-echo "  Server:    $SERVER_NAME ($SERVER_TYPE in $SERVER_LOCATION, $SERVER_IMAGE)"
-echo "  Domain:    $DOMAIN"
-echo "  SSH key:   $SSH_PUBKEY_PATH (fp: $SSH_PUBKEY_FINGERPRINT)"
+echo "${BOLD}=====================================================${RESET}"
+echo "${BOLD}About to create - please review your choices:${RESET}"
+echo "${BOLD}=====================================================${RESET}"
+echo "  Domain:       $DOMAIN"
+echo "  Server name:  $SERVER_NAME"
+echo "  Location:     $SERVER_LOCATION"
+echo "  Server type:  $SERVER_TYPE"
+echo "  OS image:     $SERVER_IMAGE"
+echo "  SSH key:      $SSH_PUBKEY_PATH"
+echo "  Key fp:       $SSH_PUBKEY_FINGERPRINT"
+echo "${BOLD}=====================================================${RESET}"
 echo ""
 if ! ask_yes_no "Proceed?"; then
     echo "Aborted."
@@ -425,7 +454,15 @@ step "Step 4: DNS records"
 # Notification email — used in DMARC rua and CAA iodef. Same convention as
 # phase0: ask once, reuse everywhere. We don't write this to tenant.local
 # here (phase0 owns that file); just prompt and use it in the records.
-NOTIFICATION_EMAIL=$(ask_required "Notification email (for DMARC + CAA reports)")
+# Notification email — must look like a real address (used in DMARC/CAA).
+while true; do
+    NOTIFICATION_EMAIL=$(ask_required "Notification email (for DMARC + CAA reports)")
+    if echo "$NOTIFICATION_EMAIL" | grep -qE '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'; then
+        echo "  Using: $NOTIFICATION_EMAIL"
+        break
+    fi
+    echo "  '$NOTIFICATION_EMAIL' is not a valid email address. Try again."
+done
 
 # A records: @, www, mail, team
 # - @ / www : main site (Apache vhost, phase 2)

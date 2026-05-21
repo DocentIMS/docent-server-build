@@ -182,7 +182,11 @@ hcloud_zone_nameservers() {
     local zone_id="$1"
     local resp
     resp=$(hcloud_get "/zones/$zone_id")
-    echo "$resp" | jq -r '.zone.ns[]' 2>/dev/null
+    # Current API nests them under authoritative_nameservers.assigned;
+    # fall back to the older .zone.ns for safety.
+    echo "$resp" | jq -r '
+        (.zone.authoritative_nameservers.assigned // .zone.ns // [])[]
+        | rtrimstr(".")' 2>/dev/null
 }
 
 hcloud_rrset_upsert() {
@@ -211,4 +215,25 @@ hcloud_rrset_upsert() {
     fi
     echo "$resp" | jq -r '.error.message // empty' >&2
     return 1
+}
+
+# ============================================================================
+# hcloud_print_server_types - List server types actually available at a
+# given location, with specs. Used to build a live menu instead of a
+# hardcoded one. Prints "  name  N vCPU / N GB RAM / N GB disk" per line.
+# Returns 1 (and prints nothing) if the API can't be reached.
+hcloud_print_server_types() {
+    local location="$1"
+    local dc_resp st_resp ids id
+    dc_resp=$(hcloud_get "/datacenters")
+    ids=$(echo "$dc_resp" | jq -r --arg loc "$location" \
+        '.datacenters[]? | select(.location.name == $loc) | .server_types.available[]' 2>/dev/null)
+    [ -n "$ids" ] || return 1
+    st_resp=$(hcloud_get "/server_types")
+    echo "$st_resp" | jq -e '.server_types' >/dev/null 2>&1 || return 1
+    for id in $ids; do
+        echo "$st_resp" | jq -r --argjson id "$id" \
+            '.server_types[]? | select(.id == $id and .deprecation == null) |
+             "  \(.name)  \(.cores) vCPU / \(.memory) GB RAM / \(.disk) GB disk"' 2>/dev/null
+    done | sort
 }
