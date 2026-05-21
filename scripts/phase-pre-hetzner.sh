@@ -248,7 +248,7 @@ echo "  cx42  - 8 vCPU / 16 GB / 160 GB (~€14/mo)"
 echo ""
 SERVER_TYPE=$(ask "Server type" "cx32")
 
-SERVER_IMAGE=$(ask "OS image" "ubuntu-24.04")
+SERVER_IMAGE=$(ask "OS image" "ubuntu-26.04")
 
 # SSH key
 step "SSH key"
@@ -488,20 +488,19 @@ CAA_BODY=$(jq -n \
         ]
     }')
 
-# Check existence first; PUT to update, POST to create.
-hcloud_get "/zones/${ZONE_ID}/rrsets/@/CAA" >/dev/null
+# If the CAA rrset exists, delete it, then recreate cleanly.
+hcloud_get "/zones/${ZONE_ID}/rrsets/@/CAA" >/dev/null 2>&1
 if [ "$HCLOUD_LAST_STATUS" = "200" ]; then
-    CAA_RESP=$(hcloud_put "/zones/${ZONE_ID}/rrsets/@/CAA" "$CAA_BODY")
-else
-    CAA_RESP=$(hcloud_post "/zones/${ZONE_ID}/rrsets" "$CAA_BODY")
+    hcloud_request DELETE "/zones/${ZONE_ID}/rrsets/@/CAA" >/dev/null 2>&1
 fi
+CAA_RESP=$(hcloud_post "/zones/${ZONE_ID}/rrsets" "$CAA_BODY")
 
-case "$HCLOUD_LAST_STATUS" in
-    200|201) log_done "CAA  @ (Let's Encrypt only)" ;;
-    *) log_fail "CAA  @ (HTTP $HCLOUD_LAST_STATUS)"
-       echo "$CAA_RESP" | jq -r '.error.message // .' >&2
-       ;;
-esac
+if echo "$CAA_RESP" | jq -e '.rrset.id' >/dev/null 2>&1; then
+    log_done "CAA  @ (Let's Encrypt only)"
+else
+    log_fail "CAA  @"
+    echo "$CAA_RESP" | jq -r '.error.message // empty' >&2
+fi
 
 # ============================================================================
 # WRITE tenant.local

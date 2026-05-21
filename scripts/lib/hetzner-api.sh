@@ -142,13 +142,9 @@ hcloud_wait_for_action() {
     local action_id="$1"
     local max_wait="${2:-300}"
     local elapsed=0
+    local resp status
     while [ $elapsed -lt "$max_wait" ]; do
-        local resp
         resp=$(hcloud_get "/actions/$action_id")
-        if [ "$HCLOUD_LAST_STATUS" != "200" ]; then
-            return 1
-        fi
-        local status
         status=$(echo "$resp" | jq -r '.action.status' 2>/dev/null)
         if [ "$status" = "success" ]; then
             return 0
@@ -204,15 +200,15 @@ hcloud_rrset_upsert() {
         --argjson ttl "$ttl" \
         '{name: $n, type: $t, ttl: $ttl, records: [{value: $v}]}')
 
-    hcloud_get "/zones/${zone_id}/rrsets/${name}/${type}" >/dev/null
+    hcloud_get "/zones/${zone_id}/rrsets/${name}/${type}" >/dev/null 2>&1
     if [ "$HCLOUD_LAST_STATUS" = "200" ]; then
-        resp=$(hcloud_put "/zones/${zone_id}/rrsets/${name}/${type}" "$body")
-    else
-        resp=$(hcloud_post "/zones/${zone_id}/rrsets" "$body")
+        hcloud_request DELETE "/zones/${zone_id}/rrsets/${name}/${type}" >/dev/null 2>&1
     fi
 
-    case "$HCLOUD_LAST_STATUS" in
-        200|201) return 0 ;;
-        *) echo "$resp" | jq -r '.error.message // empty' >&2; return 1 ;;
-    esac
+    resp=$(hcloud_post "/zones/${zone_id}/rrsets" "$body")
+    if echo "$resp" | jq -e '.rrset.id' >/dev/null 2>&1; then
+        return 0
+    fi
+    echo "$resp" | jq -r '.error.message // empty' >&2
+    return 1
 }
