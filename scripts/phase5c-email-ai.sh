@@ -48,44 +48,24 @@ XAI_TARBALL="$VENDOR_DIR/roundcube_plus_plugin_xai.tar.gz"
 # What we configure xai to use
 OPENAI_MODEL="gpt-4o-mini"
 
-# === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
-__PHASE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-__PHASE_REPO_ROOT="$(dirname "$__PHASE_SCRIPT_DIR")"
-if [ -f "$__PHASE_REPO_ROOT/tenant.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/tenant.local"
-fi
-if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/secrets.local"
-fi
-unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
-# === END tenant.local/secrets.local source block ===
+# Load shared helpers and per-tenant config. lib/common.sh sources
+# tenant.local/secrets.local (overriding the hardcoded defaults above) and
+# provides colors, logging helpers, and verification helpers.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/common.sh"
 
 # XAI_API_KEY is what phase 0 collects. Default to empty so the script can
 # still run (and warn) when the user hasn't supplied a real key yet.
 : "${XAI_API_KEY:=}"
 
-# ============================================================================
-# COSMETICS
-# ============================================================================
-RESET="\033[0m"
-BOLD="\033[1m"
-RED="\033[31m"
-GREEN="\033[32m"
-YELLOW="\033[33m"
-CYAN="\033[36m"
 
 # ============================================================================
 # REPORT TRACKING
 # ============================================================================
 REPORT=()
-log_done() { REPORT+=("[DONE]    $1"); echo "  ${GREEN}✓${RESET} $1"; }
-log_skip() { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }
-log_warn() { REPORT+=("[WARN]    $1"); echo "  ${YELLOW}!${RESET} $1"; }
-log_fail() { REPORT+=("[FAIL]    $1"); echo "  ${RED}✗${RESET} $1"; }
 
-step() { echo ""; echo "${BOLD}=== $1 ===${RESET}"; }
 
 # ============================================================================
 # SAFETY CHECKS
