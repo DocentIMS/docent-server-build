@@ -33,16 +33,19 @@ ADDRESSBOOK_DISPLAY_NAME="Project Contacts"
 ADDRESSBOOK_USER="_project_contacts_user_"
 VMAIL_ROOT=/var/vmail
 
+# Load shared helpers and per-tenant config. lib/common.sh sources
+# tenant.local/secrets.local (overriding the hardcoded defaults above) and
+# provides colors, logging helpers, and verification helpers.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/common.sh"
+
 # ============================================================================
 # REPORT TRACKING
 # ============================================================================
 REPORT=()
-log_done() { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
-log_skip() { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }
-log_warn() { REPORT+=("[WARN]    $1"); echo "  ! $1"; }
-log_fail() { REPORT+=("[FAIL]    $1"); echo "  ✗ $1"; }
 
-step() { echo ""; echo "=== $1 ==="; }
 
 # ============================================================================
 # SAFETY CHECKS
@@ -229,34 +232,24 @@ step "Step 7: Verification"
 VERIFY_PASS=0
 VERIFY_FAIL=0
 
-verify() {
-    local name="$1"; shift
-    if "$@" >/dev/null 2>&1; then
-        echo "  ✓ $name"
-        VERIFY_PASS=$((VERIFY_PASS + 1))
-    else
-        echo "  ✗ $name"
-        VERIFY_FAIL=$((VERIFY_FAIL + 1))
-    fi
-}
 
-verify "Plugin source directory exists" \
+verify_cmd "Plugin source directory exists" \
     test -d "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
-verify "Plugin clone is at pinned tag $PLUGIN_VERSION" \
+verify_cmd "Plugin clone is at pinned tag $PLUGIN_VERSION" \
     bash -c "cd '$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME' && [ \"\$(git describe --tags --exact-match 2>/dev/null)\" = '$PLUGIN_VERSION' ]"
-verify "Plugin main PHP file exists" \
+verify_cmd "Plugin main PHP file exists" \
     test -f "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME/$PLUGIN_NAME.php"
-verify "Plugin config exists" \
+verify_cmd "Plugin config exists" \
     test -f "$ROUNDCUBE_PLUGIN_CONFIG_DIR/config.inc.php"
-verify "Plugin config syntax is valid PHP" \
+verify_cmd "Plugin config syntax is valid PHP" \
     php -l "$ROUNDCUBE_PLUGIN_CONFIG_DIR/config.inc.php"
-verify "Roundcube main config syntax is valid PHP" \
+verify_cmd "Roundcube main config syntax is valid PHP" \
     php -l "$ROUNDCUBE_CONFIG"
-verify "Plugin load symlink exists" \
+verify_cmd "Plugin load symlink exists" \
     test -L "$ROUNDCUBE_PLUGINS_LOAD/$PLUGIN_NAME"
-verify "Plugin appears in plugins array" \
+verify_cmd "Plugin appears in plugins array" \
     grep -q "'$PLUGIN_NAME'" "$ROUNDCUBE_CONFIG"
-verify "Apache is running" \
+verify_cmd "Apache is running" \
     systemctl is-active --quiet apache2
 
 echo ""
