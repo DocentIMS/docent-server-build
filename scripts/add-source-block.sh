@@ -8,7 +8,9 @@
 # hardcoded values. If those files don't exist, the existing hardcoded
 # defaults are used (preserving original behavior).
 #
-# Idempotent: re-running detects existing injection and skips it.
+# Idempotent: re-running detects existing injection and skips it. Any phase
+# script that already contains the block (e.g. injected by hand) is left
+# untouched, so it is safe to list every phase script here.
 #
 # After running this, commit and push to GitHub.
 
@@ -16,14 +18,21 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Phase scripts to modify
+# Phase scripts to modify.
+#
+# This list MUST match the actual filenames in scripts/. The phase 5 family
+# is split into four files (5, 5a, 5b, 5c) - all of them source the .local
+# files, so all of them belong here. Phase 7 (Plone) scripts are NOT included
+# because they do not yet exist; add them here when they are written.
 PHASE_SCRIPTS=(
     "phase1.sh"
     "phase2.sh"
     "phase3.sh"
     "phase4.sh"
     "phase5.sh"
-    "phase5b-rc-plus.sh"
+    "phase5a-rc-plus.sh"
+    "phase5b-globaladdressbook.sh"
+    "phase5c-email-ai.sh"
     "phase6.sh"
 )
 
