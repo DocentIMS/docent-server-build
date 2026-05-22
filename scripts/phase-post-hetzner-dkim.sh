@@ -27,20 +27,12 @@ HETZNER_FILE="$REPO_ROOT/hetzner.local"
 # shellcheck source=lib/hetzner-api.sh
 source "$LIB_DIR/hetzner-api.sh"
 
-# ============================================================================
-# COLORS
-# ============================================================================
-if [ -t 1 ]; then
-    BOLD=$'\e[1m'; YELLOW=$'\e[1;33m'; GREEN=$'\e[1;32m'
-    RED=$'\e[1;31m'; RESET=$'\e[0m'
-else
-    BOLD=""; YELLOW=""; GREEN=""; RED=""; RESET=""
-fi
+# Load shared helpers and per-tenant config (colors, logging, verify helpers).
+# SCRIPT_DIR/REPO_ROOT are defined above; lib/common.sh also sources
+# tenant.local/secrets.local if they exist.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/common.sh"
 
-step()     { echo ""; echo "${BOLD}=== $1 ===${RESET}"; }
-log_done() { echo "  ${GREEN}✓${RESET} $1"; }
-log_fail() { echo "  ${RED}✗${RESET} $1"; }
-log_warn() { echo "  ${YELLOW}!${RESET} $1"; }
 
 # ============================================================================
 # PRE-FLIGHT
