@@ -30,22 +30,13 @@ ROOT_DEFAULTS_FILE="/root/.my.cnf"
 
 DKIM_SELECTOR="default"
 
-# === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
-# Source per-tenant config and secrets if they exist. These files are created
-# by phase0-bootstrap.sh. If they are not present, the hardcoded defaults
-# above remain in effect (preserving original standalone behavior).
-__PHASE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-__PHASE_REPO_ROOT="$(dirname "$__PHASE_SCRIPT_DIR")"
-if [ -f "$__PHASE_REPO_ROOT/tenant.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/tenant.local"
-fi
-if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/secrets.local"
-fi
-unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
-# === END tenant.local/secrets.local source block ===
+# Load shared helpers and per-tenant config. lib/common.sh sources
+# tenant.local/secrets.local (overriding the hardcoded defaults above) and
+# provides colors, logging helpers, and verification helpers.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/common.sh"
 
 # Domain-dependent paths and values. These MUST be computed AFTER sourcing
 # tenant.local so they pick up the correct DOMAIN/MAIL_HOSTNAME values.
@@ -66,12 +57,7 @@ REPORT=()
 # generate new ones, breaking the canonical-credentials design.
 DKIM_TXT_VALUE=""
 
-log_done() { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
-log_skip() { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }
-log_warn() { REPORT+=("[WARN]    $1"); echo "  ! $1"; }
-log_fail() { REPORT+=("[FAIL]    $1"); echo "  ✗ $1"; }
 
-step() { echo ""; echo "=== $1 ==="; }
 
 # wait_for_dpkg_lock - block until /var/lib/dpkg/lock-frontend is released.
 # unattended-upgrades (enabled by phase 1) can hold the lock for several
