@@ -54,26 +54,17 @@ HETZNER_FILE="$REPO_ROOT/hetzner.local"
 source "$LIB_DIR/hetzner-api.sh"
 HCLOUD_LAST_STATUS=""
 
-# ============================================================================
-# COLORS
-# ============================================================================
-if [ -t 1 ]; then
-    BOLD=$'\e[1m'; YELLOW=$'\e[1;33m'; CYAN=$'\e[1;36m'
-    GREEN=$'\e[1;32m'; RED=$'\e[1;31m'; RESET=$'\e[0m'
-else
-    BOLD=""; YELLOW=""; CYAN=""; GREEN=""; RED=""; RESET=""
-fi
+# Load shared helpers and per-tenant config (colors, logging, verify helpers).
+# SCRIPT_DIR/REPO_ROOT are defined above; lib/common.sh also sources
+# tenant.local/secrets.local if they exist.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/common.sh"
 
 # ============================================================================
 # REPORT TRACKING
 # ============================================================================
 REPORT=()
 
-log_done() { REPORT+=("[DONE]    $1"); echo "  ${GREEN}✓${RESET} $1"; }
-log_skip() { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }
-log_warn() { REPORT+=("[WARN]    $1"); echo "  ${YELLOW}!${RESET} $1"; }
-log_fail() { REPORT+=("[FAIL]    $1"); echo "  ${RED}✗${RESET} $1"; }
-step()     { echo ""; echo "${BOLD}=== $1 ===${RESET}"; }
 
 # ============================================================================
 # HELPERS
