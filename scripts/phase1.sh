@@ -25,22 +25,13 @@ HOSTNAME_SHORT="docenttemplate"
 TIMEZONE="America/Los_Angeles"
 SERVER_IP=""  # populated from tenant.local; falls back to detection if unset
 
-# === BEGIN tenant.local/secrets.local source block (added by phase0 design) ===
-# Source per-tenant config and secrets if they exist. These files are created
-# by phase0-bootstrap.sh. If they are not present, the hardcoded defaults
-# above remain in effect (preserving original standalone behavior).
-__PHASE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-__PHASE_REPO_ROOT="$(dirname "$__PHASE_SCRIPT_DIR")"
-if [ -f "$__PHASE_REPO_ROOT/tenant.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/tenant.local"
-fi
-if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/secrets.local"
-fi
-unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
-# === END tenant.local/secrets.local source block ===
+# Load shared helpers and per-tenant config. lib/common.sh sources
+# tenant.local/secrets.local (overriding the hardcoded defaults above) and
+# provides colors, logging helpers, and verification helpers.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/common.sh"
 
 # Backward-compat: in older phase0 versions, only STAFF_USER was set.
 # In newer versions, SHARED_ADMIN_USER is the canonical name.
@@ -62,12 +53,7 @@ fi
 # ============================================================================
 REPORT=()
 
-log_done()    { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
-log_skip()    { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }
-log_warn()    { REPORT+=("[WARN]    $1"); echo "  ! $1"; }
-log_fail()    { REPORT+=("[FAIL]    $1"); echo "  ✗ $1"; }
 
-step() { echo ""; echo "=== $1 ==="; }
 
 # wait_for_dpkg_lock - block until /var/lib/dpkg/lock-frontend is released.
 # unattended-upgrades (or any background apt process) can hold the lock for
@@ -634,49 +620,8 @@ echo ""
 VERIFY_PASS=0
 VERIFY_FAIL=0
 
-verify() {
-    local description="$1"
-    local expected="$2"
-    local actual="$3"
-    if [ "$expected" = "$actual" ]; then
-        echo "  [PASS] $description"
-        VERIFY_PASS=$((VERIFY_PASS + 1))
-    else
-        echo "  [FAIL] $description"
-        echo "         expected: $expected"
-        echo "         actual:   $actual"
-        VERIFY_FAIL=$((VERIFY_FAIL + 1))
-    fi
-}
 
-verify_contains() {
-    local description="$1"
-    local haystack="$2"
-    local needle="$3"
-    if echo "$haystack" | grep -q "$needle"; then
-        echo "  [PASS] $description"
-        VERIFY_PASS=$((VERIFY_PASS + 1))
-    else
-        echo "  [FAIL] $description"
-        echo "         looking for: $needle"
-        echo "         in:          $haystack"
-        VERIFY_FAIL=$((VERIFY_FAIL + 1))
-    fi
-}
 
-verify_not_contains() {
-    local description="$1"
-    local haystack="$2"
-    local needle="$3"
-    if echo "$haystack" | grep -q "$needle"; then
-        echo "  [FAIL] $description"
-        echo "         unexpectedly found: $needle"
-        VERIFY_FAIL=$((VERIFY_FAIL + 1))
-    else
-        echo "  [PASS] $description"
-        VERIFY_PASS=$((VERIFY_PASS + 1))
-    fi
-}
 
 # Hostname
 verify "Hostname is $HOSTNAME_SHORT" "$HOSTNAME_SHORT" "$(hostname)"
