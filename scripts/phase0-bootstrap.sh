@@ -576,10 +576,10 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
 ==============================================================
   *** NOT YET ACTIVE - wait for phase 1 to complete ***
   These credentials will work AFTER phase 1 has run successfully.
-  This server was provisioned with SSH already on port ${SSH_PORT}
-  and the ${ADMIN_USER} user created for SSH-key login (see
-  section 2). Phase 1 sets the passwords below, creates the
-  remaining users, and finishes the hardening.
+  Until then: you reach this server as root on port 22, using the
+  SSH key that was attached when phase-pre-hetzner created it.
+  Phase 1 creates these users, sets the passwords below, moves
+  SSH to port ${SSH_PORT}, and locks down port 22.
   This warning will be removed automatically once phase 1 completes.
   --------------------------------------------------------------
   WHAT IT'S FOR:    Logging into the server via SSH using

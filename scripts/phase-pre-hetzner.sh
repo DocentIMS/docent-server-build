@@ -3,10 +3,11 @@
 # phase-pre-hetzner.sh - Provision a Hetzner Cloud server and create the
 #                       DNS zone + records that the rest of the build needs.
 #
-# Runs BEFORE phase0-bootstrap.sh. End state:
-#   - A new Hetzner Cloud server exists, booted, with SSH key installed and
-#     a sane base cloud-init config (admin user, SSH port 2222, root login
-#     disabled).
+# Runs BEFORE bootstrap.sh / phase0-bootstrap.sh. End state:
+#   - A new Hetzner Cloud server exists and is booted, with your SSH key
+#     attached so you can log in as root on the default port 22. cloud-init
+#     only patches the box and installs jq/curl - it does NOT create users
+#     or change the SSH port; phase 1 does that hardening later.
 #   - A Hetzner DNS zone exists for the primary domain.
 #   - DNS records exist for: @, www, mail (A); @ (MX); @ (SPF TXT);
 #     _dmarc (DMARC TXT); @ (CAA x3). DKIM is added later by
@@ -630,20 +631,18 @@ cat <<EOF
 
 ${BOLD}Next:${RESET}
   1. Update nameservers at your registrar (see above)
-  2. Copy tenant.local + hetzner.local + org-secrets.local to the new
-     server (from THIS host):
-       scp tenant.local hetzner.local org-secrets.local root@${SERVER_IP}:/root/
-     (Once the repo is cloned on the new server, move them to the repo root.)
+  2. Copy bootstrap.sh and the three handoff files to the new server
+     (run from THIS host, in the repo root):
+       scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local root@${SERVER_IP}:/root/
   3. SSH to the new server:
        ssh root@${SERVER_IP}
-  4. Clone the repo there (a fresh clone checks out the main branch):
-       git clone https://github.com/DocentIMS/docent-server-build.git /root/server-build
-       cd /root/server-build
-       mv /root/tenant.local /root/hetzner.local /root/org-secrets.local .
-  5. Run: sudo bash scripts/phase0-bootstrap.sh
-     (it pre-fills DOMAIN + SERVER_IP from the tenant.local stub and the
-      RC+ key from org-secrets.local, so it runs with no prompts)
-  6. Run: sudo bash scripts/run-phases.sh
+  4. Run: bash /root/bootstrap.sh
+     (bootstrap.sh registers this server's key with GitHub, clones the
+      repo with that key, moves the three handoff files into the repo,
+      and chains straight into phase 0 - which runs with no prompts since
+      DOMAIN, SERVER_IP and the RC+ key are already supplied)
+  5. When phase 0 finishes, run:
+       sudo bash /root/server-build/scripts/run-phases.sh
      (runs phases 1-6 plus the DKIM DNS record automatically; it will
       prompt before the optional Plone phases)
 

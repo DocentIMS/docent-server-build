@@ -2,16 +2,24 @@
 # ============================================================================
 # bootstrap.sh - Step Zero entry point for a fresh Docent server build.
 #
-# Run this on a brand-new Kamatera server (Ubuntu 26.04 LTS) as root, on the
-# default SSH port 22. It walks through the manual SSH-key-to-GitHub flow,
-# clones the build repo, and chains into phase 0.
+# Run this on a freshly-provisioned Hetzner Cloud server (Ubuntu 26.04 LTS),
+# as root on the default SSH port 22. phase-pre-hetzner.sh creates that
+# server with your SSH key attached and leaves a clean root@22 baseline -
+# it does NOT create users or change the SSH port (phase 1 does that).
+#
+# bootstrap.sh walks the SSH-key-to-GitHub flow, clones the build repo,
+# moves any phase-pre-hetzner handoff files (tenant.local, hetzner.local,
+# org-secrets.local) sitting beside it into the repo, then chains into phase 0.
 #
 # How to get this script onto a new server:
-#   On the docenttemplate (green) server:
-#     scp -P 2222 /home/wayne/server-build/scripts/bootstrap.sh \
+#   On the docenttemplate (build) server, from the repo root, copy
+#   bootstrap.sh together with the three handoff files phase-pre-hetzner
+#   produced:
+#     scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local \
 #         root@<new-server-ip>:/root/
 #
 # Then SSH into the new server and run:
+#   ssh root@<new-server-ip>
 #   bash /root/bootstrap.sh
 #
 # This script is idempotent - safe to re-run if something goes wrong.
@@ -89,7 +97,7 @@ if [ "$ID" != "ubuntu" ] || [ "$VERSION_ID" != "26.04" ]; then
     echo "  The Docent server build requires Ubuntu 26.04 LTS for Dovecot 2.4"
     echo "  and a few other version-specific things."
     echo ""
-    echo "  Re-provision the server in Kamatera with the correct image."
+    echo "  Re-provision the server in Hetzner Cloud with the correct image."
     exit 1
 fi
 echo "  ✓ OS verified: $PRETTY_NAME"
@@ -245,9 +253,35 @@ echo "  Latest commit:"
 git -C "$REPO_DIR" log --oneline -1 | sed 's/^/    /'
 
 # ============================================================================
-# Step 6: Hand off to phase 0
+# Step 6: Stage phase-pre-hetzner handoff files
 # ============================================================================
-step "Step 6: Bootstrap complete - launching phase 0"
+# phase-pre-hetzner.sh produces tenant.local (a stub with DOMAIN + SERVER_IP),
+# hetzner.local (Hetzner API token + zone IDs) and org-secrets.local (the RC+
+# license key). They are scp'd to this server alongside bootstrap.sh. phase 0
+# and the phase scripts read them from the repo root, so move any that are
+# sitting next to this script into the repo. A purely manual build has none
+# of these, which is fine - phase 0 simply prompts for the values instead.
+step "Step 6: Stage handoff files"
+
+BOOTSTRAP_DIR="$(cd "$(dirname "$0")" && pwd)"
+staged=0
+for handoff in tenant.local hetzner.local org-secrets.local; do
+    src="$BOOTSTRAP_DIR/$handoff"
+    dst="$REPO_DIR/$handoff"
+    if [ -f "$src" ] && [ ! "$src" -ef "$dst" ]; then
+        mv "$src" "$dst"
+        echo "  ✓ moved $handoff into $REPO_DIR"
+        staged=$((staged + 1))
+    fi
+done
+if [ "$staged" -eq 0 ]; then
+    echo "  - no handoff files beside bootstrap.sh (manual build - phase 0 will prompt)"
+fi
+
+# ============================================================================
+# Step 7: Hand off to phase 0
+# ============================================================================
+step "Step 7: Bootstrap complete - launching phase 0"
 
 echo ""
 echo "${GREEN}  Bootstrap finished successfully. Launching phase 0...${RESET}"
