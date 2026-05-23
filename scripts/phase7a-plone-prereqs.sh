@@ -145,6 +145,14 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+echo ""
+echo "==================================================================="
+echo "  PHASE 7A: OS prerequisites for Plone 6.2"
+echo "==================================================================="
+echo "  Plone user:    $PLONE_USER"
+echo "  Instance dir:  $PLONE_INSTANCE_DIR"
+echo ""
+
 # ============================================================================
 # STEP 1: Verify Python version is in Plone 6.2's supported range
 # ============================================================================
