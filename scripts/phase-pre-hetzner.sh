@@ -117,7 +117,7 @@ ask_secret() {
 clear
 cat <<EOF
 ${BOLD}=============================================================
-  PHASE PRE-HETZNER - Server + DNS provisioning
+  HETZNER SERVER CREATION
 =============================================================${RESET}
 
 This script will:
@@ -442,18 +442,12 @@ ZONE_NS=$(hcloud_zone_nameservers "$ZONE_ID")
 # ============================================================================
 step "Step 4: DNS records"
 
-# Notification email — used in DMARC rua and CAA iodef. Same convention as
-# phase0: ask once, reuse everywhere. We don't write this to tenant.local
-# here (phase0 owns that file); just prompt and use it in the records.
-# Notification email — must look like a real address (used in DMARC/CAA).
-while true; do
-    NOTIFICATION_EMAIL=$(ask_required "Notification email (for DMARC + CAA reports)")
-    if echo "$NOTIFICATION_EMAIL" | grep -qE '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$'; then
-        echo "  Using: $NOTIFICATION_EMAIL"
-        break
-    fi
-    echo "  '$NOTIFICATION_EMAIL' is not a valid email address. Try again."
-done
+# Notification email is an org-wide constant - used in the DMARC rua and CAA
+# iodef records below. Hardcoded here so it always matches phase0-bootstrap.sh,
+# which uses the same constant for Let's Encrypt / WordPress. It is published
+# in DNS anyway, so it is not a secret.
+NOTIFICATION_EMAIL="wglover@docentims.com"
+echo "  Notification email: $NOTIFICATION_EMAIL"
 
 # A records: @, www, mail, team
 # - @ / www : main site (Apache vhost, phase 2)
