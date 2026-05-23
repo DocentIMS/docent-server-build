@@ -608,7 +608,7 @@ ${BOLD}Server:${RESET}
 ${BOLD}DNS:${RESET}
   Zone:     $DOMAIN (id $ZONE_ID)
   Records:  A (@/www/mail/team), MX, TXT (SPF + DMARC), CAA (x3)
-  DKIM:     NOT YET - add after phase 4 with phase-post-hetzner-dkim.sh
+  DKIM:     added automatically after phase 4 by run-phases.sh (post-dkim)
 
 ${BOLD}REQUIRED next step at your registrar:${RESET}
   Set the following authoritative nameservers for $DOMAIN:
@@ -630,20 +630,21 @@ cat <<EOF
 
 ${BOLD}Next:${RESET}
   1. Update nameservers at your registrar (see above)
-  2. Copy tenant.local + hetzner.local to the new server (from THIS host):
-       scp tenant.local hetzner.local root@${SERVER_IP}:/root/
+  2. Copy tenant.local + hetzner.local + org-secrets.local to the new
+     server (from THIS host):
+       scp tenant.local hetzner.local org-secrets.local root@${SERVER_IP}:/root/
      (Once the repo is cloned on the new server, move them to the repo root.)
   3. SSH to the new server:
        ssh root@${SERVER_IP}
-  4. Clone the repo there:
-       git clone https://github.com/DocentIMS/docent-server-build.git /root/server_setup
-       cd /root/server_setup
-       git checkout feature/hetzner-provisioning
-       mv /root/tenant.local /root/hetzner.local .
+  4. Clone the repo there (a fresh clone checks out the main branch):
+       git clone https://github.com/DocentIMS/docent-server-build.git /root/server-build
+       cd /root/server-build
+       mv /root/tenant.local /root/hetzner.local /root/org-secrets.local .
   5. Run: sudo bash scripts/phase0-bootstrap.sh
-     (it will pre-fill SERVER_IP=$SERVER_IP and DOMAIN=$DOMAIN from tenant.local)
-  6. Continue with phase1, phase2, ... as documented in README.md
-  7. After phase 4: sudo bash scripts/phase-post-hetzner-dkim.sh
-     (this adds the DKIM record to Hetzner DNS automatically)
+     (it pre-fills DOMAIN + SERVER_IP from the tenant.local stub and the
+      RC+ key from org-secrets.local, so it runs with no prompts)
+  6. Run: sudo bash scripts/run-phases.sh
+     (runs phases 1-6 plus the DKIM DNS record automatically; it will
+      prompt before the optional Plone phases)
 
 EOF
