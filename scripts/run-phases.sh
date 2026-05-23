@@ -53,7 +53,6 @@ SECRETS_FILE="$REPO_ROOT/secrets.local"
 # --only can target them, but the default run stops after CORE_LAST_LABEL
 # and prompts the user whether to continue.
 PHASES=(
-    "pre-hz:phase-pre-hetzner.sh"
     "1:phase1.sh"
     "2:phase2.sh"
     "3:phase3.sh"
