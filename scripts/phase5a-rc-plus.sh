@@ -223,12 +223,16 @@ fi
 # ============================================================================
 step "Step 4: Installing RC+ plugins"
 
-# Map plugin name -> staging source path
+# Map plugin name -> staging source path.
+# Only plugins that come from the RC+ tarballs belong here. docent_skin_overrides
+# is NOT in this map on purpose - it is the repo's own plugin and is installed
+# separately by Step 5b. The loop below iterates over this map's keys (NOT
+# RC_PLUS_PLUGINS), so Step 4 only ever touches tarball-sourced plugins.
 declare -A PLUGIN_SRC_MAP=(
     [xsignature]="$STAGING/plugin_xsignature/xsignature"
 )
 
-for plugin in "${RC_PLUS_PLUGINS[@]}"; do
+for plugin in "${!PLUGIN_SRC_MAP[@]}"; do
     SRC="${PLUGIN_SRC_MAP[$plugin]}"
     if [ ! -d "$SRC" ]; then
         log_warn "$plugin source not found at $SRC - skipping"
