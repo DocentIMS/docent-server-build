@@ -40,6 +40,17 @@ YELLOW=$'\e[33m'
 CYAN=$'\e[36m'
 
 # ============================================================================
+# Banner - printed first, before any pre-flight output, so the script
+# always identifies itself as the first thing on screen.
+# ============================================================================
+echo ""
+echo "${BOLD}${CYAN}============================================================${RESET}"
+echo "${BOLD}${CYAN}  RUN-PHASES - automated phase chain${RESET}"
+echo "${BOLD}${CYAN}  Started: $(date "+%Y-%m-%d %H:%M:%S %Z")${RESET}"
+echo "${BOLD}${CYAN}============================================================${RESET}"
+echo ""
+
+# ============================================================================
 # DEFAULTS
 # ============================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -204,13 +215,8 @@ else
 fi
 
 # ============================================================================
-# Banner
+# Phases-to-run summary + confirmation
 # ============================================================================
-echo ""
-echo "${BOLD}${CYAN}============================================================${RESET}"
-echo "${BOLD}${CYAN}  RUN-PHASES - automated phase chain${RESET}"
-echo "${BOLD}${CYAN}  Started: $(date "+%Y-%m-%d %H:%M:%S %Z")${RESET}"
-echo "${BOLD}${CYAN}============================================================${RESET}"
 echo ""
 echo "  Phases to run:"
 for entry in "${TO_RUN[@]}"; do
