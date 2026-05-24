@@ -382,8 +382,41 @@ step "Step 2: Create Hetzner Cloud server"
 EXISTING_SERVER_ID=$(hcloud_server_id_by_name "$SERVER_NAME")
 
 if [ -n "$EXISTING_SERVER_ID" ]; then
-    log_skip "Server $SERVER_NAME already exists (id $EXISTING_SERVER_ID)"
     SERVER_ID="$EXISTING_SERVER_ID"
+    log_warn "A Hetzner server named '$SERVER_NAME' already exists (id $SERVER_ID)"
+
+    # Pull details so the user can tell a harmless leftover (an earlier
+    # aborted run of this script) apart from a live/production box.
+    EXISTING_INFO=$(hcloud_get "/servers/${SERVER_ID}")
+    EX_IP=$(echo "$EXISTING_INFO"      | jq -r '.server.public_net.ipv4.ip // "unknown"' 2>/dev/null)
+    EX_STATUS=$(echo "$EXISTING_INFO"  | jq -r '.server.status // "unknown"' 2>/dev/null)
+    EX_TYPE=$(echo "$EXISTING_INFO"    | jq -r '.server.server_type.name // "unknown"' 2>/dev/null)
+    EX_CREATED=$(echo "$EXISTING_INFO" | jq -r '.server.created // "unknown"' 2>/dev/null)
+
+    echo ""
+    echo "  This script would REUSE that existing server - the rest of the"
+    echo "  build (phases 1-8) would then run ON it, hardening and"
+    echo "  reconfiguring it and rebooting it. If that server is a live or"
+    echo "  production box, that is destructive."
+    echo ""
+    echo "    Name:     $SERVER_NAME"
+    echo "    ID:       $SERVER_ID"
+    echo "    IPv4:     $EX_IP"
+    echo "    Status:   $EX_STATUS"
+    echo "    Type:     $EX_TYPE"
+    echo "    Created:  $EX_CREATED"
+    echo ""
+    echo "  Only continue if this is a server you intend to (re)build - for"
+    echo "  example a leftover from an earlier, aborted run of this script."
+    echo ""
+    if ! ask_yes_no "Reuse and build on this existing server?" "n"; then
+        echo ""
+        echo "${YELLOW}  Stopped. No server was created and nothing was changed.${RESET}"
+        echo "  For a brand-new server, rename or delete the existing"
+        echo "  '$SERVER_NAME' in the Hetzner Console first, then re-run."
+        exit 1
+    fi
+    log_done "User confirmed reuse of existing server $SERVER_NAME (id $SERVER_ID)"
 else
     # Build request body. jq -n handles JSON escaping for us so the
     # cloud-init YAML survives intact (newlines, colons, etc).
