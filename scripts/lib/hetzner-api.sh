@@ -66,10 +66,14 @@ hcloud_delete() { hcloud_request "DELETE" "$1"; }
 hcloud_validate_token() {
     local resp
     resp=$(hcloud_get "/locations")
-    if [ "$HCLOUD_LAST_STATUS" = "200" ]; then
+    # Decide from the response body, not HCLOUD_LAST_STATUS: hcloud_request
+    # runs inside the $(...) subshell, so the status it exports never reaches
+    # this function. A working token returns a locations array; a bad token
+    # returns an .error object.
+    if echo "$resp" | jq -e '(.locations | type) == "array"' >/dev/null 2>&1; then
         return 0
     fi
-    echo "  Token validation failed (HTTP $HCLOUD_LAST_STATUS)" >&2
+    echo "  Token validation failed" >&2
     if command -v jq >/dev/null 2>&1; then
         echo "$resp" | jq -r '.error.message // empty' 2>/dev/null >&2
     fi
@@ -82,10 +86,12 @@ hcloud_ssh_key_id_by_fingerprint() {
     local fingerprint="$1"
     local resp
     resp=$(hcloud_get "/ssh_keys")
-    if [ "$HCLOUD_LAST_STATUS" != "200" ]; then
-        return 1
-    fi
-    echo "$resp" | jq -r ".ssh_keys[] | select(.fingerprint == \"$fingerprint\") | .id" 2>/dev/null | head -1
+    # Decide from the response body, not HCLOUD_LAST_STATUS: hcloud_request
+    # runs inside the $(...) subshell above, so the status it exports never
+    # reaches this function. If the body is an error object instead of a
+    # key list, .ssh_keys[]? simply yields nothing.
+    echo "$resp" | jq -r --arg fp "$fingerprint" \
+        '.ssh_keys[]? | select(.fingerprint == $fp) | .id' 2>/dev/null | head -1
 }
 
 hcloud_ssh_key_upload() {
@@ -105,8 +111,12 @@ hcloud_ssh_key_upload() {
     body=$(jq -n --arg n "$name" --arg k "$pubkey" '{name: $n, public_key: $k}')
     resp=$(hcloud_post "/ssh_keys" "$body")
 
-    if [ "${HCLOUD_LAST_STATUS:0:1}" = "2" ]; then
-        echo "$resp" | jq -r '.ssh_key.id'
+    # Decide from the response body, not HCLOUD_LAST_STATUS: hcloud_request
+    # runs inside the $(...) subshell, so the status it exports never reaches
+    # us. A successful create returns the new key under .ssh_key.id.
+    key_id=$(echo "$resp" | jq -r '.ssh_key.id // empty' 2>/dev/null)
+    if [ -n "$key_id" ]; then
+        echo "$key_id"
         return 0
     fi
 
