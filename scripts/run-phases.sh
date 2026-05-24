@@ -3,10 +3,11 @@
 # run-phases.sh - Chain all build phases automatically.
 #
 # Use only AFTER phase 0 has been run (so tenant.local and secrets.local
-# exist). This script runs the core phases 1 -> 2 -> 3 -> 4 -> 5 -> 5a ->
-# 5b -> 5c -> 6 in order, stopping at the first failure. After phase 6
-# completes, the script prompts whether to continue with the Plone phases
-# 7a -> 7b -> 7c (typed yes or no, no default).
+# exist). This script runs the core phases 1 -> 2 -> 3 -> 4 -> post-dkim
+# -> 5 -> 5a -> 5b -> 5c -> 6 in order, stopping at the first failure.
+# (post-dkim publishes the DKIM DNS record in Hetzner DNS after phase 4
+# generates the key.) After phase 6 completes, the script prompts whether
+# to continue with the Plone phases 7a -> 7b -> 7c (typed yes or no, no default).
 #
 # All phases are idempotent, so it's safe to re-run this script after a
 # reboot or after fixing whatever caused a failure.
@@ -167,7 +168,7 @@ if [ -n "$ONLY_PHASE" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --only $ONLY_PHASE: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 5 5a 5b 5c 6 7a 7b 7c"
+        echo "Valid phase labels: 1 2 3 4 post-dkim 5 5a 5b 5c 6 7a 7b 7c"
         exit 1
     fi
 elif [ -n "$START_FROM" ]; then
@@ -195,7 +196,7 @@ elif [ -n "$START_FROM" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --from $START_FROM: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 5 5a 5b 5c 6 7a 7b 7c"
+        echo "Valid phase labels: 1 2 3 4 post-dkim 5 5a 5b 5c 6 7a 7b 7c"
         exit 1
     fi
     # Only prompt for Plone if we started in core (we'll have stopped before 7a)

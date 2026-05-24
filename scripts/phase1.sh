@@ -777,16 +777,23 @@ fi
 # has actually created the users and switched SSH. Only do this if all checks
 # passed - if anything failed, leave the warning in place because the
 # credentials probably still won't work.
+#
+# There can be up to two copies of CREDENTIALS.txt: the original at the repo
+# root, and a copy phase 0 places in the admin user's home directory (for
+# SFTP download) if that home directory already existed. Strip the warning
+# from whichever copies are present so neither shows stale "not active" text.
 # ============================================================================
-CREDENTIALS_FILE="$(dirname "$0")/../CREDENTIALS.txt"
-if [ "$VERIFY_FAIL" -eq 0 ] && [ -f "$CREDENTIALS_FILE" ]; then
-    if grep -q "NOT YET ACTIVE" "$CREDENTIALS_FILE"; then
-        # Strip the 6-line warning block (header + 4 body lines + separator).
-        # Sed deletes from the "*** NOT YET ACTIVE" line through the
-        # "------" separator that closes the warning.
-        sed -i '/\*\*\* NOT YET ACTIVE/,/^  ---/d' "$CREDENTIALS_FILE"
-        log_done "Removed 'NOT YET ACTIVE' warning from CREDENTIALS.txt (SSH login is now live)"
-    fi
+if [ "$VERIFY_FAIL" -eq 0 ]; then
+    for CREDENTIALS_FILE in \
+        "$(dirname "$0")/../CREDENTIALS.txt" \
+        "/home/${ADMIN_USER}/CREDENTIALS.txt"; do
+        if [ -f "$CREDENTIALS_FILE" ] && grep -q "NOT YET ACTIVE" "$CREDENTIALS_FILE"; then
+            # Strip the warning block: from the "*** NOT YET ACTIVE" line
+            # through the "------" separator that closes the warning.
+            sed -i '/\*\*\* NOT YET ACTIVE/,/^  ---/d' "$CREDENTIALS_FILE"
+            log_done "Removed 'NOT YET ACTIVE' warning from $CREDENTIALS_FILE (SSH login is now live)"
+        fi
+    done
 fi
 
 echo "==================================================================="

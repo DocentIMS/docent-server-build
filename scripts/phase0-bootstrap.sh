@@ -642,8 +642,11 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
 ==============================================================
   *** SAVE THIS FILE TO YOUR PASSWORD MANAGER NOW. ***
 
-  After the build is verified working, delete this file
-  from the server with:  rm ${CREDENTIALS_FILE}
+  Keep this file on the server until the whole build - including
+  the Plone phases (7a-7d) - is finished and verified. The Plone
+  phases read PLONE_ADMIN_PW from this file. Once Plone is done
+  and everything is confirmed working, you may delete it with:
+      rm ${CREDENTIALS_FILE}
 ==============================================================
 CREDENTIALS_EOF
 
@@ -868,8 +871,14 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
   CLEANING UP AFTER VERIFIED BUILD
 ==============================================================
 
-  Once you've confirmed the build works end-to-end, delete the
-  sensitive files (passwords are in your password manager):
+  IMPORTANT: do NOT delete CREDENTIALS.txt until the entire build,
+  including the Plone phases (7a-7d), is finished. The Plone phases
+  read PLONE_ADMIN_PW from CREDENTIALS.txt - deleting it early will
+  make those phases fail.
+
+  Once Plone is installed and the whole build is confirmed working
+  end-to-end, you may delete the sensitive files (the passwords are
+  in your password manager by then):
 
     rm /root/server-build/CREDENTIALS.txt
     rm /root/server-build/QUICK-REFERENCE.txt
