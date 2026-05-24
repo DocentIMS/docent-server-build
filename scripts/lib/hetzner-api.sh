@@ -8,6 +8,7 @@
 HCLOUD_API_BASE="${HCLOUD_API_BASE:-https://api.hetzner.cloud/v1}"
 HCLOUD_CURL_CONNECT_TIMEOUT="${HCLOUD_CURL_CONNECT_TIMEOUT:-10}"
 HCLOUD_CURL_MAX_TIME="${HCLOUD_CURL_MAX_TIME:-30}"
+HCLOUD_LAST_STATUS="000"  # init so a bare read cannot trip set -u
 
 # ============================================================================
 # hcloud_request - Core function: make an HTTP request to the Hetzner API.
@@ -214,8 +215,9 @@ hcloud_rrset_upsert() {
         --argjson ttl "$ttl" \
         '{name: $n, type: $t, ttl: $ttl, records: [{value: $v}]}')
 
-    hcloud_get "/zones/${zone_id}/rrsets/${name}/${type}" >/dev/null 2>&1
-    if [ "$HCLOUD_LAST_STATUS" = "200" ]; then
+    local existing
+    existing=$(hcloud_request GET "/zones/${zone_id}/rrsets/${name}/${type}")
+    if echo "$existing" | jq -e '.rrset.id' >/dev/null 2>&1; then
         hcloud_request DELETE "/zones/${zone_id}/rrsets/${name}/${type}" >/dev/null 2>&1
     fi
 
