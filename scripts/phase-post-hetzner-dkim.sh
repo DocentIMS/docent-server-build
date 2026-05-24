@@ -170,10 +170,14 @@ else
     EXPECTED_STATUS=201
 fi
 
-if [ "$HCLOUD_LAST_STATUS" = "$EXPECTED_STATUS" ] || [ "$HCLOUD_LAST_STATUS" = "200" ]; then
+# HCLOUD_LAST_STATUS is unreliable here: hcloud_post/hcloud_put run inside
+# $(...) command substitution, so the status never reaches this shell.
+# Decide success from the response body - a created or updated RRSet
+# always comes back with .rrset.id populated.
+if echo "$RESP" | jq -e '.rrset.id' >/dev/null 2>&1; then
     log_done "DKIM TXT record published at ${DKIM_NAME}.${DOMAIN}"
 else
-    log_fail "Publish failed (HTTP $HCLOUD_LAST_STATUS)"
+    log_fail "Publish failed"
     echo "$RESP" | jq -r '.error.message // .' >&2
     exit 1
 fi
