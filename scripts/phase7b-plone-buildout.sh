@@ -50,20 +50,6 @@ DEFAULT_PLONE_VERSION="6.2.0rc2"
 # Computed from PLONE_VERSION below (e.g. 6.2.0rc2 -> 6.2-latest).
 PLONE_RELEASE_LINE=""
 
-# === BEGIN tenant.local/secrets.local source block ===
-__PHASE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-__PHASE_REPO_ROOT="$(dirname "$__PHASE_SCRIPT_DIR")"
-if [ -f "$__PHASE_REPO_ROOT/tenant.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/tenant.local"
-fi
-if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/secrets.local"
-fi
-REPO_ROOT="$__PHASE_REPO_ROOT"
-unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
-# === END tenant.local/secrets.local source block ===
 
 # Compute Plone path values now that tenant.local has been sourced.
 if [ -z "${DOMAIN:-}" ]; then
@@ -92,12 +78,6 @@ CREDENTIALS_FILE="$REPO_ROOT/CREDENTIALS.txt"
 # ============================================================================
 REPORT=()
 
-log_done()    { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
-log_skip()    { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }
-log_warn()    { REPORT+=("[WARN]    $1"); echo "  ! $1"; }
-log_fail()    { REPORT+=("[FAIL]    $1"); echo "  ✗ $1"; }
-
-step() { echo ""; echo "=== $1 ==="; }
 
 # ============================================================================
 # Must run as root

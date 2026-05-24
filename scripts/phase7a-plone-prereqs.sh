@@ -32,6 +32,16 @@ PLONE_HOME="/home/plone"
 PLONE_INSTANCE_DIR=""  # Derived from DOMAIN below, after tenant.local is sourced
 PLONE_SHELL="/bin/bash"
 
+# ============================================================================
+# SCRIPT SETUP
+# ============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Load shared helpers and per-tenant config
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/common.sh"
+
 # Python version requirements for Plone 6.2 (per official Plone docs).
 # Plone 6.2.0rc2 was released 2026-05-08 and supports Python 3.10 through 3.14.
 # Ubuntu 26.04 ships with Python 3.14 as the system Python, so the system
@@ -76,19 +86,6 @@ SYSTEM_PACKAGES=(
     wget
 )
 
-# === BEGIN tenant.local/secrets.local source block ===
-__PHASE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-__PHASE_REPO_ROOT="$(dirname "$__PHASE_SCRIPT_DIR")"
-if [ -f "$__PHASE_REPO_ROOT/tenant.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/tenant.local"
-fi
-if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
-    # shellcheck disable=SC1091
-    source "$__PHASE_REPO_ROOT/secrets.local"
-fi
-unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
-# === END tenant.local/secrets.local source block ===
 
 # Derive PLONE_INSTANCE_DIR from DOMAIN (matches phase 7b/7c convention).
 # Each tenant gets a Plone instance at /home/plone/<first-label-of-DOMAIN>/
@@ -108,12 +105,6 @@ PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 # ============================================================================
 REPORT=()
 
-log_done()    { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
-log_skip()    { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }
-log_warn()    { REPORT+=("[WARN]    $1"); echo "  ! $1"; }
-log_fail()    { REPORT+=("[FAIL]    $1"); echo "  ✗ $1"; }
-
-step() { echo ""; echo "=== $1 ==="; }
 
 # wait_for_dpkg_lock - block until /var/lib/dpkg/lock-frontend is released.
 # Same helper as phases 1-6. unattended-upgrades or apt-daily can hold the
