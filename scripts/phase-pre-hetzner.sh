@@ -435,6 +435,13 @@ if [ -z "$SERVER_IP" ] || [ "$SERVER_IP" = "null" ]; then
 fi
 log_done "Server IPv4: $SERVER_IP"
 
+# Clear any stale known_hosts entry for this IP. Hetzner recycles IP
+# addresses, so a previously-destroyed server may have left an old host
+# key here. The new server is a different machine; without this, the
+# scp/ssh steps below would fail host-key verification.
+ssh-keygen -R "$SERVER_IP" -f "$HOME/.ssh/known_hosts" >/dev/null 2>&1 || true
+log_done "Cleared any stale known_hosts entry for $SERVER_IP"
+
 # ============================================================================
 # DNS ZONE
 # ============================================================================
