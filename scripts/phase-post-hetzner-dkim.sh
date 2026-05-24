@@ -26,6 +26,10 @@ HETZNER_FILE="$REPO_ROOT/hetzner.local"
 # Load helpers
 # shellcheck source=lib/hetzner-api.sh
 source "$LIB_DIR/hetzner-api.sh"
+# hetzner-api.sh reads HCLOUD_LAST_STATUS; pre-set it so nounset (set -u)
+# does not abort before the first API call records a status. This matches
+# how phase-pre-hetzner.sh initializes it after sourcing the library.
+HCLOUD_LAST_STATUS=""
 
 # Load shared helpers and per-tenant config (colors, logging, verify helpers).
 # SCRIPT_DIR/REPO_ROOT are defined above; lib/common.sh also sources
