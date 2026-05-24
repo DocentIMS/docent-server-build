@@ -450,10 +450,12 @@ ZONE_ID=$(hcloud_zone_id_by_name "$DOMAIN")
 
 if [ -n "$ZONE_ID" ]; then
     log_skip "Zone $DOMAIN already exists (id $ZONE_ID)"
+    ZONE_PREEXISTING="yes"
 else
     ZONE_ID=$(hcloud_zone_create "$DOMAIN" 3600)
     if [ -n "$ZONE_ID" ] && [ "$ZONE_ID" != "null" ]; then
         log_done "Created zone $DOMAIN (id $ZONE_ID)"
+        ZONE_PREEXISTING="no"
     else
         log_fail "Zone create failed"
         exit 1
@@ -463,6 +465,55 @@ fi
 # Capture nameservers so we can print them in the final report. The user
 # MUST set these at their registrar, otherwise nothing else works.
 ZONE_NS=$(hcloud_zone_nameservers "$ZONE_ID")
+
+# ============================================================================
+# DNS RECORD SAFETY CHECK (only when the zone already existed)
+# ============================================================================
+# A freshly created zone is empty, so there is nothing to overwrite. But if
+# the zone ALREADY existed, the records this script writes (@, www, mail and
+# team A records; MX; SPF; DMARC; CAA) might belong to a live site. Before
+# Step 4 overwrites them, show which of them already exist - with their
+# current values - and ask the user to confirm.
+if [ "$ZONE_PREEXISTING" = "yes" ]; then
+    step "Step 3b: Checking existing DNS records before overwrite"
+
+    echo "  The zone $DOMAIN already existed. Step 4 will write these records,"
+    echo "  and any that already exist will be DELETED and recreated:"
+    echo ""
+
+    PREEXISTING_RECORDS=()
+    for pair in "@:A" "www:A" "mail:A" "team:A" "@:MX" "@:TXT" "_dmarc:TXT" "@:CAA"; do
+        rname="${pair%%:*}"
+        rtype="${pair##*:}"
+        rbody=$(hcloud_get "/zones/${ZONE_ID}/rrsets/${rname}/${rtype}")
+        if echo "$rbody" | jq -e '.rrset.id' >/dev/null 2>&1; then
+            rvals=$(echo "$rbody" | jq -r '.rrset.records[]?.value' 2>/dev/null | paste -sd ' ; ' -)
+            printf '    %-4s %-8s  currently: %s\n' "$rtype" "$rname" "$rvals"
+            PREEXISTING_RECORDS+=("$rtype $rname")
+        fi
+    done
+
+    if [ "${#PREEXISTING_RECORDS[@]}" -eq 0 ]; then
+        echo "    (none of those records exist yet)"
+        echo ""
+        log_done "Zone $DOMAIN pre-existed but has none of the target records - safe to write"
+    else
+        echo ""
+        echo "${BOLD}${YELLOW}  ${#PREEXISTING_RECORDS[@]} record(s) above already exist and will be"
+        echo "  OVERWRITTEN to point at the new server ($SERVER_IP).${RESET}"
+        echo "  If $DOMAIN is a live site, this repoints its web and/or mail traffic."
+        echo ""
+        if ! ask_yes_no "Overwrite these DNS records?" "n"; then
+            echo ""
+            echo "${YELLOW}  Stopped before changing DNS. The server has already been"
+            echo "  created, but the DNS records were left untouched.${RESET}"
+            echo "  When you are ready, either re-run this script and answer yes,"
+            echo "  or set the records by hand in the Hetzner Console."
+            exit 1
+        fi
+        log_done "User confirmed overwrite of ${#PREEXISTING_RECORDS[@]} existing record(s)"
+    fi
+fi
 
 # ============================================================================
 # DNS RECORDS
