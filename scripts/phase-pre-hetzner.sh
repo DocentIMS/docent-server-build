@@ -49,6 +49,14 @@ LIB_DIR="$SCRIPT_DIR/lib"
 TENANT_FILE="$REPO_ROOT/tenant.local"
 HETZNER_FILE="$REPO_ROOT/hetzner.local"
 
+# ============================================================================
+# DEFAULTS
+# ============================================================================
+# The Docent build requires Ubuntu 26.04 LTS (Dovecot 2.4 and other
+# version-specific pieces), so the OS image is fixed here, not prompted for.
+# To build on a different image, change this one line.
+SERVER_IMAGE="ubuntu-26.04"
+
 # Load helpers. The library is sourced once and self-guards against
 # double-loading via __HETZNER_API_SH_LOADED.
 # shellcheck source=lib/hetzner-api.sh
@@ -268,13 +276,6 @@ while true; do
     echo ""
     SERVER_TYPE=$(ask_required "Server type")
     if ask_yes_no "Use server type '${SERVER_TYPE}'?"; then
-        break
-    fi
-done
-
-while true; do
-    SERVER_IMAGE=$(ask "OS image" "ubuntu-26.04")
-    if ask_yes_no "Use OS image '${SERVER_IMAGE}'?"; then
         break
     fi
 done
