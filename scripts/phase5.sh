@@ -772,11 +772,11 @@ cat <<EOF
      You should see the Roundcube login page.
 
   2. Log in with the test mailbox credentials from Phase 4:
-       Username:  wglover@${DOMAIN}  (full email address required)
+       Username:  test@${DOMAIN}  (full email address required)
        Password:  (the test mailbox password from Phase 4)
 
   3. You should land in the inbox and see your existing messages
-     (the local test, IONOS test, plus any others).
+     (the local test plus any others).
 
   4. Try composing a new message and sending it. Check the mail log:
        sudo tail -30 /var/log/mail.log

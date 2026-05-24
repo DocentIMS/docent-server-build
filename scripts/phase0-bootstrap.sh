@@ -156,7 +156,7 @@ ask_yes_no() {
 }
 
 # ask_server_ip - try to auto-derive the public IPv4 from hostname -I. If
-# exactly one IPv4 address is bound (the typical Kamatera single-interface
+# exactly one IPv4 address is bound (the typical single-interface
 # case), display it and ask for confirmation. If multiple IPs are present
 # or detection fails, fall back to a typed prompt. Either way, the result
 # is validated as a plausible IPv4.

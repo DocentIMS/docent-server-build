@@ -438,7 +438,7 @@ fi
 # introduced), bail out with a clear error rather than inventing one.
 if [ -z "${WP_ADMIN_PW:-}" ]; then
     log_fail "WP_ADMIN_PW is not set. Re-run phase 0 to regenerate secrets.local,"
-    log_fail "or set it manually in $__PHASE_REPO_ROOT/secrets.local and re-run phase 6."
+    log_fail "or set it manually in $REPO_ROOT/secrets.local and re-run phase 6."
     exit 1
 fi
 
@@ -754,12 +754,13 @@ cat <<EOF
      once the site is publicly ready.
 
   3. Theme/configure the site to look like a real Docent project page,
-     using whatever template/approach you've used before. The goal is
-     a real-looking site so Kamatera will approve PTR.
+     using whatever template/approach you've used before.
 
-  4. Once the site is "real-looking enough":
-     - Submit (or re-submit) the PTR request to Kamatera, asking for:
+  4. Set the PTR (reverse DNS) record:
+     - Return to Hetzner and manually activate a PTR record:
          PTR $SERVER_IP -> mail.$DOMAIN
+       (Hetzner Cloud Console -> select this server -> set the reverse
+        DNS on the server's IPv4 address. No support ticket needed.)
      - Without PTR, outbound mail to Gmail/Outlook/etc. will land in spam.
        Inbound and webmail still work fine - PTR only affects outbound
        deliverability reputation.

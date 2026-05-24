@@ -57,8 +57,7 @@ HETZNER_FILE="$REPO_ROOT/hetzner.local"
 # To build on a different image, change this one line.
 SERVER_IMAGE="ubuntu-26.04"
 
-# Load helpers. The library is sourced once and self-guards against
-# double-loading via __HETZNER_API_SH_LOADED.
+# Load helpers.
 # shellcheck source=lib/hetzner-api.sh
 source "$LIB_DIR/hetzner-api.sh"
 HCLOUD_LAST_STATUS=""
