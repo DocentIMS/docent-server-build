@@ -162,7 +162,11 @@ DKIM_BODY=$(jq -n \
 hcloud_get "/zones/${HETZNER_ZONE_ID}/rrsets/${DKIM_NAME}/TXT" >/dev/null
 if [ "$HCLOUD_LAST_STATUS" = "200" ]; then
     echo "  Existing DKIM RRSet found - updating in place"
-    RESP=$(hcloud_put "/zones/${HETZNER_ZONE_ID}/rrsets/${DKIM_NAME}/TXT" "$DKIM_BODY")
+    # The rrset PUT endpoint cannot change records, only metadata. Delete the
+    # existing RRSet and recreate it via the create endpoint, which is the
+    # only one that accepts a records payload. Keeps the phase idempotent.
+    hcloud_delete "/zones/${HETZNER_ZONE_ID}/rrsets/${DKIM_NAME}/TXT" >/dev/null 2>&1 || true
+    RESP=$(hcloud_post "/zones/${HETZNER_ZONE_ID}/rrsets" "$DKIM_BODY")
     EXPECTED_STATUS=200
 else
     echo "  No existing DKIM RRSet - creating"
