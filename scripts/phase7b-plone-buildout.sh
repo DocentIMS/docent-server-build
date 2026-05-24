@@ -41,15 +41,29 @@ PLONE_HOME="/home/plone"
 PLONE_INSTANCE_DIR=""  # Set after tenant.local is sourced (see below)
 
 # Default Plone version. Override via PLONE_VERSION in tenant.local.
-# As of May 2026, 6.2.0rc2 is the current release candidate; 6.2 stable
-# expected end of May. Pin to a specific version for reproducibility.
-DEFAULT_PLONE_VERSION="6.2.0rc2"
+# Pinned to a specific released version for reproducibility.
+# Plone 6.2.0 is the current stable release (released 2026-05-19).
+DEFAULT_PLONE_VERSION="6.2.0"
 
 # Plone release line: used to fetch versions.cfg and requirements.txt.
 # For 6.2.x releases this is "6.2-latest". For 6.1.x it would be "6.1-latest".
-# Computed from PLONE_VERSION below (e.g. 6.2.0rc2 -> 6.2-latest).
+# Computed from PLONE_VERSION below (e.g. 6.2.0 -> 6.2-latest).
 PLONE_RELEASE_LINE=""
 
+# === BEGIN tenant.local/secrets.local source block ===
+__PHASE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+__PHASE_REPO_ROOT="$(dirname "$__PHASE_SCRIPT_DIR")"
+if [ -f "$__PHASE_REPO_ROOT/tenant.local" ]; then
+    # shellcheck disable=SC1091
+    source "$__PHASE_REPO_ROOT/tenant.local"
+fi
+if [ -f "$__PHASE_REPO_ROOT/secrets.local" ]; then
+    # shellcheck disable=SC1091
+    source "$__PHASE_REPO_ROOT/secrets.local"
+fi
+REPO_ROOT="$__PHASE_REPO_ROOT"
+unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
+# === END tenant.local/secrets.local source block ===
 
 # Compute Plone path values now that tenant.local has been sourced.
 if [ -z "${DOMAIN:-}" ]; then
@@ -78,6 +92,12 @@ CREDENTIALS_FILE="$REPO_ROOT/CREDENTIALS.txt"
 # ============================================================================
 REPORT=()
 
+log_done()    { REPORT+=("[DONE]    $1"); echo "  ✓ $1"; }
+log_skip()    { REPORT+=("[SKIPPED] $1 (already done)"); echo "  - $1 (already done)"; }
+log_warn()    { REPORT+=("[WARN]    $1"); echo "  ! $1"; }
+log_fail()    { REPORT+=("[FAIL]    $1"); echo "  ✗ $1"; }
+
+step() { echo ""; echo "=== $1 ==="; }
 
 # ============================================================================
 # Must run as root

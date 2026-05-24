@@ -7,17 +7,19 @@
 # -> 5 -> 5a -> 5b -> 5c -> 6 in order, stopping at the first failure.
 # (post-dkim publishes the DKIM DNS record in Hetzner DNS after phase 4
 # generates the key.) After phase 6 completes, the script prompts whether
-# to continue with the Plone phases 7a -> 7b -> 7c (typed yes or no, no default).
+# to continue with the Plone phases 7a -> 7b -> 7c (typed yes or no, no
+# default), then prompts separately whether to install the Plone add-on
+# products (phase 7d).
 #
 # All phases are idempotent, so it's safe to re-run this script after a
 # reboot or after fixing whatever caused a failure.
 #
 # Usage:
-#   sudo bash run-phases.sh                # run 1-6, prompt for 7a/b/c
+#   sudo bash run-phases.sh                # run 1-6, then prompt for 7a/b/c and 7d
 #   sudo bash run-phases.sh --from 4       # start from phase 4, prompt for 7
-#   sudo bash run-phases.sh --from 7a      # run 7a, 7b, 7c (no prompt)
+#   sudo bash run-phases.sh --from 7a      # run 7a, 7b, 7c, 7d (no prompt)
 #   sudo bash run-phases.sh --only 4       # run only phase 4 (no prompt)
-#   sudo bash run-phases.sh --only 7b      # run only phase 7b (no prompt)
+#   sudo bash run-phases.sh --only 7d      # run only phase 7d (no prompt)
 #
 # After phase 1 reboots the server, the SSH session will die. After the
 # server comes back up, SSH back in and run this script again - it will
@@ -61,7 +63,7 @@ SECRETS_FILE="$REPO_ROOT/secrets.local"
 
 # Ordered list of phases. Each entry is "label:script-filename".
 # Ordered list of phases. Each entry is "label:script-filename".
-# The Plone phases (7a/7b/7c) are part of this array so that --from and
+# The Plone phases (7a/7b/7c/7d) are part of this array so that --from and
 # --only can target them, but the default run stops after CORE_LAST_LABEL
 # and prompts the user whether to continue.
 PHASES=(
@@ -78,6 +80,7 @@ PHASES=(
     "7a:phase7a-plone-prereqs.sh"
     "7b:phase7b-plone-buildout.sh"
     "7c:phase7c-plone-frontend.sh"
+    "7d:phase7d-plone-products.sh"
 )
 # After this label completes in the default run, the script prompts before
 # running anything past it. (Phases past this point are the Plone install,
@@ -87,7 +90,7 @@ CORE_LAST_LABEL="6"
 # Set of phase labels that belong to the Plone chain. Used to format the
 # prompt and to detect whether an explicit --from or --only is targeting
 # Plone (so we don't prompt redundantly).
-PLONE_LABELS=" 7a 7b 7c "
+PLONE_LABELS=" 7a 7b 7c 7d "
 
 # ============================================================================
 # Argument parsing
@@ -168,7 +171,7 @@ if [ -n "$ONLY_PHASE" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --only $ONLY_PHASE: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 post-dkim 5 5a 5b 5c 6 7a 7b 7c"
+        echo "Valid phase labels: 1 2 3 4 post-dkim 5 5a 5b 5c 6 7a 7b 7c 7d"
         exit 1
     fi
 elif [ -n "$START_FROM" ]; then
@@ -196,7 +199,7 @@ elif [ -n "$START_FROM" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --from $START_FROM: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 post-dkim 5 5a 5b 5c 6 7a 7b 7c"
+        echo "Valid phase labels: 1 2 3 4 post-dkim 5 5a 5b 5c 6 7a 7b 7c 7d"
         exit 1
     fi
     # Only prompt for Plone if we started in core (we'll have stopped before 7a)
@@ -306,7 +309,7 @@ for entry in "${TO_RUN[@]}"; do
 done
 
 # ============================================================================
-# Optional: continue into Plone (phases 7a/7b/7c)
+# Optional: continue into Plone (phases 7a/7b/7c), then add-on products (7d)
 # ============================================================================
 # We only offer Plone if the run that just completed was a core run (default
 # chain or --from inside core). --only and --from 7x skip this.
@@ -343,6 +346,9 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
         PLONE_TO_RUN=()
         for entry in "${PHASES[@]}"; do
             label="${entry%%:*}"
+            # 7d (add-on products) has its own separate prompt below, so it
+            # is deliberately excluded from this 7a/7b/7c auto-run list.
+            [ "$label" = "7d" ] && continue
             case "$PLONE_LABELS" in
                 *" $label "*) PLONE_TO_RUN+=("$entry") ;;
             esac
@@ -403,6 +409,92 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
             echo "${GREEN}  ✓ Phase $label completed.${RESET}"
             TO_RUN+=("$entry")   # so the summary banner includes 7a/7b/7c
         done
+
+        # --------------------------------------------------------------
+        # Optional: phase 7d - install the Plone add-on products.
+        # Offered as its own yes/no prompt, only after 7a/7b/7c succeeded.
+        # --------------------------------------------------------------
+        echo ""
+        echo "${BOLD}${CYAN}============================================================${RESET}"
+        echo "${BOLD}${CYAN}  PLONE ADD-ON PRODUCTS (phase 7d) IS OPTIONAL${RESET}"
+        echo "${BOLD}${CYAN}============================================================${RESET}"
+        echo ""
+        echo "  Phase 7d installs the Docent add-on products onto the Plone"
+        echo "  site you just built. It downloads the product list (products.cfg)"
+        echo "  from the docent-plone-addons GitHub repo and builds those add-ons"
+        echo "  in. Plone itself is not reinstalled. (~3-8 min.)"
+        echo ""
+        echo "  You can always run it later via:  sudo bash $0 --only 7d"
+        echo ""
+        while true; do
+            read -r -p "Install Plone products based on the buildout on GitHub? ${BOLD}(type yes or no)${RESET}: " ans7d
+            ans7d_norm=$(echo "$ans7d" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+            case "$ans7d_norm" in
+                yes) PRODUCTS_OPT_IN="yes"; break ;;
+                no)  PRODUCTS_OPT_IN="no";  break ;;
+                *)   echo "${RED}Please type 'yes' or 'no' (full word).${RESET}" ;;
+            esac
+        done
+
+        if [ "$PRODUCTS_OPT_IN" = "yes" ]; then
+            label="7d"
+            script="phase7d-plone-products.sh"
+            script_path="$SCRIPT_DIR/$script"
+            log_path="/tmp/phase${label}-run.log"
+
+            if [ ! -f "$script_path" ]; then
+                echo ""
+                echo "${RED}ERROR: Phase $label script not found at $script_path${RESET}"
+                exit 1
+            fi
+
+            echo ""
+            echo "${BOLD}${CYAN}============================================================${RESET}"
+            echo "${BOLD}${CYAN}  PHASE $label - $script${RESET}"
+            echo "${BOLD}${CYAN}  Log: $log_path${RESET}"
+            echo "${BOLD}${CYAN}============================================================${RESET}"
+            echo ""
+
+            set +e
+            bash "$script_path" 2>&1 | tee "$log_path"
+            rc=${PIPESTATUS[0]}
+            set -e
+
+            if [ "$rc" -ne 0 ]; then
+                echo ""
+                echo "${RED}============================================================${RESET}"
+                echo "${RED}  PHASE $label FAILED (exit code $rc)${RESET}"
+                echo "${RED}============================================================${RESET}"
+                echo ""
+                echo "  Log: $log_path"
+                echo ""
+                echo "  Investigate the log, fix the issue, then resume:"
+                echo "    sudo bash $0 --only $label"
+                exit "$rc"
+            fi
+
+            if grep -qE '^\s*\[FAIL\]' "$log_path"; then
+                echo ""
+                echo "${YELLOW}  WARNING: Phase $label had [FAIL] checks.${RESET}"
+                echo "${YELLOW}  Review the log before continuing.${RESET}"
+                echo ""
+                read -r -p "Continue anyway? Type ${BOLD}yes${RESET} to proceed: " keep_going
+                keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
+                if [ "$keep_going" != "yes" ]; then
+                    echo "Stopped at user request. Resume with:"
+                    echo "  sudo bash $0 --only $label"
+                    exit 1
+                fi
+            fi
+
+            echo ""
+            echo "${GREEN}  ✓ Phase $label completed.${RESET}"
+            TO_RUN+=("7d:phase7d-plone-products.sh")   # include 7d in the summary
+        else
+            echo ""
+            echo "${YELLOW}  Skipping phase 7d (Plone add-on products). Run later with:${RESET}"
+            echo "    sudo bash $0 --only 7d"
+        fi
     else
         echo ""
         echo "${YELLOW}  Skipping phase 7 (Plone). Run later with:${RESET}"
