@@ -1290,15 +1290,24 @@ fi
 # reads via bash TCP redirect proved unreliable when the kernel races
 # Postfix's banner output. Wait, no STARTTLS - just a plain banner read.
 # Use python for a reliable line read with timeout.
-SMTP_BANNER=$(timeout 5 python3 -c "
+# Retry the banner read - Postfix can be slow to emit the 220 greeting
+# right after a restart, and a single read races that. Try up to 5 times.
+SMTP_BANNER=""
+for attempt in 1 2 3 4 5; do
+    SMTP_BANNER=$(timeout 8 python3 -c "
 import socket
 s = socket.socket()
-s.settimeout(3)
+s.settimeout(6)
 s.connect(('127.0.0.1', 25))
 banner = s.recv(1024).decode('utf-8', errors='replace').split('\n')[0].strip()
 s.close()
 print(banner)
 " 2>/dev/null)
+    if echo "$SMTP_BANNER" | grep -qE "^220.*${MAIL_HOSTNAME}"; then
+        break
+    fi
+    sleep 2
+done
 if echo "$SMTP_BANNER" | grep -qE "^220.*${MAIL_HOSTNAME}"; then
     vp "SMTP banner correct: $SMTP_BANNER"
 else
