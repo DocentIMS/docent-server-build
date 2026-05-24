@@ -173,7 +173,7 @@ fi
 # ============================================================================
 # TOKEN
 # ============================================================================
-step "Hetzner Cloud API token"
+step "Hetzner API Token"
 
 # Read from hetzner.local if it exists (set on prior run).
 if [ -f "$HETZNER_FILE" ]; then
@@ -185,7 +185,7 @@ if [ -z "${HETZNER_CLOUD_TOKEN:-}" ]; then
     echo "Get a token from: Hetzner Console -> Security -> API tokens"
     echo "Permission: Read & Write"
     echo ""
-    HETZNER_CLOUD_TOKEN=$(ask_secret "Cloud API token")
+    HETZNER_CLOUD_TOKEN=$(ask_secret "Hetzner API Token")
     if [ -z "$HETZNER_CLOUD_TOKEN" ]; then
         log_fail "No token provided"
         exit 1
@@ -240,29 +240,44 @@ step "Server configuration"
 SERVER_NAME="${DOMAIN_STEM}-docent"
 echo "Server name (in Hetzner Console): ${SERVER_NAME}"
 
-echo ""
-echo "Available locations:"
-echo "  nbg1 - Nuremberg, Germany"
-echo "  fsn1 - Falkenstein, Germany"
-echo "  hel1 - Helsinki, Finland"
-echo "  ash  - Ashburn, VA (USA)"
-echo "  hil  - Hillsboro, OR (USA)"
-echo "  sin  - Singapore"
-echo ""
-SERVER_LOCATION=$(ask "Location" "hil")
-
-echo ""
-echo "Server types available in ${SERVER_LOCATION}:"
-if hcloud_print_server_types "$SERVER_LOCATION"; then
+while true; do
     echo ""
-    echo "  (4 GB RAM is the minimum for this stack; 8 GB recommended.)"
-else
-    echo "  (could not fetch live list - enter a type name manually)"
-fi
-echo ""
-SERVER_TYPE=$(ask_required "Server type")
+    echo "Available locations:"
+    echo "  nbg1 - Nuremberg, Germany"
+    echo "  fsn1 - Falkenstein, Germany"
+    echo "  hel1 - Helsinki, Finland"
+    echo "  ash  - Ashburn, VA (USA)"
+    echo "  hil  - Hillsboro, OR (USA)"
+    echo "  sin  - Singapore"
+    echo ""
+    SERVER_LOCATION=$(ask "Location" "hil")
+    if ask_yes_no "Use location '${SERVER_LOCATION}'?"; then
+        break
+    fi
+done
 
-SERVER_IMAGE=$(ask "OS image" "ubuntu-26.04")
+while true; do
+    echo ""
+    echo "Server types available in ${SERVER_LOCATION}:"
+    if hcloud_print_server_types "$SERVER_LOCATION"; then
+        echo ""
+        echo "  (4 GB RAM is the minimum for this stack; 8 GB recommended.)"
+    else
+        echo "  (could not fetch live list - enter a type name manually)"
+    fi
+    echo ""
+    SERVER_TYPE=$(ask_required "Server type")
+    if ask_yes_no "Use server type '${SERVER_TYPE}'?"; then
+        break
+    fi
+done
+
+while true; do
+    SERVER_IMAGE=$(ask "OS image" "ubuntu-26.04")
+    if ask_yes_no "Use OS image '${SERVER_IMAGE}'?"; then
+        break
+    fi
+done
 
 # SSH key
 step "SSH key"
@@ -275,20 +290,24 @@ for candidate in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
     fi
 done
 
-if [ -n "$DEFAULT_PUBKEY" ]; then
-    echo "Found existing public key: $DEFAULT_PUBKEY"
-    SSH_PUBKEY_PATH=$(ask "Public key to install on the server" "$DEFAULT_PUBKEY")
-else
-    echo "No SSH key found in ~/.ssh/. You'll need one to log into the server."
-    echo "Generate one with:  ssh-keygen -t ed25519 -C \"docent-build\""
-    echo ""
-    SSH_PUBKEY_PATH=$(ask_required "Path to public key file")
-fi
-
-if [ ! -f "$SSH_PUBKEY_PATH" ]; then
-    log_fail "Public key not found: $SSH_PUBKEY_PATH"
-    exit 1
-fi
+while true; do
+    if [ -n "$DEFAULT_PUBKEY" ]; then
+        echo "Found existing public key: $DEFAULT_PUBKEY"
+        SSH_PUBKEY_PATH=$(ask "Public key to install on the server" "$DEFAULT_PUBKEY")
+    else
+        echo "No SSH key found in ~/.ssh/. You'll need one to log into the server."
+        echo "Generate one with:  ssh-keygen -t ed25519 -C \"docent-build\""
+        echo ""
+        SSH_PUBKEY_PATH=$(ask_required "Path to public key file")
+    fi
+    if [ ! -f "$SSH_PUBKEY_PATH" ]; then
+        echo "  Public key not found: $SSH_PUBKEY_PATH - try again."
+        continue
+    fi
+    if ask_yes_no "Use public key '${SSH_PUBKEY_PATH}'?"; then
+        break
+    fi
+done
 
 SSH_PUBKEY_CONTENT=$(cat "$SSH_PUBKEY_PATH")
 # Fingerprint matches what Hetzner stores: MD5 of the key, colon-separated.
