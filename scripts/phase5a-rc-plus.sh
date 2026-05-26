@@ -172,8 +172,8 @@ step "Step 2: Extracting tarballs to staging area"
 # Each tarball gets extracted into its own subdirectory of the staging
 # area so we can find things deterministically.
 
-STAGING=$(mktemp -d /tmp/rcplus-staging.XXXXXX)
-trap "rm -rf $STAGING" EXIT
+STAGING=$(mktemp -d /tmp/rcplus-staging.XXXXXX) || { log_fail "mktemp failed for staging dir"; exit 1; }
+trap 'rm -rf "$STAGING"' EXIT
 
 for tb in "${EXPECTED_TARBALLS[@]}"; do
     # Strip .tar.gz and the roundcube_plus_ prefix for the staging dir name

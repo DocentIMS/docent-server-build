@@ -215,8 +215,12 @@ if [ -z "$MISSING" ]; then
 else
     wait_for_dpkg_lock
     apt-get update -qq
-    apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null
-    log_done "Installed:$MISSING"
+    if apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null; then
+        log_done "Installed:$MISSING"
+    else
+        log_fail "apt-get install failed for:$MISSING - see output above"
+        exit 1
+    fi
 fi
 
 # ============================================================================
@@ -276,7 +280,7 @@ else
     # When phase0 was used, MAIL_DB_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${MAIL_DB_PW:-}" ]; then
-        MAIL_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        MAIL_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
         log_warn "No MAIL_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
@@ -341,7 +345,7 @@ else
     # When phase0 was used, TEST_MAILBOX_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${TEST_MAILBOX_PW:-}" ]; then
-        TEST_MAILBOX_PW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 22)
+        TEST_MAILBOX_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 22)
         log_warn "No TEST_MAILBOX_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     HASHED_PW=$(doveadm pw -s SHA512-CRYPT -p "$TEST_MAILBOX_PW" 2>/dev/null)
@@ -371,7 +375,7 @@ if [ -z "$MAIL_DB_PW" ]; then
     # Use the value from secrets.local if it's there (CREDENTIALS.txt must
     # stay canonical). Otherwise generate.
     if [ -z "${MAIL_DB_PW:-}" ]; then
-        MAIL_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        MAIL_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
         log_warn "No MAIL_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \

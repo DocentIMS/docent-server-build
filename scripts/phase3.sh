@@ -88,7 +88,10 @@ if dpkg -l mariadb-server 2>/dev/null | grep -q "^ii"; then
 else
     wait_for_dpkg_lock
     apt-get update -qq
-    apt-get install -y -qq -o Dpkg::Use-Pty=0 mariadb-server mariadb-client < /dev/null
+    if ! apt-get install -y -qq -o Dpkg::Use-Pty=0 mariadb-server mariadb-client < /dev/null; then
+        log_fail "apt-get install mariadb failed - see output above"
+        exit 1
+    fi
     log_done "MariaDB installed"
 fi
 
@@ -124,7 +127,7 @@ else
     # When phase0 was used, ROOT_DB_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${ROOT_DB_PW:-}" ]; then
-        ROOT_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        ROOT_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
         log_warn "No ROOT_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     else
         log_done "Using ROOT_DB_PW from secrets.local (matches CREDENTIALS.txt)"

@@ -342,7 +342,7 @@ else
     useradd -m -s /bin/bash -G sudo "$ADMIN_USER"
     # Use ADMIN_PW from secrets.local if available, otherwise generate
     if [ -z "${ADMIN_PW:-}" ]; then
-        ADMIN_PW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 22)
+        ADMIN_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 22)
         log_warn "No ADMIN_PW in secrets.local - generated a random password (NOT in CREDENTIALS.txt)"
     fi
     echo "$ADMIN_USER:$ADMIN_PW" | chpasswd
@@ -363,7 +363,7 @@ else
         SHARED_ADMIN_PW="$STAFF_PW"
     fi
     if [ -z "${SHARED_ADMIN_PW:-}" ]; then
-        SHARED_ADMIN_PW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 22)
+        SHARED_ADMIN_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 22)
         log_warn "No SHARED_ADMIN_PW in secrets.local - generated a random password (NOT in CREDENTIALS.txt)"
     fi
     echo "$SHARED_ADMIN_USER:$SHARED_ADMIN_PW" | chpasswd
@@ -390,7 +390,7 @@ else
     useradd -m -s /bin/bash "$ESPEN_USER"
     # Use ESPEN_PW from secrets.local if available, otherwise generate
     if [ -z "${ESPEN_PW:-}" ]; then
-        ESPEN_PW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 22)
+        ESPEN_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 22)
         log_warn "No ESPEN_PW in secrets.local - generated a random password (NOT in CREDENTIALS.txt)"
     fi
     echo "$ESPEN_USER:$ESPEN_PW" | chpasswd
