@@ -311,12 +311,17 @@ else
 fi
 
 # Each add-on should be materialized in the instance: either a released egg
-# under eggs/, or a mr.developer source checkout under src/ (with a link in
-# develop-eggs/). This mirrors how phase 7b verifies the Plone egg.
+# somewhere under eggs/ (buildout may nest it in a versioned sub-cache such
+# as eggs/v5/, so search recursively, not just the top level), or a
+# mr.developer source checkout under src/ (with a link in develop-eggs/).
+# This mirrors how phase 7b verifies the Plone egg.
 if [ "${#PRODUCTS[@]}" -gt 0 ]; then
     for prod in "${PRODUCTS[@]}"; do
-        if ls -d "$PLONE_INSTANCE_DIR"/eggs/"${prod}"*        >/dev/null 2>&1 \
-           || ls -d "$PLONE_INSTANCE_DIR"/develop-eggs/"${prod}"* >/dev/null 2>&1 \
+        # '.' -> '?' so the glob also matches the underscore form some
+        # packaging tools use (collective.x vs collective_x).
+        prod_glob="${prod//./?}"
+        if   [ -n "$(find "$PLONE_INSTANCE_DIR/eggs"          -maxdepth 3 -iname "${prod_glob}*" -print -quit 2>/dev/null)" ] \
+           || [ -n "$(find "$PLONE_INSTANCE_DIR/develop-eggs" -maxdepth 3 -iname "${prod_glob}*" -print -quit 2>/dev/null)" ] \
            || [ -d "$PLONE_INSTANCE_DIR/src/$prod" ]; then
             vp "Add-on built into instance: $prod"
         else
