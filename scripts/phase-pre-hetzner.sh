@@ -259,17 +259,36 @@ step "Server configuration"
 SERVER_NAME="${DOMAIN_STEM}-docent"
 echo "Server name (in Hetzner Console): ${SERVER_NAME}"
 
+# The default 'hil' (Hillsboro, OR) is the normal choice, so offer it as a
+# simple yes/no. Only ask for a data center code if the answer is no - and
+# validate that code, so a stray 'yes' can never end up as the location.
+VALID_LOCATIONS="nbg1 fsn1 hel1 ash hil sin"
 while true; do
     echo ""
-    echo "Available locations:"
-    echo "  nbg1 - Nuremberg, Germany"
-    echo "  fsn1 - Falkenstein, Germany"
-    echo "  hel1 - Helsinki, Finland"
-    echo "  ash  - Ashburn, VA (USA)"
-    echo "  hil  - Hillsboro, OR (USA)"
-    echo "  sin  - Singapore"
+    echo "Server location - the default is '${BOLD}hil${RESET}' (Hillsboro, OR, USA)."
+    if ask_yes_no "Use the default location 'hil'?"; then
+        SERVER_LOCATION="hil"
+        break
+    fi
+
+    # Answered no - show the data center codes and ask for one.
     echo ""
-    SERVER_LOCATION=$(ask "Location" "hil")
+    echo "  Data center codes:"
+    echo "    nbg1 - Nuremberg, Germany"
+    echo "    fsn1 - Falkenstein, Germany"
+    echo "    hel1 - Helsinki, Finland"
+    echo "    ash  - Ashburn, VA (USA)"
+    echo "    hil  - Hillsboro, OR (USA)"
+    echo "    sin  - Singapore"
+    echo ""
+    SERVER_LOCATION=$(ask_required "Enter data center code")
+    SERVER_LOCATION=$(echo "$SERVER_LOCATION" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+
+    if ! echo " $VALID_LOCATIONS " | grep -q " ${SERVER_LOCATION} "; then
+        echo "  '${SERVER_LOCATION}' is not a valid data center code - pick one from the list above."
+        continue
+    fi
+    echo ""
     if ask_yes_no "Use location '${SERVER_LOCATION}'?"; then
         break
     fi
