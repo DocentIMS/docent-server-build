@@ -157,24 +157,36 @@ if [ "${#missing[@]}" -gt 0 ]; then
 fi
 log_done "curl, jq, openssl present"
 
-# Check that tenant.local doesn't already have SERVER_IP we'd clobber.
-# This script writes SERVER_IP to tenant.local at the end. If tenant.local
-# already exists with a SERVER_IP, the user has probably run phase0 already
-# for some other server. Warn loudly.
-if [ -f "$TENANT_FILE" ]; then
-    existing_ip=$(grep -E '^SERVER_IP=' "$TENANT_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)
-    if [ -n "$existing_ip" ] && [ "$existing_ip" != "" ]; then
-        log_warn "tenant.local already has SERVER_IP=$existing_ip"
-        echo ""
-        echo "  This usually means you've already provisioned a server for this"
-        echo "  build directory. Running this script again will create a NEW server"
-        echo "  and OVERWRITE tenant.local's SERVER_IP."
-        echo ""
-        if ! ask_yes_no "Continue and provision a new server anyway?" "n"; then
-            echo "Aborted."
-            exit 1
-        fi
+# Each server creation must start from a clean slate. tenant.local and
+# secrets.local are PER-TENANT files - if a previous build left them in the
+# repo, their stale domain / IP / secrets must not leak into this new build.
+# Any that exist are archived (timestamped, into previous-tenants/) and this
+# run continues clean. hetzner.local / org-secrets.local are account-wide,
+# not per-tenant, so they are intentionally left in place.
+PRE_ARCHIVE_DIR="$REPO_ROOT/previous-tenants"
+PRE_ARCHIVE_STAMP="$(date '+%Y%m%d-%H%M%S')"
+PRE_ARCHIVED=()
+for stale in tenant.local secrets.local; do
+    if [ -f "$REPO_ROOT/$stale" ]; then
+        mkdir -p "$PRE_ARCHIVE_DIR"
+        # Keep the archive folder out of git regardless of the main .gitignore.
+        [ -f "$PRE_ARCHIVE_DIR/.gitignore" ] || echo "*" > "$PRE_ARCHIVE_DIR/.gitignore"
+        mv "$REPO_ROOT/$stale" "$PRE_ARCHIVE_DIR/${stale}.${PRE_ARCHIVE_STAMP}"
+        PRE_ARCHIVED+=("$stale")
     fi
+done
+if [ "${#PRE_ARCHIVED[@]}" -gt 0 ]; then
+    echo ""
+    echo "  Found leftover per-tenant file(s) from a previous build and moved"
+    echo "  them aside so this server creation starts clean:"
+    for f in "${PRE_ARCHIVED[@]}"; do
+        echo "    $f  ->  previous-tenants/${f}.${PRE_ARCHIVE_STAMP}"
+    done
+    echo ""
+    echo "  Nothing was lost - the copies are kept in previous-tenants/ in case"
+    echo "  you ever need them."
+    echo ""
+    log_done "Cleared leftover per-tenant file(s) - starting with a clean slate"
 fi
 
 # ============================================================================
