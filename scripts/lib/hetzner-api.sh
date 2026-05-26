@@ -232,7 +232,8 @@ hcloud_rrset_upsert() {
 # ============================================================================
 # hcloud_print_server_types - List server types actually available at a
 # given location, with specs. Used to build a live menu instead of a
-# hardcoded one. Prints "  name  N vCPU / N GB RAM / N GB disk" per line.
+# hardcoded one. Prints "  name  N vCPU / N GB RAM / N GB disk  ~EURn/mo"
+# per line (the monthly price is for the given location).
 # Returns 1 (and prints nothing) if the API can't be reached.
 hcloud_print_server_types() {
     local location="$1"
@@ -244,8 +245,13 @@ hcloud_print_server_types() {
     st_resp=$(hcloud_get "/server_types")
     echo "$st_resp" | jq -e '.server_types' >/dev/null 2>&1 || return 1
     for id in $ids; do
-        echo "$st_resp" | jq -r --argjson id "$id" \
-            '.server_types[]? | select(.id == $id and .deprecation == null) |
-             "  \(.name)  \(.cores) vCPU / \(.memory) GB RAM / \(.disk) GB disk"' 2>/dev/null
+        echo "$st_resp" | jq -r --argjson id "$id" --arg loc "$location" \
+            '.server_types[]? | select(.id == $id and .deprecation == null) | . as $st
+             | ([ $st.prices[]? | select(.location == $loc) | .price_monthly.gross ] | .[0] // "") as $g
+             | (if $g == "" then ""
+                else ($g | split(".")) as $p
+                     | "  ~EUR " + $p[0] + "." + (($p[1] // "") + "00")[0:2] + "/mo"
+                end) as $price
+             | "  \($st.name)  \($st.cores) vCPU / \($st.memory) GB RAM / \($st.disk) GB disk\($price)"' 2>/dev/null
     done | sort
 }
