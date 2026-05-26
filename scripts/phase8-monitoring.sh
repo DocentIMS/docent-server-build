@@ -370,3 +370,19 @@ echo "Next steps:"
 echo "  1. Verify in UR dashboard: https://uptimerobot.com/dashboard"
 echo "  2. Wait ~5 min for first check, confirm all monitors go green"
 echo "  3. To retire this tenant later: ./retire-tenant.sh $DOMAIN"
+
+# ----------------------------------------------------------------------------
+# Final completion box.
+# Phase 8 is the last phase, so this marks the end of the entire Docent
+# product install for this tenant.
+# ----------------------------------------------------------------------------
+echo ""
+COMPLETION_BORDER="$(printf '+%58s+' '' | tr ' ' '-')"
+echo "$COMPLETION_BORDER"
+printf '|%-58s|\n' ""
+printf '|%-58s|\n' "   This ends the complete installation"
+printf '|%-58s|\n' "   of the Docent Product."
+printf '|%-58s|\n' "   Exit out of the session."
+printf '|%-58s|\n' ""
+echo "$COMPLETION_BORDER"
+echo ""
