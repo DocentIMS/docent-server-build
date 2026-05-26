@@ -176,17 +176,11 @@ for stale in tenant.local secrets.local; do
     fi
 done
 if [ "${#PRE_ARCHIVED[@]}" -gt 0 ]; then
-    echo ""
-    echo "  Found leftover per-tenant file(s) from a previous build and moved"
-    echo "  them aside so this server creation starts clean:"
-    for f in "${PRE_ARCHIVED[@]}"; do
-        echo "    $f  ->  previous-tenants/${f}.${PRE_ARCHIVE_STAMP}"
-    done
-    echo ""
-    echo "  Nothing was lost - the copies are kept in previous-tenants/ in case"
-    echo "  you ever need them."
-    echo ""
-    log_done "Cleared leftover per-tenant file(s) - starting with a clean slate"
+    # A previous build left per-tenant file(s) in the repo; they were just
+    # moved (timestamped) into previous-tenants/ so this run starts clean.
+    # Deliberately a single line of output - nothing is lost, the copies
+    # are kept in previous-tenants/ if ever needed.
+    log_done "Cleared ${#PRE_ARCHIVED[@]} leftover per-tenant file(s) (archived to previous-tenants/)"
 fi
 
 # ============================================================================
@@ -321,22 +315,31 @@ for candidate in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub; do
     fi
 done
 
-while true; do
-    if [ -n "$DEFAULT_PUBKEY" ]; then
-        echo "Found existing public key: $DEFAULT_PUBKEY"
-        SSH_PUBKEY_PATH=$(ask "Public key to install on the server" "$DEFAULT_PUBKEY")
-    else
-        echo "No SSH key found in ~/.ssh/. You'll need one to log into the server."
-        echo "Generate one with:  ssh-keygen -t ed25519 -C \"docent-build\""
-        echo ""
-        SSH_PUBKEY_PATH=$(ask_required "Path to public key file")
+SSH_PUBKEY_PATH=""
+
+# If a key was found, offer it directly with a simple yes/no. The user does
+# not have to type or confirm a file path they don't care about.
+if [ -n "$DEFAULT_PUBKEY" ]; then
+    echo "Found existing public key: $DEFAULT_PUBKEY"
+    if ask_yes_no "Use this public key?"; then
+        SSH_PUBKEY_PATH="$DEFAULT_PUBKEY"
     fi
-    if [ ! -f "$SSH_PUBKEY_PATH" ]; then
-        echo "  Public key not found: $SSH_PUBKEY_PATH - try again."
+fi
+
+# Runs only if no key was found, or the user declined the one we found.
+# This loop repeats just the path question - it never re-offers a declined key.
+while [ -z "$SSH_PUBKEY_PATH" ]; do
+    echo ""
+    echo "Enter the full path to the public key (.pub) file to install on the server."
+    echo "(No key yet? Generate one with:  ssh-keygen -t ed25519 -C \"docent-build\")"
+    echo ""
+    keypath=$(ask_required "Path to public key file")
+    if [ ! -f "$keypath" ]; then
+        echo "  Public key not found: $keypath - try again."
         continue
     fi
-    if ask_yes_no "Use public key '${SSH_PUBKEY_PATH}'?"; then
-        break
+    if ask_yes_no "Use public key '${keypath}'?"; then
+        SSH_PUBKEY_PATH="$keypath"
     fi
 done
 
@@ -727,6 +730,51 @@ chmod 600 "$HETZNER_FILE"
 log_done "Wrote $HETZNER_FILE (mode 600)"
 
 # ============================================================================
+# WAIT FOR THE NEW SERVER TO ACCEPT SSH, THEN RECORD ITS HOST KEY
+# ============================================================================
+# A freshly-created server needs a short while to finish booting before its
+# SSH service answers. Until it does, the scp/ssh handoff printed below would
+# fail with a raw "Connection closed". We poll here - with a friendly message
+# so the user knows to simply wait - and, once the server answers, record its
+# host key in known_hosts. Pre-registering the key means the handoff ssh/scp
+# below will NOT trigger the OpenSSH "Are you sure you want to continue
+# connecting?" prompt.
+#
+# (For a reused, already-running server this just succeeds on the first try.)
+step "Step 6: Waiting for the new server to accept SSH"
+
+echo "  A brand-new server takes 1-2 minutes to finish booting before it"
+echo "  will answer SSH. Please wait - no action needed..."
+
+SSH_READY="no"
+KNOWN_HOSTS="$HOME/.ssh/known_hosts"
+mkdir -p "$HOME/.ssh"
+printf "  Waiting"
+for attempt in $(seq 1 36); do
+    # ssh-keyscan does double duty here: it confirms SSH is answering AND
+    # returns the host key for us to store.
+    SCANNED=$(ssh-keyscan -T 5 "$SERVER_IP" 2>/dev/null)
+    if [ -n "$SCANNED" ]; then
+        # Drop any prior entry for this IP, then add the freshly-scanned key.
+        ssh-keygen -R "$SERVER_IP" -f "$KNOWN_HOSTS" >/dev/null 2>&1 || true
+        echo "$SCANNED" >> "$KNOWN_HOSTS"
+        SSH_READY="yes"
+        break
+    fi
+    printf "."
+    sleep 5
+done
+echo ""
+
+if [ "$SSH_READY" = "yes" ]; then
+    log_done "New server is accepting SSH; host key recorded - handoff will not prompt"
+else
+    log_warn "Server has not answered SSH yet after waiting a few minutes"
+    echo "  It may simply need a little longer. If the scp/ssh steps below"
+    echo "  fail with 'Connection closed', wait a minute and run them again."
+fi
+
+# ============================================================================
 # REPORT
 # ============================================================================
 echo ""
@@ -772,8 +820,10 @@ cat <<EOF
 
 ${BOLD}Next:${RESET}
   1. Update nameservers at your registrar (see above)
-  2. Copy bootstrap.sh and the three handoff files to the new server
-     (run from THIS host, in the repo root):
+  2. Copy bootstrap.sh and the three handoff files to the new server.
+     Copy-paste BOTH lines below - the first moves you to the repo root
+     so the scp works no matter where you currently are:
+       cd ${REPO_ROOT}
        scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local root@${SERVER_IP}:/root/
   3. SSH to the new server:
        ssh root@${SERVER_IP}
