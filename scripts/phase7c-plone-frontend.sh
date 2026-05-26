@@ -34,6 +34,22 @@
 set -u
 
 # ============================================================================
+# LOAD SHARED HELPERS + TENANT CONFIG
+# ============================================================================
+# lib/common.sh provides the logging helpers (log_done, log_fail, log_skip,
+# log_warn, step), the ANSI colours, AND sources tenant.local / secrets.local
+# (which is where DOMAIN, NOTIFICATION_EMAIL, PLONE_ADMIN_PW, etc. come from).
+# It must be sourced after SCRIPT_DIR and REPO_ROOT are defined.
+#
+# This block was missing: commit 740f0a7 ("source lib/common.sh from Plone
+# scripts") removed 7c's previous loader but never added the replacement, so
+# phase 7c had no way to load its configuration or helpers. Restored here.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+
+# ============================================================================
 # CONFIGURATION
 # ============================================================================
 PLONE_USER="plone"
