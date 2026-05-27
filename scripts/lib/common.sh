@@ -142,6 +142,17 @@ step() {
 }
 
 # ============================================================================
+# SECRET GENERATION
+# ============================================================================
+
+# gen_pw <length> - emit an alphanumeric password of exactly <length> chars.
+# Requests 3x the bytes so that, after dropping non-alphanumerics from the
+# base64 output, at least <length> characters remain for head -c to emit.
+gen_pw() {
+    openssl rand -base64 "$(( $1 * 3 ))" | tr -dc 'A-Za-z0-9' | head -c "$1"
+}
+
+# ============================================================================
 # VERIFICATION HELPERS
 # ============================================================================
 

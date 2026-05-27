@@ -175,7 +175,7 @@ else
     # When phase0 was used, WP_DB_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${WP_DB_PW:-}" ]; then
-        WP_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+        WP_DB_PW=$(gen_pw 28)
         log_warn "No WP_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
@@ -249,7 +249,7 @@ else
         # WP_DB_PW if available (CREDENTIALS.txt must stay canonical).
         # Otherwise generate.
         if [ -z "${WP_DB_PW:-}" ]; then
-            WP_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+            WP_DB_PW=$(gen_pw 28)
             log_warn "No WP_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
         fi
         mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
