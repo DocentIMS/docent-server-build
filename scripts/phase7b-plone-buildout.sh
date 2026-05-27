@@ -160,7 +160,7 @@ if [ -n "${PLONE_ADMIN_PW:-}" ]; then
     log_skip "PLONE_ADMIN_PW already set from secrets.local"
     PLONE_ADMIN_PW_SOURCE="secrets.local"
 else
-    PLONE_ADMIN_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
+    PLONE_ADMIN_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 24)
     log_done "Generated PLONE_ADMIN_PW (24 chars)"
     PLONE_ADMIN_PW_SOURCE="generated"
 fi
@@ -184,6 +184,7 @@ else
         echo "PLONE_INSTANCE_DIR=$PLONE_INSTANCE_DIR"
         echo "PLONE_URL_LOCAL=http://127.0.0.1:8080/"
     } >> "$CREDENTIALS_FILE"
+    chmod 600 "$CREDENTIALS_FILE"
     log_done "Recorded Plone admin credentials to $CREDENTIALS_FILE"
 fi
 

@@ -98,7 +98,10 @@ if dpkg -l apache2 2>/dev/null | grep -q "^ii"; then
 else
     wait_for_dpkg_lock
     apt-get update -qq
-    apt-get install -y -qq -o Dpkg::Use-Pty=0 apache2 < /dev/null
+    if ! apt-get install -y -qq -o Dpkg::Use-Pty=0 apache2 < /dev/null; then
+        log_fail "apt-get install apache2 failed - see output above"
+        exit 1
+    fi
     log_done "Apache installed"
 fi
 
@@ -127,7 +130,10 @@ if dpkg -l certbot 2>/dev/null | grep -q "^ii" && dpkg -l python3-certbot-apache
     log_skip "certbot and python3-certbot-apache already installed"
 else
     wait_for_dpkg_lock
-    apt-get install -y -qq -o Dpkg::Use-Pty=0 certbot python3-certbot-apache < /dev/null
+    if ! apt-get install -y -qq -o Dpkg::Use-Pty=0 certbot python3-certbot-apache < /dev/null; then
+        log_fail "apt-get install certbot failed - see output above"
+        exit 1
+    fi
     log_done "certbot + Apache plugin installed"
 fi
 
@@ -362,6 +368,7 @@ else
         log_done "Certificate issued for $DOMAIN${ALT_DOMAINS:+ + ${ALT_DOMAINS[*]}}"
     else
         log_fail "certbot certonly failed - see output above. Check DNS, firewall, and try again."
+        exit 1
     fi
 fi
 

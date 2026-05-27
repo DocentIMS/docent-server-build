@@ -177,7 +177,10 @@ done
 step "Step 4: Verify GitHub authentication"
 
 # Pre-accept GitHub's host key so the user doesn't get an interactive prompt.
-ssh-keyscan -t ed25519 github.com >> /root/.ssh/known_hosts 2>/dev/null || true
+# Only add it if it isn't already known, so re-runs don't pile up duplicates.
+if ! ssh-keygen -F github.com -f /root/.ssh/known_hosts >/dev/null 2>&1; then
+    ssh-keyscan -t ed25519 github.com >> /root/.ssh/known_hosts 2>/dev/null || true
+fi
 
 attempt=1
 max_attempts=3

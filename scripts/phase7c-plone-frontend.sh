@@ -411,11 +411,9 @@ log_done "Reloaded apache2 with new vhost"
 step "Step 7: Verifying ufw posture (port 8080 must NOT be open externally)"
 
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
-    if ufw status | grep -E "^\s*8080" | grep -vq "DENY\|REJECT" 2>/dev/null; then
-        if ufw status | grep -qE "^\s*8080.*ALLOW"; then
-            log_warn "ufw appears to ALLOW port 8080 externally. Plone should only be reached via Apache."
-            log_warn "Consider: sudo ufw delete allow 8080  (after verifying Apache works)"
-        fi
+    if ufw status | grep -qE "^[[:space:]]*8080.*ALLOW"; then
+        log_warn "ufw appears to ALLOW port 8080 externally. Plone should only be reached via Apache."
+        log_warn "Consider: sudo ufw delete allow 8080  (after verifying Apache works)"
     fi
     log_done "ufw is active. Port 8080 reachability checked."
 else

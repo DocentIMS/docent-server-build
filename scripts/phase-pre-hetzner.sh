@@ -443,7 +443,7 @@ if [ -n "$EXISTING_SERVER_ID" ]; then
     echo "  Only continue if this is a server you intend to (re)build - for"
     echo "  example a leftover from an earlier, aborted run of this script."
     echo ""
-    if ! ask_yes_no "Reuse and build on this existing server?" "n"; then
+    if ! ask_yes_no "Reuse and build on this existing server?"; then
         echo ""
         echo "${YELLOW}  Stopped. No server was created and nothing was changed.${RESET}"
         echo "  For a brand-new server, rename or delete the existing"
@@ -570,7 +570,7 @@ if [ "$ZONE_PREEXISTING" = "yes" ]; then
         echo "  OVERWRITTEN to point at the new server ($SERVER_IP).${RESET}"
         echo "  If $DOMAIN is a live site, this repoints its web and/or mail traffic."
         echo ""
-        if ! ask_yes_no "Overwrite these DNS records?" "n"; then
+        if ! ask_yes_no "Overwrite these DNS records?"; then
             echo ""
             echo "${YELLOW}  Stopped before changing DNS. The server has already been"
             echo "  created, but the DNS records were left untouched.${RESET}"

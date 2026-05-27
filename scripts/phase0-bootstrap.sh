@@ -78,7 +78,9 @@ fi
 # ============================================================================
 
 gen_pw() {
-    openssl rand -base64 "$1" | tr -d '/+=' | head -c "$1"
+    # Feed extra entropy so that, after dropping non-alphanumerics, we still
+    # have at least "$1" characters left for head -c to emit.
+    openssl rand -base64 $(( $1 * 3 )) | tr -dc 'A-Za-z0-9' | head -c "$1"
 }
 
 ask() {

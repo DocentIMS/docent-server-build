@@ -126,8 +126,11 @@ else
         exit 1
     fi
     # Pin to a stable tagged release with a shallow clone (--depth 1).
-    git clone --quiet --depth 1 --branch "$PLUGIN_VERSION" \
-        "$PLUGIN_REPO" "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
+    if ! git clone --quiet --depth 1 --branch "$PLUGIN_VERSION" \
+        "$PLUGIN_REPO" "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"; then
+        log_fail "git clone of $PLUGIN_NAME ($PLUGIN_VERSION) failed - see output above"
+        exit 1
+    fi
     chown -R root:www-data "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
     chmod -R g+r "$ROUNDCUBE_PLUGINS_SRC/$PLUGIN_NAME"
     log_done "Cloned $PLUGIN_NAME plugin at tag $PLUGIN_VERSION"
@@ -217,7 +220,12 @@ else
     sed -i "/\\\$config\\['plugins'\\]/,/^\\];/{ /^\\];/i\\
     '$PLUGIN_NAME',
 }" "$ROUNDCUBE_CONFIG"
-    log_done "Added '$PLUGIN_NAME' to \$config['plugins']"
+    if grep -q "'$PLUGIN_NAME'" "$ROUNDCUBE_CONFIG"; then
+        log_done "Added '$PLUGIN_NAME' to \$config['plugins']"
+    else
+        log_fail "Failed to insert '$PLUGIN_NAME' into \$config['plugins'] (unexpected config format)"
+        exit 1
+    fi
 fi
 
 # ============================================================================

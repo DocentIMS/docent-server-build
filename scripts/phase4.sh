@@ -55,7 +55,6 @@ REPORT=()
 # set by sourcing secrets.local above. Setting them to "" would wipe out
 # the canonical values from CREDENTIALS.txt and force the script to
 # generate new ones, breaking the canonical-credentials design.
-DKIM_TXT_VALUE=""
 
 
 
@@ -215,8 +214,12 @@ if [ -z "$MISSING" ]; then
 else
     wait_for_dpkg_lock
     apt-get update -qq
-    apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null
-    log_done "Installed:$MISSING"
+    if apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null; then
+        log_done "Installed:$MISSING"
+    else
+        log_fail "apt-get install failed for:$MISSING - see output above"
+        exit 1
+    fi
 fi
 
 # ============================================================================
@@ -268,15 +271,22 @@ USER_EXISTS=$(mysql --defaults-file="$ROOT_DEFAULTS_FILE" -Nse \
     "SELECT COUNT(*) FROM mysql.user WHERE User='$MAIL_DB_USER' AND Host='localhost';" 2>/dev/null || echo "0")
 if [ "$USER_EXISTS" -gt 0 ]; then
     log_skip "DB user $MAIL_DB_USER exists"
-    if [ -f /etc/postfix/mysql-virtual-mailbox-domains.cf ]; then
-        MAIL_DB_PW=$(grep "^password" /etc/postfix/mysql-virtual-mailbox-domains.cf | cut -d= -f2- | tr -d ' ')
-    fi
+    # Recover the password from an existing Postfix lookup config so we don't
+    # rotate it (which would desync CREDENTIALS.txt). Any of the three .cf
+    # files carries it; use the first one that yields a value.
+    for _cf in /etc/postfix/mysql-virtual-mailbox-domains.cf \
+               /etc/postfix/mysql-virtual-mailbox-maps.cf \
+               /etc/postfix/mysql-virtual-alias-maps.cf; do
+        [ -f "$_cf" ] || continue
+        MAIL_DB_PW=$(grep "^password" "$_cf" | cut -d= -f2- | tr -d ' ')
+        [ -n "$MAIL_DB_PW" ] && break
+    done
 else
     # Use MAIL_DB_PW from secrets.local if available, otherwise generate.
     # When phase0 was used, MAIL_DB_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${MAIL_DB_PW:-}" ]; then
-        MAIL_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        MAIL_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
         log_warn "No MAIL_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
@@ -341,7 +351,7 @@ else
     # When phase0 was used, TEST_MAILBOX_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${TEST_MAILBOX_PW:-}" ]; then
-        TEST_MAILBOX_PW=$(openssl rand -base64 18 | tr -d '/+=' | head -c 22)
+        TEST_MAILBOX_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 22)
         log_warn "No TEST_MAILBOX_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     HASHED_PW=$(doveadm pw -s SHA512-CRYPT -p "$TEST_MAILBOX_PW" 2>/dev/null)
@@ -366,14 +376,14 @@ if [ ! -f "$POSTFIX_BACKUP" ]; then
     log_done "Backed up /etc/postfix/main.cf"
 fi
 
-if [ -z "$MAIL_DB_PW" ]; then
-    log_warn "DB password unknown - resetting"
-    # Use the value from secrets.local if it's there (CREDENTIALS.txt must
-    # stay canonical). Otherwise generate.
-    if [ -z "${MAIL_DB_PW:-}" ]; then
-        MAIL_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
-        log_warn "No MAIL_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
-    fi
+if [ -z "${MAIL_DB_PW:-}" ]; then
+    # The DB user exists from a prior run but its password couldn't be recovered
+    # from the Postfix lookup configs and isn't in secrets.local. Rotate it to a
+    # fresh value and re-sync every consumer below so mail flow works again.
+    # The new password is NOT in CREDENTIALS.txt.
+    MAIL_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+    log_warn "MAIL_DB_PW could not be recovered and is not in secrets.local."
+    log_warn "Rotated the $MAIL_DB_USER DB password to a fresh value - update CREDENTIALS.txt manually."
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
         "ALTER USER '$MAIL_DB_USER'@'localhost' IDENTIFIED BY '$MAIL_DB_PW'; FLUSH PRIVILEGES;"
 fi
@@ -700,7 +710,7 @@ if [ -f "$DKIM_KEY_DIR/$DKIM_SELECTOR.private" ]; then
     log_skip "DKIM key already exists at $DKIM_KEY_DIR/$DKIM_SELECTOR.private"
 else
     mkdir -p "$DKIM_KEY_DIR"
-    cd "$DKIM_KEY_DIR"
+    cd "$DKIM_KEY_DIR" || { log_fail "Could not cd to $DKIM_KEY_DIR"; exit 1; }
     opendkim-genkey -b 2048 -d "$DOMAIN" -s "$DKIM_SELECTOR" 2>/dev/null
     chown -R opendkim:opendkim /etc/opendkim
     chmod 700 "$DKIM_KEY_DIR"
@@ -728,9 +738,6 @@ chown opendkim:opendkim /etc/opendkim/key.table /etc/opendkim/signing.table /etc
 chmod 644 /etc/opendkim/key.table /etc/opendkim/signing.table /etc/opendkim/trusted.hosts
 log_done "Wrote OpenDKIM tables"
 
-if [ -f "$DKIM_KEY_DIR/$DKIM_SELECTOR.txt" ]; then
-    DKIM_TXT_VALUE=$(cat "$DKIM_KEY_DIR/$DKIM_SELECTOR.txt" | tr -d '\n\t' | sed 's/  */ /g')
-fi
 
 # ============================================================================
 # STEP 8: Configure OpenDMARC

@@ -139,7 +139,7 @@ hcloud_server_id_by_name() {
     local name="$1"
     local resp
     resp=$(hcloud_get "/servers")
-    echo "$resp" | jq -r ".servers[] | select(.name == \"$name\") | .id" 2>/dev/null | head -1
+    echo "$resp" | jq -r --arg n "$name" '.servers[]? | select(.name == $n) | .id' 2>/dev/null | head -1
 }
 
 hcloud_server_ipv4() {
@@ -175,7 +175,7 @@ hcloud_zone_id_by_name() {
     local domain="$1"
     local resp
     resp=$(hcloud_get "/zones")
-    echo "$resp" | jq -r ".zones[] | select(.name == \"$domain\") | .id" 2>/dev/null | head -1
+    echo "$resp" | jq -r --arg d "$domain" '.zones[]? | select(.name == $d) | .id' 2>/dev/null | head -1
 }
 
 hcloud_zone_create() {

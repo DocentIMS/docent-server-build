@@ -150,8 +150,12 @@ if [ -z "$MISSING" ]; then
 else
     wait_for_dpkg_lock
     apt-get update -qq
-    apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null
-    log_done "Installed:$MISSING"
+    if apt-get install -y -qq -o Dpkg::Use-Pty=0 $MISSING < /dev/null; then
+        log_done "Installed:$MISSING"
+    else
+        log_fail "apt-get install failed for:$MISSING - see output above"
+        exit 1
+    fi
 fi
 
 # ============================================================================
@@ -225,7 +229,7 @@ else
     # When phase0 was used, ROUNDCUBE_DB_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${ROUNDCUBE_DB_PW:-}" ]; then
-        ROUNDCUBE_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
+        ROUNDCUBE_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
         log_warn "No ROUNDCUBE_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
@@ -268,14 +272,14 @@ if [ -f "$ROUNDCUBE_CONFIG" ] && grep -q "phase5-marker" "$ROUNDCUBE_CONFIG" 2>/
     # Recover existing values to print at the end
     ROUNDCUBE_DES_KEY=$(grep -oP "\\\$config\['des_key'\] = '\K[^']+" "$ROUNDCUBE_CONFIG" 2>/dev/null || echo "")
 else
-    if [ -z "$ROUNDCUBE_DB_PW" ]; then
-        log_warn "DB password unknown - resetting"
-        # Use the value from secrets.local if it's there (CREDENTIALS.txt must
-        # stay canonical). Otherwise generate.
-        if [ -z "${ROUNDCUBE_DB_PW:-}" ]; then
-            ROUNDCUBE_DB_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)
-            log_warn "No ROUNDCUBE_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
-        fi
+    if [ -z "${ROUNDCUBE_DB_PW:-}" ]; then
+        # The DB user exists from a prior run but its password couldn't be
+        # recovered from config.inc.php and isn't in secrets.local. Rotate it to
+        # a fresh value so Roundcube can connect again. The new password is NOT
+        # in CREDENTIALS.txt.
+        ROUNDCUBE_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+        log_warn "ROUNDCUBE_DB_PW could not be recovered and is not in secrets.local."
+        log_warn "Rotated the $ROUNDCUBE_DB_USER DB password to a fresh value - update CREDENTIALS.txt manually."
         mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
             "ALTER USER '$ROUNDCUBE_DB_USER'@'localhost' IDENTIFIED BY '$ROUNDCUBE_DB_PW'; FLUSH PRIVILEGES;"
     fi
@@ -283,7 +287,7 @@ else
     # When phase0 was used, ROUNDCUBE_DES_KEY is documented in CREDENTIALS.txt -
     # we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${ROUNDCUBE_DES_KEY:-}" ]; then
-        ROUNDCUBE_DES_KEY=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
+        ROUNDCUBE_DES_KEY=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 24)
         log_warn "No ROUNDCUBE_DES_KEY in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
 
@@ -717,7 +721,7 @@ else
 fi
 
 # Test that Roundcube can connect to its database
-if mysql -u "$ROUNDCUBE_DB_USER" -p"$ROUNDCUBE_DB_PW" "$ROUNDCUBE_DB" -e "SELECT 1;" 2>/dev/null | grep -q 1; then
+if MYSQL_PWD="$ROUNDCUBE_DB_PW" mysql -u "$ROUNDCUBE_DB_USER" "$ROUNDCUBE_DB" -e "SELECT 1;" 2>/dev/null | grep -q 1; then
     vp "Roundcube DB user can connect to $ROUNDCUBE_DB"
 else
     vf "Roundcube DB user CANNOT connect to $ROUNDCUBE_DB (check password in config)"

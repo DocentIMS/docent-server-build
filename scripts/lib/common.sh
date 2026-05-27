@@ -37,8 +37,58 @@ if [ -f "$REPO_ROOT/tenant.local" ]; then
 fi
 
 if [ -f "$REPO_ROOT/secrets.local" ]; then
+    # secrets.local is executed (sourced) as root, so its permissions matter:
+    #   - writable by group/other => a non-root user could inject code that runs
+    #     as root. Refuse to source it (its contents may already be tampered).
+    #   - readable by group/other => the secrets leak. Tighten to owner-only and
+    #     warn (safe to self-heal, since it isn't writable by others).
+    _sl_perm=$(stat -c '%a' "$REPO_ROOT/secrets.local" 2>/dev/null || echo "")
+    _sl_g=${_sl_perm: -2:1}; _sl_g=${_sl_g:-0}
+    _sl_o=${_sl_perm: -1:1}; _sl_o=${_sl_o:-0}
+    if [ $(( _sl_g & 2 )) -ne 0 ] || [ $(( _sl_o & 2 )) -ne 0 ]; then
+        echo "ERROR: $REPO_ROOT/secrets.local is writable by group or others (mode $_sl_perm)." >&2
+        echo "       It is sourced as root, so this is a code-injection risk. Refusing to run." >&2
+        echo "       Fix with: chmod 600 $REPO_ROOT/secrets.local" >&2
+        exit 1
+    fi
+    if [ $(( _sl_g & 4 )) -ne 0 ] || [ $(( _sl_o & 4 )) -ne 0 ]; then
+        echo "WARNING: $REPO_ROOT/secrets.local was readable by group/others (mode $_sl_perm); tightening to 600." >&2
+        chmod 600 "$REPO_ROOT/secrets.local"
+    fi
+    unset _sl_perm _sl_g _sl_o
+
     # shellcheck disable=SC1091
     source "$REPO_ROOT/secrets.local"
+
+    # ------------------------------------------------------------------------
+    # Validate operator-supplied secrets at the boundary.
+    #
+    # These values are later interpolated into SQL statements, PHP config, and
+    # sed expressions. To keep those contexts safe - and to avoid silently
+    # corrupting a generated config - reject any secret whose value contains
+    # characters outside a conservative allowlist (letters, digits, . _ -).
+    # Auto-generated secrets are alphanumeric, so this only constrains hand-set
+    # values. Unset/empty values are skipped (they get generated later).
+    # ------------------------------------------------------------------------
+    _docent_secret_vars=(
+        ROOT_DB_PW MAIL_DB_PW ROUNDCUBE_DB_PW WP_DB_PW
+        PLONE_ADMIN_PW ADMIN_PW SHARED_ADMIN_PW ESPEN_PW
+        TEST_MAILBOX_PW ROUNDCUBE_DES_KEY XAI_API_KEY LICENSE_KEY
+    )
+    for _v in "${_docent_secret_vars[@]}"; do
+        _val="${!_v:-}"
+        [ -z "$_val" ] && continue
+        if ! [[ "$_val" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "ERROR: $_v in secrets.local contains unsupported characters." >&2
+            echo "       Allowed: letters, digits, and the symbols . _ -" >&2
+            echo "       These secrets are interpolated into SQL/PHP/sed, so other" >&2
+            echo "       characters (quotes, backslash, \$, &, |, #, ...) can break or" >&2
+            echo "       corrupt generated configs. Choose a value using only the" >&2
+            echo "       allowed characters." >&2
+            exit 1
+        fi
+    done
+    unset _docent_secret_vars _v _val
 fi
 
 # ============================================================================
