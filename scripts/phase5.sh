@@ -229,7 +229,7 @@ else
     # When phase0 was used, ROUNDCUBE_DB_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${ROUNDCUBE_DB_PW:-}" ]; then
-        ROUNDCUBE_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+        ROUNDCUBE_DB_PW=$(gen_pw 28)
         log_warn "No ROUNDCUBE_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
@@ -277,7 +277,7 @@ else
         # recovered from config.inc.php and isn't in secrets.local. Rotate it to
         # a fresh value so Roundcube can connect again. The new password is NOT
         # in CREDENTIALS.txt.
-        ROUNDCUBE_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+        ROUNDCUBE_DB_PW=$(gen_pw 28)
         log_warn "ROUNDCUBE_DB_PW could not be recovered and is not in secrets.local."
         log_warn "Rotated the $ROUNDCUBE_DB_USER DB password to a fresh value - update CREDENTIALS.txt manually."
         mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
@@ -287,7 +287,7 @@ else
     # When phase0 was used, ROUNDCUBE_DES_KEY is documented in CREDENTIALS.txt -
     # we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${ROUNDCUBE_DES_KEY:-}" ]; then
-        ROUNDCUBE_DES_KEY=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 24)
+        ROUNDCUBE_DES_KEY=$(gen_pw 24)
         log_warn "No ROUNDCUBE_DES_KEY in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
 

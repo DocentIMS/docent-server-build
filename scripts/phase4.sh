@@ -286,7 +286,7 @@ else
     # When phase0 was used, MAIL_DB_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${MAIL_DB_PW:-}" ]; then
-        MAIL_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+        MAIL_DB_PW=$(gen_pw 28)
         log_warn "No MAIL_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" <<SQL
@@ -351,7 +351,7 @@ else
     # When phase0 was used, TEST_MAILBOX_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
     if [ -z "${TEST_MAILBOX_PW:-}" ]; then
-        TEST_MAILBOX_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 22)
+        TEST_MAILBOX_PW=$(gen_pw 22)
         log_warn "No TEST_MAILBOX_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
     HASHED_PW=$(doveadm pw -s SHA512-CRYPT -p "$TEST_MAILBOX_PW" 2>/dev/null)
@@ -381,7 +381,7 @@ if [ -z "${MAIL_DB_PW:-}" ]; then
     # from the Postfix lookup configs and isn't in secrets.local. Rotate it to a
     # fresh value and re-sync every consumer below so mail flow works again.
     # The new password is NOT in CREDENTIALS.txt.
-    MAIL_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+    MAIL_DB_PW=$(gen_pw 28)
     log_warn "MAIL_DB_PW could not be recovered and is not in secrets.local."
     log_warn "Rotated the $MAIL_DB_USER DB password to a fresh value - update CREDENTIALS.txt manually."
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
