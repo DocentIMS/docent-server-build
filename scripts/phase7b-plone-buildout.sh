@@ -46,8 +46,8 @@ PLONE_INSTANCE_DIR=""  # Set after tenant.local is sourced (see below)
 DEFAULT_PLONE_VERSION="6.2.0"
 
 # Plone release line: used to fetch versions.cfg and requirements.txt.
-# For 6.2.x releases this is "6.2-latest". For 6.1.x it would be "6.1-latest".
-# Computed from PLONE_VERSION below (e.g. 6.2.0 -> 6.2-latest).
+# Pegged to the EXACT PLONE_VERSION (e.g. 6.2.0), not the moving "6.2-latest"
+# alias, so every tenant builds the identical Plone release.
 PLONE_RELEASE_LINE=""
 
 # === BEGIN tenant.local/secrets.local source block ===
@@ -76,13 +76,14 @@ PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 # Apply Plone version: tenant.local override > script default
 PLONE_VERSION="${PLONE_VERSION:-$DEFAULT_PLONE_VERSION}"
 
-# Compute release line from PLONE_VERSION (e.g. 6.2.0rc2 -> 6.2)
+# Validate PLONE_VERSION parses (must look like 6.2 / 6.2.0 / 6.2.0rc2).
 PLONE_MAJOR_MINOR=$(echo "$PLONE_VERSION" | grep -oE '^[0-9]+\.[0-9]+')
 if [ -z "$PLONE_MAJOR_MINOR" ]; then
     echo "FATAL: cannot parse PLONE_VERSION='$PLONE_VERSION' (expected like 6.2.0rc2)"
     exit 1
 fi
-PLONE_RELEASE_LINE="${PLONE_MAJOR_MINOR}-latest"
+# Peg to the exact version - NOT "${PLONE_MAJOR_MINOR}-latest" (a moving alias).
+PLONE_RELEASE_LINE="${PLONE_VERSION}"
 
 # Credentials file location (matches phase 4 / phase 5 convention)
 CREDENTIALS_FILE="$REPO_ROOT/CREDENTIALS.txt"
