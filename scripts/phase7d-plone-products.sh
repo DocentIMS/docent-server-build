@@ -48,6 +48,11 @@ PLONE_INSTANCE_DIR=""   # set after tenant.local is sourced (see below)
 # branch or fork (e.g. a 'staging' branch) without editing this script.
 PRODUCTS_CFG_URL="${PRODUCTS_CFG_URL:-https://raw.githubusercontent.com/DocentIMS/docent-plone-addons/main/products.cfg}"
 
+# Private add-on sources: if any repo referenced by products.cfg is private,
+# set GITHUB_TOKEN in secrets.local to a GitHub token (classic or fine-grained)
+# with read access to those repos. Step 3 uses it to authenticate the git
+# clones mr.developer runs. Leave unset if every source repo is public.
+
 # Zope loopback port (must match phase 7b/7c).
 ZOPE_LOOPBACK_PORT=8080
 
@@ -241,15 +246,41 @@ echo "  leave the instance half-built."
 echo "  -----------------------------------------------------------------"
 echo ""
 
-if ! sudo -u "$PLONE_USER" bash -c "cd '$PLONE_INSTANCE_DIR' && bin/buildout -c products.cfg"; then
+# Private add-on repos listed in products.cfg are fetched by mr.developer over
+# https as the plone user. If GITHUB_TOKEN is set in secrets.local, give git a
+# token-based credential for github.com, scoped to this buildout run via
+# throwaway config + credential files owned by the plone user. The token never
+# appears in argv, in the cloned repos' .git/config, or in plone's persistent
+# gitconfig, and the files are removed right after the run. Public sources keep
+# working whether or not a token is present.
+GIT_AUTH_HOME=""
+BUILDOUT_ENV=()
+if [ -n "${GITHUB_TOKEN:-}" ]; then
+    GIT_AUTH_HOME="$(sudo -u "$PLONE_USER" mktemp -d)"
+    printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" \
+        | sudo -u "$PLONE_USER" tee "$GIT_AUTH_HOME/credentials" >/dev/null
+    sudo -u "$PLONE_USER" chmod 600 "$GIT_AUTH_HOME/credentials"
+    printf '[credential]\n\thelper = store --file=%s\n' "$GIT_AUTH_HOME/credentials" \
+        | sudo -u "$PLONE_USER" tee "$GIT_AUTH_HOME/gitconfig" >/dev/null
+    BUILDOUT_ENV=(GIT_CONFIG_GLOBAL="$GIT_AUTH_HOME/gitconfig")
+    log_done "Enabled token-based GitHub access for private add-on repos"
+fi
+
+cleanup_git_auth() {
+    [ -n "$GIT_AUTH_HOME" ] && sudo -u "$PLONE_USER" rm -rf "$GIT_AUTH_HOME"
+}
+
+if ! sudo -u "$PLONE_USER" env "${BUILDOUT_ENV[@]}" bash -c "cd '$PLONE_INSTANCE_DIR' && bin/buildout -c products.cfg"; then
+    cleanup_git_auth
     log_fail "The add-on buildout (bin/buildout -c products.cfg) failed."
     log_fail "Review the buildout output above. Common causes: an add-on's"
-    log_fail "dependency conflicts with the Plone version, or a git source URL"
-    log_fail "is unreachable."
+    log_fail "dependency conflicts with the Plone version, a git source URL is"
+    log_fail "unreachable, or a private repo needs GITHUB_TOKEN set in secrets.local."
     log_fail "Plone itself (from phase 7b) is unaffected - fix the issue and"
     log_fail "re-run phase 7d."
     exit 1
 fi
+cleanup_git_auth
 log_done "Add-on buildout completed"
 
 if [ ! -x "$BIN_INSTANCE" ]; then

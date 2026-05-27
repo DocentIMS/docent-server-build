@@ -144,3 +144,23 @@ multiple lines, so the corruption path does not exist.)
 - `phase7b-plone-buildout.sh` — re-assert `chmod 600` on `CREDENTIALS.txt` after
   the plain-append path (previously only the awk-rewrite branch re-applied it),
   so an append never leaves the file looser than 600.
+
+---
+
+## Enhancements (not from the review)
+
+### Private GitHub repo support for Plone add-ons
+- `phase7d-plone-products.sh` — the add-on buildout (run by mr.developer as the
+  `plone` user) cloned each `products.cfg` source over `https://github.com/...`
+  with no authentication, so any **private** source repo failed. If
+  `GITHUB_TOKEN` is set in `secrets.local`, phase7d now sets up a token-based git
+  credential for `github.com`, scoped to the buildout run via throwaway
+  config/credential files owned by `plone` (mode 600, removed after the run). The
+  token never reaches argv, the cloned repos' `.git/config`, or plone's
+  persistent gitconfig. Public sources keep working with or without a token.
+  - Operator step: add `GITHUB_TOKEN=<token>` to `secrets.local`, using a GitHub
+    token (classic or fine-grained) with read access to the private source repos.
+  - Note: the main `docent-server-build` repo is cloned over SSH in
+    `bootstrap.sh` and already supports private access via the key the operator
+    registers on GitHub; the public `docent-plone-addons` `products.cfg` fetch
+    needs no token.
