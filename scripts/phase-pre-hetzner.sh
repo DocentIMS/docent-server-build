@@ -775,6 +775,26 @@ else
 fi
 
 # ============================================================================
+# EGG CACHE - locate the pre-built Plone buildout cache (TODO 6)
+# ============================================================================
+# If a pre-built egg-cache tarball exists on this build host, it is shipped to
+# the new tenant alongside the handoff files (see the Next steps below) and
+# phase 7b extracts it before running buildout - skipping the slow egg
+# download+compile. The cache is a pure optimization: if it is absent, the
+# build still works, just slower. Path is hardcoded (not $HOME) because this
+# script may run under sudo.
+EGG_CACHE_FILE="/home/wayne/docent-egg-cache/docent-egg-cache.tar.gz"
+if [ -f "$EGG_CACHE_FILE" ]; then
+    EGG_CACHE_SCP=" $EGG_CACHE_FILE"
+    EGG_CACHE_NOTE="That scp also ships the pre-built Plone egg cache - phase 7b will be fast."
+    log_done "Egg cache found ($(du -h "$EGG_CACHE_FILE" | cut -f1)) - will ship to the tenant"
+else
+    EGG_CACHE_SCP=""
+    EGG_CACHE_NOTE="No egg cache on this host ($EGG_CACHE_FILE) - phase 7b will build Plone from scratch (slower)."
+    log_warn "Egg cache not found at $EGG_CACHE_FILE - phase 7b will be slow (no cache to ship)"
+fi
+
+# ============================================================================
 # REPORT
 # ============================================================================
 echo ""
@@ -824,7 +844,8 @@ ${BOLD}Next:${RESET}
      Copy-paste BOTH lines below - the first moves you to the repo root
      so the scp works no matter where you currently are:
        cd ${REPO_ROOT}
-       scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local root@${SERVER_IP}:/root/
+       scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local${EGG_CACHE_SCP} root@${SERVER_IP}:/root/
+     ${EGG_CACHE_NOTE}
   3. SSH to the new server:
        ssh root@${SERVER_IP}
   4. Run: bash /root/bootstrap.sh
