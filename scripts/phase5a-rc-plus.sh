@@ -865,19 +865,22 @@ if [ -d "$INTER_SRC_DIR" ] && [ "$(ls -A "$INTER_SRC_DIR" 2>/dev/null | grep -c 
     log_skip "Inter fonts already in repo at $INTER_SRC_DIR"
 else
     mkdir -p "$INTER_SRC_DIR"
-    cd "$INTER_SRC_DIR"
-    for f in "${INTER_FILES[@]}"; do
-        if [ ! -f "$f" ]; then
-            wget -q "$INTER_BASE_URL/$f" -O "$f"
-            if [ -s "$f" ]; then
-                log_done "Downloaded $f"
-            else
-                rm -f "$f"
-                log_warn "Failed to download $f - font fallback chain still works without it"
+    if cd "$INTER_SRC_DIR"; then
+        for f in "${INTER_FILES[@]}"; do
+            if [ ! -f "$f" ]; then
+                wget -q "$INTER_BASE_URL/$f" -O "$f"
+                if [ -s "$f" ]; then
+                    log_done "Downloaded $f"
+                else
+                    rm -f "$f"
+                    log_warn "Failed to download $f - font fallback chain still works without it"
+                fi
             fi
-        fi
-    done
-    cd - > /dev/null
+        done
+        cd - > /dev/null
+    else
+        log_warn "Could not cd to $INTER_SRC_DIR; skipping Inter font download (fallback fonts still work)"
+    fi
 fi
 
 # Install fonts to the WordPress vhost branding dir

@@ -789,9 +789,15 @@ if [ "$VERIFY_FAIL" -eq 0 ]; then
         "/home/${ADMIN_USER}/CREDENTIALS.txt"; do
         if [ -f "$CREDENTIALS_FILE" ] && grep -q "NOT YET ACTIVE" "$CREDENTIALS_FILE"; then
             # Strip the warning block: from the "*** NOT YET ACTIVE" line
-            # through the "------" separator that closes the warning.
-            sed -i '/\*\*\* NOT YET ACTIVE/,/^  ---/d' "$CREDENTIALS_FILE"
-            log_done "Removed 'NOT YET ACTIVE' warning from $CREDENTIALS_FILE (SSH login is now live)"
+            # through the "------" separator that closes the warning. Only do
+            # this if the closing marker is present - otherwise a range delete
+            # with no end match would run to EOF and truncate the file.
+            if grep -qE '^  ---' "$CREDENTIALS_FILE"; then
+                sed -i '/\*\*\* NOT YET ACTIVE/,/^  ---/d' "$CREDENTIALS_FILE"
+                log_done "Removed 'NOT YET ACTIVE' warning from $CREDENTIALS_FILE (SSH login is now live)"
+            else
+                log_warn "Found 'NOT YET ACTIVE' in $CREDENTIALS_FILE but no closing '  ---' marker; left it untouched to avoid truncating the file"
+            fi
         fi
     done
 fi

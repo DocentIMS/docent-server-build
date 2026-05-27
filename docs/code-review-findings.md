@@ -4,14 +4,15 @@ Status tracker for the full review of the provisioning scripts. Every item
 carries a status:
 
 - **FIXED** — change applied on the `docent-code-updates` branch.
-- **DEFERRED** — real but intentionally held back (needs testing, or dead path).
+- **DEFERRED** — real but intentionally held back (needs live testing).
 - **OPEN** — not yet addressed; awaiting a decision or scheduling.
 - **WON'T FIX** — investigated and judged not-a-bug or correct by design.
 
-Status counts: 11 fixed, 2 deferred, 10 open, 2 won't-fix.
+Status counts: 17 fixed, 1 deferred, 4 open, 2 won't-fix.
 
 Commits: `8a34cca` (first batch), `cd59ad3` (phase5b/audit/add-source-block),
-plus the password-rotation follow-up that also carries this update.
+the password-rotation follow-up, and the phase8 + low-items follow-up that also
+carries this update.
 
 ---
 
@@ -35,50 +36,33 @@ restrict the accepted charset for operator-supplied secrets.
   `secrets.local`; `tenant.local` is intentionally 644). Confirm desired
   behavior before changing.
 
-### 3. phase8 partial failure leaves orphaned UptimeRobot monitors — OPEN (design)
-- `phase8-monitoring.sh:307-335` — the audit file is only written at the end,
-  so a mid-sequence failure creates monitors with no audit record; a re-run
-  then creates duplicates. Fix: write the audit incrementally, or roll back
-  created monitors on the EXIT trap.
-
-### 4. Plone admin password in group-readable buildout.cfg — OPEN (design)
+### 3. Plone admin password in group-readable buildout.cfg — OPEN (design)
 - `phase7b-plone-buildout.sh:274,289` — `PLONE_ADMIN_PW` written cleartext into
   `buildout.cfg` (mode 640, group `plone`); group members can read it. Also
   `CREDENTIALS.txt` perms are not re-asserted to 600 on the plain-append path.
 
 ---
 
-## Deferred — Medium
+## Deferred
 
-### 5. phase7c systemd PIDFile hardcoded — DEFERRED (needs live testing)
+### 4. phase7c systemd PIDFile hardcoded — DEFERRED (needs live testing)
 - `phase7c-plone-frontend.sh:223` — `PIDFile=…/Z4.pid` with `Type=forking` is
   version-fragile; systemd may mis-track Plone. Recommended fix is `Type=simple`
   + `ExecStart=…/bin/instance console`, dropping `PIDFile`/`ExecStop`/`ExecReload`.
   Changes service semantics (restart, journald logging) and must be verified
   against a running Plone instance before merging.
 
-### 6. refactor-to-common.py corrupts multi-line helper defs — DEFERRED (dead path)
-- `refactor-to-common.py:57-59` — single-line removal of `log_*`/`step` defs
-  would leave orphaned bodies if a *target* script defined them across multiple
-  lines. The migration has already run; the only scripts still defining helpers
-  (`phase7b`, `phase7d`) use single-line defs, which the tool handles. The
-  corruption case does not exist today.
-
 ---
 
 ## Open — Low
 
-- `bootstrap.sh:180` — `ssh-keyscan >> known_hosts` accumulates duplicate
-  entries on re-run.
-- `phase1.sh:793` — unbounded `sed` range can truncate `CREDENTIALS.txt` to EOF
-  if the closing marker is missing; no backup.
-- `phase-pre-hetzner.sh:446,573` — `ask_yes_no "…" "n"` passes a default the
-  function ignores (dead/misleading arg).
-- `phase4.sh:732` — `DKIM_TXT_VALUE` computed but never used.
-- Unchecked `cd` in non-subshells (`phase4.sh:703`, `phase5a-rc-plus.sh:868`)
-  run subsequent commands in the wrong directory on failure.
 - Remote buildout/requirements fetched and executed with no checksum pinning
-  (`phase7b-plone-buildout.sh:237`, `phase7d-plone-products.sh:49`).
+  (`phase7b-plone-buildout.sh:237` pip `--pre -r <remote requirements.txt>`;
+  `phase7d-plone-products.sh:49` `products.cfg` from the `main` branch). Not
+  auto-fixed: a safe fix needs maintained known-good hashes (upstream Plone's
+  requirements.txt isn't hash-pinned) or pinning to a specific reviewed commit/
+  tag. TLS already protects the transport; this is defense against a compromised
+  upstream. Decide whether to pin and supply the reference.
 
 ---
 
@@ -94,6 +78,10 @@ restrict the accepted charset for operator-supplied secrets.
   `grep -q` (regex). Callers in `phase1.sh`/`phase2.sh` intentionally pass
   anchored regex patterns (`^port …$`, `^22/tcp`), so switching to `grep -F`
   would break them.
+
+(Former item: `refactor-to-common.py` multi-line-def corruption — removed. The
+migration has already run and no phase script defines `log_*`/`step` across
+multiple lines, so the corruption path does not exist.)
 
 ---
 
@@ -125,10 +113,29 @@ restrict the accepted charset for operator-supplied secrets.
   before overwriting and re-apply it explicitly, warning on failure instead of
   silently leaving mktemp's 0600.
 
-### Password-rotation follow-up (this commit)
+### Password-rotation follow-up
 - `phase4.sh` / `phase5.sh` — fixed the silent live-password rotation on re-run:
   the `[ -z "$VAR" ]` gates now use `${VAR:-}` (no more unbound-variable crash
   under `set -u`); phase4 recovers the DB password from any of the three Postfix
   `.cf` lookup files before considering a rotation; and when a rotation is
-  genuinely unavoidable it now warns explicitly that `CREDENTIALS.txt` must be
+  genuinely unavoidable it warns explicitly that `CREDENTIALS.txt` must be
   updated by hand.
+
+### phase8 + low-items follow-up (this commit)
+- `phase8-monitoring.sh` — write the audit file incrementally (header up front,
+  each monitor id appended as it's created) instead of only at the end. A
+  mid-run failure now always leaves a complete record, so no monitors are
+  orphaned without an audit entry and a naive re-run is refused by the existing
+  file check rather than silently duplicating the partial set.
+- `bootstrap.sh` — only `ssh-keyscan` GitHub's host key if it isn't already in
+  `known_hosts`, so re-runs don't accumulate duplicate entries.
+- `phase1.sh` — guard the `CREDENTIALS.txt` warning-strip `sed`: only run the
+  range delete when the closing `^  ---` marker exists, so a missing marker
+  can't truncate the file to EOF.
+- `phase-pre-hetzner.sh` — drop the misleading `"n"` argument from the two
+  `ask_yes_no` calls (the function ignores a default).
+- `phase4.sh` — remove the unused `DKIM_TXT_VALUE` variable, and guard the
+  `cd "$DKIM_KEY_DIR"` so a failure aborts instead of generating keys in the
+  wrong directory.
+- `phase5a-rc-plus.sh` — guard the `cd "$INTER_SRC_DIR"` font-download block so
+  a cd failure warns and skips instead of downloading into the repo root.

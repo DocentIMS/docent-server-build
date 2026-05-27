@@ -55,7 +55,6 @@ REPORT=()
 # set by sourcing secrets.local above. Setting them to "" would wipe out
 # the canonical values from CREDENTIALS.txt and force the script to
 # generate new ones, breaking the canonical-credentials design.
-DKIM_TXT_VALUE=""
 
 
 
@@ -711,7 +710,7 @@ if [ -f "$DKIM_KEY_DIR/$DKIM_SELECTOR.private" ]; then
     log_skip "DKIM key already exists at $DKIM_KEY_DIR/$DKIM_SELECTOR.private"
 else
     mkdir -p "$DKIM_KEY_DIR"
-    cd "$DKIM_KEY_DIR"
+    cd "$DKIM_KEY_DIR" || { log_fail "Could not cd to $DKIM_KEY_DIR"; exit 1; }
     opendkim-genkey -b 2048 -d "$DOMAIN" -s "$DKIM_SELECTOR" 2>/dev/null
     chown -R opendkim:opendkim /etc/opendkim
     chmod 700 "$DKIM_KEY_DIR"
@@ -739,9 +738,6 @@ chown opendkim:opendkim /etc/opendkim/key.table /etc/opendkim/signing.table /etc
 chmod 644 /etc/opendkim/key.table /etc/opendkim/signing.table /etc/opendkim/trusted.hosts
 log_done "Wrote OpenDKIM tables"
 
-if [ -f "$DKIM_KEY_DIR/$DKIM_SELECTOR.txt" ]; then
-    DKIM_TXT_VALUE=$(cat "$DKIM_KEY_DIR/$DKIM_SELECTOR.txt" | tr -d '\n\t' | sed 's/  */ /g')
-fi
 
 # ============================================================================
 # STEP 8: Configure OpenDMARC

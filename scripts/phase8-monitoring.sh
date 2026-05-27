@@ -292,15 +292,25 @@ create_monitor() {
 echo ""
 echo "Creating monitors for $DOMAIN..."
 
-# Temporary scratch for IDs — written to audit file at the end if all succeed
-TMPDIR_PATH=$(mktemp -d)
-trap 'rm -rf "$TMPDIR_PATH"' EXIT
-SCRATCH="$TMPDIR_PATH/ids.txt"
-: > "$SCRATCH"
+# Write the audit file incrementally: each monitor ID is appended the moment it
+# is created, so a mid-run failure still leaves a complete record of whatever
+# was created (no orphaned monitors without an audit entry). The file's presence
+# also makes a naive re-run refuse via the existing-file check above, forcing a
+# clean retire-then-recreate instead of silently duplicating the partial set.
+if [ "$DRY_RUN" -eq 0 ]; then
+  {
+    echo "# UptimeRobot monitor IDs for $DOMAIN"
+    echo "# Created: $(date -Iseconds)"
+    echo "# Used by retire-tenant.sh and audit-monitors.sh"
+    echo "domain=$DOMAIN"
+  } > "$AUDIT_FILE"
+  chmod 600 "$AUDIT_FILE"
+fi
 
 write_id() {
-  # $1=label  $2=id
-  echo "$1=$2" >> "$SCRATCH"
+  # $1=label  $2=id  — append immediately (skipped in dry-run)
+  [ "$DRY_RUN" -eq 1 ] && return 0
+  echo "$1=$2" >> "$AUDIT_FILE"
 }
 
 # Monitor 1: WordPress root (keyword check)
@@ -335,10 +345,7 @@ ID=$(create_monitor "$KEYWORD_PREFIX imaps $DOMAIN" 4 "$DOMAIN" \
 write_id "imaps" "$ID"
 
 # ----------------------------------------------------------------------------
-# Write the audit file
-# ----------------------------------------------------------------------------
-# ----------------------------------------------------------------------------
-# Write the audit file (skipped in dry-run)
+# Done (the audit file was written incrementally as monitors were created)
 # ----------------------------------------------------------------------------
 if [ "$DRY_RUN" -eq 1 ]; then
   echo ""
@@ -349,16 +356,6 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "============================================================"
   exit 0
 fi
-
-{
-  echo "# UptimeRobot monitor IDs for $DOMAIN"
-  echo "# Created: $(date -Iseconds)"
-  echo "# Used by retire-tenant.sh and audit-monitors.sh"
-  echo "domain=$DOMAIN"
-  cat "$SCRATCH"
-} > "$AUDIT_FILE"
-
-chmod 600 "$AUDIT_FILE"
 
 echo ""
 echo "============================================================"
