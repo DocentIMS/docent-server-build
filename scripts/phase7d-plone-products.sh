@@ -48,6 +48,11 @@ PLONE_INSTANCE_DIR=""   # set after tenant.local is sourced (see below)
 # branch or fork (e.g. a 'staging' branch) without editing this script.
 PRODUCTS_CFG_URL="${PRODUCTS_CFG_URL:-https://raw.githubusercontent.com/DocentIMS/docent-plone-addons/main/products.cfg}"
 
+# Private add-on sources: any repo referenced by products.cfg as git@github.com:
+# (SSH) is cloned by mr.developer as the plone user. Step 3 installs the SSH key
+# bootstrap created for root into the plone user's ~/.ssh so those clones
+# authenticate. The key's GitHub account must have read access to those repos.
+
 # Zope loopback port (must match phase 7b/7c).
 ZOPE_LOOPBACK_PORT=8080
 
@@ -241,11 +246,34 @@ echo "  leave the instance half-built."
 echo "  -----------------------------------------------------------------"
 echo ""
 
+# Private add-on repos in products.cfg are referenced as git@github.com: (SSH)
+# and cloned by mr.developer as the plone user. Give the plone user the SSH key
+# that bootstrap created for root (and that the operator registered on GitHub),
+# so those clones authenticate. Harmless for public https sources.
+PLONE_SSH_DIR="$(getent passwd "$PLONE_USER" | cut -d: -f6)/.ssh"
+ROOT_SSH_KEY="/root/.ssh/id_ed25519"
+if [ -f "$ROOT_SSH_KEY" ]; then
+    install -d -m 700 -o "$PLONE_USER" -g "$PLONE_USER" "$PLONE_SSH_DIR"
+    install -m 600 -o "$PLONE_USER" -g "$PLONE_USER" "$ROOT_SSH_KEY" "$PLONE_SSH_DIR/id_ed25519"
+    if [ -f "$ROOT_SSH_KEY.pub" ]; then
+        install -m 644 -o "$PLONE_USER" -g "$PLONE_USER" "$ROOT_SSH_KEY.pub" "$PLONE_SSH_DIR/id_ed25519.pub"
+    fi
+    # Pre-accept github.com's host key so the clone doesn't prompt or fail.
+    if ! sudo -u "$PLONE_USER" ssh-keygen -F github.com -f "$PLONE_SSH_DIR/known_hosts" >/dev/null 2>&1; then
+        ssh-keyscan -t rsa,ed25519 github.com 2>/dev/null \
+            | sudo -u "$PLONE_USER" tee -a "$PLONE_SSH_DIR/known_hosts" >/dev/null
+    fi
+    log_done "Installed GitHub SSH key for $PLONE_USER (enables private add-on repos)"
+else
+    log_warn "No SSH key at $ROOT_SSH_KEY - private add-on repos (git@github.com:) will fail to clone."
+    log_warn "Run bootstrap.sh first (it creates and registers the key), or install a key for $PLONE_USER manually."
+fi
+
 if ! sudo -u "$PLONE_USER" bash -c "cd '$PLONE_INSTANCE_DIR' && bin/buildout -c products.cfg"; then
     log_fail "The add-on buildout (bin/buildout -c products.cfg) failed."
     log_fail "Review the buildout output above. Common causes: an add-on's"
-    log_fail "dependency conflicts with the Plone version, or a git source URL"
-    log_fail "is unreachable."
+    log_fail "dependency conflicts with the Plone version, a git source URL is"
+    log_fail "unreachable, or a private repo's SSH key lacks access on GitHub."
     log_fail "Plone itself (from phase 7b) is unaffected - fix the issue and"
     log_fail "re-run phase 7d."
     exit 1

@@ -144,3 +144,26 @@ multiple lines, so the corruption path does not exist.)
 - `phase7b-plone-buildout.sh` — re-assert `chmod 600` on `CREDENTIALS.txt` after
   the plain-append path (previously only the awk-rewrite branch re-applied it),
   so an append never leaves the file looser than 600.
+
+---
+
+## Enhancements (not from the review)
+
+### Private GitHub repo support for Plone add-ons
+- `phase7d-plone-products.sh` — the live `docent-plone-addons` `products.cfg`
+  references its private add-on repos as `git@github.com:` (SSH), and
+  mr.developer clones them as the `plone` user, so they failed with no key.
+  Phase7d now installs the SSH key that `bootstrap.sh` created for root (and
+  that the operator registered on GitHub) into the plone user's `~/.ssh`
+  (key 600, dir 700, plone-owned) and pre-accepts github.com's host key, so the
+  SSH clones authenticate. Public `https://` sources are unaffected. If the root
+  key is absent, it warns and continues (public sources still build).
+  - Prerequisite: the SSH key's GitHub account must have read access to the
+    private source repos (note some are under `espenmn/`, some under
+    `DocentIMS/`).
+  - Still required outside this repo: the private entries in the
+    `docent-plone-addons` `products.cfg` are currently **commented out** — they
+    must be uncommented there for the add-ons to actually build.
+  - Context: the main `docent-server-build` repo is already cloned over SSH in
+    `bootstrap.sh`; the public `docent-plone-addons` `products.cfg` fetch needs
+    no auth.
