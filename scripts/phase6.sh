@@ -616,7 +616,7 @@ fi
 if [ -f "$WP_CONFIG" ]; then
     EXTRACTED_PW=$(grep "^define( 'DB_PASSWORD'" "$WP_CONFIG" | sed -E "s/.*'DB_PASSWORD'\s*,\s*'([^']+)'.*/\1/")
     if [ -n "$EXTRACTED_PW" ] && \
-       MYSQL_PWD="$EXTRACTED_PW" mysql -u"$WP_DB_USER" -e "USE $WP_DB_NAME;" >/dev/null 2>&1; then
+       MYSQL_PWD="$EXTRACTED_PW" mysql --no-defaults -u"$WP_DB_USER" -e "USE $WP_DB_NAME;" >/dev/null 2>&1; then
         echo "  [PASS] DB user $WP_DB_USER can connect to $WP_DB_NAME"
         VERIFY_PASS=$((VERIFY_PASS + 1))
     else

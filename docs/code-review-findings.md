@@ -170,13 +170,17 @@ multiple lines, so the corruption path does not exist.)
 
 ---
 
-## To investigate
+## Resolved during chelsea build (2026-05-27)
 
-### phase5 Roundcube DB-connect verify: intermittent false failure
-- On a fresh chelsea build (2026-05-27), phase5's final check "Roundcube DB
-  user CANNOT connect" failed (exit 1), but an identical manual connect
-  immediately afterward succeeded and the config DSN password matched
-  secrets.local. Suspected race: the verify ran before CREATE USER / GRANT /
-  FLUSH fully settled. Has not been seen before. Consider adding a short
-  retry/wait around the DB-connect verify in phase5 (and the equivalent in
-  phase4/phase6) before reporting FAIL.
+### phase5/phase6 DB-connect verify failed: MYSQL_PWD overridden by /root/.my.cnf
+- Root cause: the earlier hardening that switched the verify from `-p"$PW"` to
+  `MYSQL_PWD="$PW" mysql ...` broke when run as root. `mysql` reads
+  `/root/.my.cnf` (written by phase3 with the *root* DB password), and an
+  option-file password takes precedence over `MYSQL_PWD`, so the verify tried
+  the roundcube/wp user with root's password -> "Access denied" -> false FAIL.
+  The old `-p` form worked only because a command-line password outranks the
+  option file. (The "intermittent" appearance was a red herring: a manual test
+  with empty `-u` had silently connected as root via `/root/.my.cnf`.)
+- Fix: add `--no-defaults` to the `MYSQL_PWD` verify in `phase5.sh` and
+  `phase6.sh` so `/root/.my.cnf` is ignored and `MYSQL_PWD` is used. Keeps the
+  password off the command line.
