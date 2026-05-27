@@ -183,6 +183,7 @@ else
         echo "PLONE_INSTANCE_DIR=$PLONE_INSTANCE_DIR"
         echo "PLONE_URL_LOCAL=http://127.0.0.1:8080/"
     } >> "$CREDENTIALS_FILE"
+    chmod 600 "$CREDENTIALS_FILE"
     log_done "Recorded Plone admin credentials to $CREDENTIALS_FILE"
 fi
 

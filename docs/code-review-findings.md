@@ -8,7 +8,7 @@ carries a status:
 - **OPEN** — not yet addressed; awaiting a decision or scheduling.
 - **WON'T FIX** — investigated and judged not-a-bug or correct by design.
 
-Status counts: 18 fixed, 1 deferred, 3 open, 2 won't-fix.
+Status counts: 19 fixed, 1 deferred, 2 open, 2 won't-fix.
 
 Commits: `8a34cca` (first batch), `cd59ad3` (phase5b/audit/add-source-block),
 the password-rotation follow-up, and the phase8 + low-items follow-up that also
@@ -18,23 +18,18 @@ carries this update.
 
 ## Open — High
 
-### 1. `secrets.local` sourced as root with no permission check — OPEN (design)
-- `lib/common.sh:36-42` sources `tenant.local` and `secrets.local` as shell.
-  If `secrets.local` is group/world-writable this is arbitrary code execution.
-  Fix: refuse to source unless mode 600 and root-owned (apply only to
-  `secrets.local`; `tenant.local` is intentionally 644). Confirm desired
-  behavior before changing.
-
-### 2. Plone admin password in group-readable buildout.cfg — OPEN (design)
+### 1. Plone admin password in group-readable buildout.cfg — OPEN (design)
 - `phase7b-plone-buildout.sh:274,289` — `PLONE_ADMIN_PW` written cleartext into
-  `buildout.cfg` (mode 640, group `plone`); group members can read it. Also
-  `CREDENTIALS.txt` perms are not re-asserted to 600 on the plain-append path.
+  `buildout.cfg` (mode 640, group `plone`); group members can read it. Low real
+  risk today (the only `plone`-group member, `espen`, already has `sudo`).
+  Left open until a less-privileged account is introduced. The related
+  `CREDENTIALS.txt` perm gap has been fixed (see Fixed below).
 
 ---
 
 ## Deferred
 
-### 3. phase7c systemd PIDFile hardcoded — DEFERRED (needs live testing)
+### 2. phase7c systemd PIDFile hardcoded — DEFERRED (needs live testing)
 - `phase7c-plone-frontend.sh:223` — `PIDFile=…/Z4.pid` with `Type=forking` is
   version-fragile; systemd may mis-track Plone. Recommended fix is `Type=simple`
   + `ExecStart=…/bin/instance console`, dropping `PIDFile`/`ExecStop`/`ExecReload`.
@@ -139,3 +134,13 @@ multiple lines, so the corruption path does not exist.)
   boundary: dangerous characters can never reach those contexts. Auto-generated
   secrets are alphanumeric, so the constraint affects only hand-set values;
   unset/empty values are skipped (generated later by the phase scripts).
+
+### Permission-hardening follow-up (this commit)
+- `lib/common.sh` — before sourcing `secrets.local`, check its mode: refuse to
+  run if it is writable by group/others (it executes as root, so that's a
+  code-injection path and the contents may already be tampered), and tighten it
+  to `600` with a warning if it is merely readable by group/others. Resolves the
+  former High "`secrets.local` sourced without a permission check".
+- `phase7b-plone-buildout.sh` — re-assert `chmod 600` on `CREDENTIALS.txt` after
+  the plain-append path (previously only the awk-rewrite branch re-applied it),
+  so an append never leaves the file looser than 600.
