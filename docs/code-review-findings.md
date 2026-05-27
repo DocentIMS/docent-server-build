@@ -184,3 +184,18 @@ multiple lines, so the corruption path does not exist.)
 - Fix: add `--no-defaults` to the `MYSQL_PWD` verify in `phase5.sh` and
   `phase6.sh` so `/root/.my.cnf` is ignored and `MYSQL_PWD` is used. Keeps the
   password off the command line.
+
+---
+
+## To do (build improvements)
+
+### Wire the Plone egg-cache into the repo so it's used automatically
+- `phase-pre-hetzner.sh` already scp's `docent-egg-cache.tar.gz` (~90 MB) to the
+  new server's `/root/`, but the `phase7b` code that extracts/uses it exists only
+  as an unpushed local commit (`20db3af`, on docenttemplate). So the GitHub copy
+  of `phase7b` ignores the cache and rebuilds Plone from dist.plone.org every
+  time (slow). Push the egg-cache-extraction logic into `phase7b-plone-buildout.sh`
+  so it auto-detects `/root/docent-egg-cache.tar.gz`, extracts it into buildout's
+  eggs/download cache before running buildout, and falls back cleanly when the
+  file is absent. Also document how the cache tarball is built/refreshed on the
+  template server.
