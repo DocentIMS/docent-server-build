@@ -167,3 +167,16 @@ multiple lines, so the corruption path does not exist.)
   - Context: the main `docent-server-build` repo is already cloned over SSH in
     `bootstrap.sh`; the public `docent-plone-addons` `products.cfg` fetch needs
     no auth.
+
+---
+
+## To investigate
+
+### phase5 Roundcube DB-connect verify: intermittent false failure
+- On a fresh chelsea build (2026-05-27), phase5's final check "Roundcube DB
+  user CANNOT connect" failed (exit 1), but an identical manual connect
+  immediately afterward succeeded and the config DSN password matched
+  secrets.local. Suspected race: the verify ran before CREATE USER / GRANT /
+  FLUSH fully settled. Has not been seen before. Consider adding a short
+  retry/wait around the DB-connect verify in phase5 (and the equivalent in
+  phase4/phase6) before reporting FAIL.
