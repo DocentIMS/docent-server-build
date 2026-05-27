@@ -39,6 +39,36 @@ fi
 if [ -f "$REPO_ROOT/secrets.local" ]; then
     # shellcheck disable=SC1091
     source "$REPO_ROOT/secrets.local"
+
+    # ------------------------------------------------------------------------
+    # Validate operator-supplied secrets at the boundary.
+    #
+    # These values are later interpolated into SQL statements, PHP config, and
+    # sed expressions. To keep those contexts safe - and to avoid silently
+    # corrupting a generated config - reject any secret whose value contains
+    # characters outside a conservative allowlist (letters, digits, . _ -).
+    # Auto-generated secrets are alphanumeric, so this only constrains hand-set
+    # values. Unset/empty values are skipped (they get generated later).
+    # ------------------------------------------------------------------------
+    _docent_secret_vars=(
+        ROOT_DB_PW MAIL_DB_PW ROUNDCUBE_DB_PW WP_DB_PW
+        PLONE_ADMIN_PW ADMIN_PW SHARED_ADMIN_PW ESPEN_PW
+        TEST_MAILBOX_PW ROUNDCUBE_DES_KEY XAI_API_KEY LICENSE_KEY
+    )
+    for _v in "${_docent_secret_vars[@]}"; do
+        _val="${!_v:-}"
+        [ -z "$_val" ] && continue
+        if ! [[ "$_val" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "ERROR: $_v in secrets.local contains unsupported characters." >&2
+            echo "       Allowed: letters, digits, and the symbols . _ -" >&2
+            echo "       These secrets are interpolated into SQL/PHP/sed, so other" >&2
+            echo "       characters (quotes, backslash, \$, &, |, #, ...) can break or" >&2
+            echo "       corrupt generated configs. Choose a value using only the" >&2
+            echo "       allowed characters." >&2
+            exit 1
+        fi
+    done
+    unset _docent_secret_vars _v _val
 fi
 
 # ============================================================================

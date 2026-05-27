@@ -8,7 +8,7 @@ carries a status:
 - **OPEN** — not yet addressed; awaiting a decision or scheduling.
 - **WON'T FIX** — investigated and judged not-a-bug or correct by design.
 
-Status counts: 17 fixed, 1 deferred, 4 open, 2 won't-fix.
+Status counts: 18 fixed, 1 deferred, 3 open, 2 won't-fix.
 
 Commits: `8a34cca` (first batch), `cd59ad3` (phase5b/audit/add-source-block),
 the password-rotation follow-up, and the phase8 + low-items follow-up that also
@@ -18,25 +18,14 @@ carries this update.
 
 ## Open — High
 
-### 1. DB password / API key interpolated unescaped into SQL, PHP, sed — OPEN
-- `phase3.sh` — `ROOT_DB_PW` into `ALTER USER … IDENTIFIED BY '$ROOT_DB_PW';` and the `.my.cnf` heredoc.
-- `phase4.sh` — `MAIL_DB_PW`/`HASHED_PW`/`DOMAIN` in SQL inserts.
-- `phase6.sh:262` — `WP_DB_PW` into `wp-config.php` via `sed` (no `\` escaping).
-- `phase5c-email-ai.sh:201` — `XAI_API_KEY` into single-quoted PHP (backslash not escaped).
-
-Generated passwords are now alphanumeric (length fix applied), so the
-generated-value path is safe. Remaining risk is a `secrets.local`-supplied
-value containing `'`, `\`, `#`, `|`, or `&`. Fix: validate/escape values, or
-restrict the accepted charset for operator-supplied secrets.
-
-### 2. `secrets.local` sourced as root with no permission check — OPEN (design)
+### 1. `secrets.local` sourced as root with no permission check — OPEN (design)
 - `lib/common.sh:36-42` sources `tenant.local` and `secrets.local` as shell.
   If `secrets.local` is group/world-writable this is arbitrary code execution.
   Fix: refuse to source unless mode 600 and root-owned (apply only to
   `secrets.local`; `tenant.local` is intentionally 644). Confirm desired
   behavior before changing.
 
-### 3. Plone admin password in group-readable buildout.cfg — OPEN (design)
+### 2. Plone admin password in group-readable buildout.cfg — OPEN (design)
 - `phase7b-plone-buildout.sh:274,289` — `PLONE_ADMIN_PW` written cleartext into
   `buildout.cfg` (mode 640, group `plone`); group members can read it. Also
   `CREDENTIALS.txt` perms are not re-asserted to 600 on the plain-append path.
@@ -45,7 +34,7 @@ restrict the accepted charset for operator-supplied secrets.
 
 ## Deferred
 
-### 4. phase7c systemd PIDFile hardcoded — DEFERRED (needs live testing)
+### 3. phase7c systemd PIDFile hardcoded — DEFERRED (needs live testing)
 - `phase7c-plone-frontend.sh:223` — `PIDFile=…/Z4.pid` with `Type=forking` is
   version-fragile; systemd may mis-track Plone. Recommended fix is `Type=simple`
   + `ExecStart=…/bin/instance console`, dropping `PIDFile`/`ExecStop`/`ExecReload`.
@@ -139,3 +128,14 @@ multiple lines, so the corruption path does not exist.)
   wrong directory.
 - `phase5a-rc-plus.sh` — guard the `cd "$INTER_SRC_DIR"` font-download block so
   a cd failure warns and skips instead of downloading into the repo root.
+
+### Secret validation follow-up (this commit) — resolves former High #1
+- `lib/common.sh` — after sourcing `secrets.local`, validate every known secret
+  (`ROOT_DB_PW`, `MAIL_DB_PW`, `ROUNDCUBE_DB_PW`, `WP_DB_PW`, `PLONE_ADMIN_PW`,
+  `ADMIN_PW`, `SHARED_ADMIN_PW`, `ESPEN_PW`, `TEST_MAILBOX_PW`,
+  `ROUNDCUBE_DES_KEY`, `XAI_API_KEY`, `LICENSE_KEY`) against the allowlist
+  `[A-Za-z0-9._-]` and exit with a clear per-variable error if a set value
+  contains anything else. This closes the SQL/PHP/sed interpolation risk at the
+  boundary: dangerous characters can never reach those contexts. Auto-generated
+  secrets are alphanumeric, so the constraint affects only hand-set values;
+  unset/empty values are skipped (generated later by the phase scripts).
