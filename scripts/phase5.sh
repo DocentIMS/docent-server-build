@@ -272,14 +272,14 @@ if [ -f "$ROUNDCUBE_CONFIG" ] && grep -q "phase5-marker" "$ROUNDCUBE_CONFIG" 2>/
     # Recover existing values to print at the end
     ROUNDCUBE_DES_KEY=$(grep -oP "\\\$config\['des_key'\] = '\K[^']+" "$ROUNDCUBE_CONFIG" 2>/dev/null || echo "")
 else
-    if [ -z "$ROUNDCUBE_DB_PW" ]; then
-        log_warn "DB password unknown - resetting"
-        # Use the value from secrets.local if it's there (CREDENTIALS.txt must
-        # stay canonical). Otherwise generate.
-        if [ -z "${ROUNDCUBE_DB_PW:-}" ]; then
-            ROUNDCUBE_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
-            log_warn "No ROUNDCUBE_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
-        fi
+    if [ -z "${ROUNDCUBE_DB_PW:-}" ]; then
+        # The DB user exists from a prior run but its password couldn't be
+        # recovered from config.inc.php and isn't in secrets.local. Rotate it to
+        # a fresh value so Roundcube can connect again. The new password is NOT
+        # in CREDENTIALS.txt.
+        ROUNDCUBE_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+        log_warn "ROUNDCUBE_DB_PW could not be recovered and is not in secrets.local."
+        log_warn "Rotated the $ROUNDCUBE_DB_USER DB password to a fresh value - update CREDENTIALS.txt manually."
         mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
             "ALTER USER '$ROUNDCUBE_DB_USER'@'localhost' IDENTIFIED BY '$ROUNDCUBE_DB_PW'; FLUSH PRIVILEGES;"
     fi

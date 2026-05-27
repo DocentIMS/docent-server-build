@@ -272,9 +272,16 @@ USER_EXISTS=$(mysql --defaults-file="$ROOT_DEFAULTS_FILE" -Nse \
     "SELECT COUNT(*) FROM mysql.user WHERE User='$MAIL_DB_USER' AND Host='localhost';" 2>/dev/null || echo "0")
 if [ "$USER_EXISTS" -gt 0 ]; then
     log_skip "DB user $MAIL_DB_USER exists"
-    if [ -f /etc/postfix/mysql-virtual-mailbox-domains.cf ]; then
-        MAIL_DB_PW=$(grep "^password" /etc/postfix/mysql-virtual-mailbox-domains.cf | cut -d= -f2- | tr -d ' ')
-    fi
+    # Recover the password from an existing Postfix lookup config so we don't
+    # rotate it (which would desync CREDENTIALS.txt). Any of the three .cf
+    # files carries it; use the first one that yields a value.
+    for _cf in /etc/postfix/mysql-virtual-mailbox-domains.cf \
+               /etc/postfix/mysql-virtual-mailbox-maps.cf \
+               /etc/postfix/mysql-virtual-alias-maps.cf; do
+        [ -f "$_cf" ] || continue
+        MAIL_DB_PW=$(grep "^password" "$_cf" | cut -d= -f2- | tr -d ' ')
+        [ -n "$MAIL_DB_PW" ] && break
+    done
 else
     # Use MAIL_DB_PW from secrets.local if available, otherwise generate.
     # When phase0 was used, MAIL_DB_PW is the password documented in
@@ -370,14 +377,14 @@ if [ ! -f "$POSTFIX_BACKUP" ]; then
     log_done "Backed up /etc/postfix/main.cf"
 fi
 
-if [ -z "$MAIL_DB_PW" ]; then
-    log_warn "DB password unknown - resetting"
-    # Use the value from secrets.local if it's there (CREDENTIALS.txt must
-    # stay canonical). Otherwise generate.
-    if [ -z "${MAIL_DB_PW:-}" ]; then
-        MAIL_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
-        log_warn "No MAIL_DB_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
-    fi
+if [ -z "${MAIL_DB_PW:-}" ]; then
+    # The DB user exists from a prior run but its password couldn't be recovered
+    # from the Postfix lookup configs and isn't in secrets.local. Rotate it to a
+    # fresh value and re-sync every consumer below so mail flow works again.
+    # The new password is NOT in CREDENTIALS.txt.
+    MAIL_DB_PW=$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 28)
+    log_warn "MAIL_DB_PW could not be recovered and is not in secrets.local."
+    log_warn "Rotated the $MAIL_DB_USER DB password to a fresh value - update CREDENTIALS.txt manually."
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" -e \
         "ALTER USER '$MAIL_DB_USER'@'localhost' IDENTIFIED BY '$MAIL_DB_PW'; FLUSH PRIVILEGES;"
 fi
