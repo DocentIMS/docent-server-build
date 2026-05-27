@@ -4,7 +4,8 @@ Tracking list from the full review of the provisioning scripts. Items that
 have been fixed are removed from the active list and recorded under
 "Resolved" at the bottom for reference.
 
-Last refreshed against commit `8a34cca`.
+Last refreshed after the `8a34cca` fixes plus the follow-up commit (items 8-10
+of the prior list resolved; former item 7 reclassified as not-a-bug).
 
 ---
 
@@ -51,31 +52,20 @@ restrict the accepted charset for operator-supplied secrets.
   value not in `CREDENTIALS.txt`, desyncing Postfix/Dovecot/Roundcube. The
   `[ -z "$VAR" ]` gates (no `:-`) can also be a fatal unbound-var under `set -u`.
 
-### 6. phase7c systemd PIDFile hardcoded
+### 6. phase7c systemd PIDFile hardcoded — DEFERRED (needs live testing)
 - `phase7c-plone-frontend.sh:223` — `PIDFile=…/Z4.pid` with `Type=forking` is
-  version-fragile; systemd may mis-track Plone. Consider `Type=simple`.
+  version-fragile; systemd may mis-track Plone. Recommended fix is `Type=simple`
+  + `ExecStart=…/bin/instance console`, dropping `PIDFile`/`ExecStop`/`ExecReload`.
+  This changes service semantics (restart, journald logging) and must be verified
+  against a running Plone instance before merging, so it's held back for now.
 
-### 7. run-phases FAIL detection is partial
-- `run-phases.sh:292` (and the equivalent later) — the `[FAIL]` log heuristic
-  only catches `verify`-style failures, not `log_fail`-style ones, so some real
-  failures can pass silently.
-
-### 8. phase5b plugin-array sed insertion not verified
-- `phase5b-globaladdressbook.sh:217-220` — the `sed` insert is not re-checked
-  afterward (unlike `phase5c`, which re-greps). Fragile against formatting drift.
-
-### 9. audit-monitors `|` in monitor names corrupts parsing
-- `audit-monitors.sh:92-104` — names containing `|` break the `cut -d'|'`
-  field splitting used for orphan/missing reporting.
-
-### 10. add-source-block uses GNU-only `chmod --reference`, unchecked
-- `add-source-block.sh:105` — fails on non-GNU; failure is silent and can leave
-  injected scripts at mktemp's restrictive 0600.
-
-### 11. refactor-to-common.py corrupts multi-line helper defs
+### 7. refactor-to-common.py corrupts multi-line helper defs — DEFERRED (dead path)
 - `refactor-to-common.py:57-59` — single-line removal of `log_*`/`step`
-  definitions leaves orphaned function bodies if a script defines them across
-  multiple lines. Dev tool only.
+  definitions would leave orphaned bodies if a *target* script defined them
+  across multiple lines. The migration has already run; the only scripts still
+  defining helpers (`phase7b`, `phase7d`) define them on single lines, which the
+  tool handles. So the corruption case does not exist today. Left as-is unless
+  the tool is re-run against a future multi-line-def script.
 
 ---
 
@@ -95,8 +85,14 @@ restrict the accepted charset for operator-supplied secrets.
 
 ---
 
-## Won't fix (by design)
+## Won't fix (not a bug / by design)
 
+- `run-phases.sh:292` — "FAIL detection is partial" was incorrect on closer
+  inspection. `log_fail` appends `[FAIL]  msg` to the `REPORT` array, which each
+  phase prints in its summary (e.g. `phase2.sh:482`); that line is tee'd to the
+  log and matches the `^\s*\[FAIL\]` heuristic just like `verify`-style failures.
+  Hard failures additionally `exit 1` and are caught by `rc=${PIPESTATUS[0]}`.
+  No silent-pass path exists.
 - `lib/common.sh:119,135` — `verify_contains`/`verify_not_contains` use
   `grep -q` (regex). Callers in `phase1.sh`/`phase2.sh` intentionally pass
   anchored regex patterns (`^port …$`, `^22/tcp`), so switching to `grep -F`
@@ -120,3 +116,14 @@ restrict the accepted charset for operator-supplied secrets.
   literal under `grep -E`).
 - Password generation (`phase0/1/3/4/5/6/7b`) — feed extra entropy and keep
   alphanumerics so the output is reliably the requested length.
+
+### Follow-up commit
+
+- `phase5b-globaladdressbook.sh` — re-grep after the plugins-array `sed` insert
+  and `log_fail`/`exit 1` if the plugin name isn't present (mirrors `phase5c`).
+- `audit-monitors.sh` — look up the friendly name with `awk` keyed on the exact
+  id field, preserving everything after the first delimiter, so names containing
+  `|` no longer corrupt the orphan report.
+- `add-source-block.sh` — capture the original file mode with `stat -c '%a'`
+  before overwriting and re-apply it explicitly, warning on failure instead of
+  silently leaving mktemp's 0600.

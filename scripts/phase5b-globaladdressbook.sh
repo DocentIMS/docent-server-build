@@ -220,7 +220,12 @@ else
     sed -i "/\\\$config\\['plugins'\\]/,/^\\];/{ /^\\];/i\\
     '$PLUGIN_NAME',
 }" "$ROUNDCUBE_CONFIG"
-    log_done "Added '$PLUGIN_NAME' to \$config['plugins']"
+    if grep -q "'$PLUGIN_NAME'" "$ROUNDCUBE_CONFIG"; then
+        log_done "Added '$PLUGIN_NAME' to \$config['plugins']"
+    else
+        log_fail "Failed to insert '$PLUGIN_NAME' into \$config['plugins'] (unexpected config format)"
+        exit 1
+    fi
 fi
 
 # ============================================================================

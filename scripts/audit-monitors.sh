@@ -194,7 +194,7 @@ if [ "$ORPHAN_COUNT" -gt 0 ]; then
   echo ""
   while read -r id; do
     [ -z "$id" ] && continue
-    name=$(grep "^${id}[|]" "$UR_NAME_FILE" | head -1 | cut -d'|' -f2)
+    name=$(awk -F'|' -v id="$id" '$1==id { sub(/^[^|]*\|/, ""); print; exit }' "$UR_NAME_FILE")
     printf "    %-12s %s\n" "$id" "$name"
   done <<< "$ORPHANS"
   echo ""

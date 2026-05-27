@@ -101,8 +101,14 @@ for script in "${PHASE_SCRIPTS[@]}"; do
         tail -n +"$insert_at" "$target"
     } > "$tmpfile"
 
+    # Capture the original mode before we overwrite the file, then re-apply it
+    # explicitly. Don't silently leave mktemp's restrictive 0600 perms if the
+    # chmod fails.
+    orig_mode=$(stat -c '%a' "$target")
     mv "$tmpfile" "$target"
-    chmod --reference="$target.preinject.bak" "$target"
+    if ! chmod "$orig_mode" "$target"; then
+        echo "  ! WARNING: could not restore mode $orig_mode on $target"
+    fi
 
     # Verify syntax
     if bash -n "$target" 2>/dev/null; then
