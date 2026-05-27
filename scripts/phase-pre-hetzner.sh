@@ -23,9 +23,9 @@
 # on the new server itself. Run it from wherever you already SSH from.
 #
 # Usage:
-#   sudo bash phase-pre-hetzner.sh        (root recommended for writing tenant.local
-#                                          to a system path; not required if run
-#                                          from your own user account)
+#   bash phase-pre-hetzner.sh        (run as your normal user - NO sudo/root
+#                                     needed; it only writes tenant.local into
+#                                     this repo and calls the Hetzner API)
 #
 # Requirements on the running machine:
 #   - bash 4+, curl, jq, openssl
