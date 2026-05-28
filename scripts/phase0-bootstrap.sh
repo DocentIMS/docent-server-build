@@ -929,38 +929,6 @@ else
 fi
 
 # ============================================================================
-# DISPLAY CREDENTIALS
-# ============================================================================
-echo ""
-echo "${BOLD}${YELLOW}=============================================================${RESET}"
-echo "${BOLD}${YELLOW}  CREDENTIALS GENERATED (full list shown at end of build)${RESET}"
-echo "${BOLD}${YELLOW}=============================================================${RESET}"
-echo ""
-echo "  Saved to: ${CYAN}${CREDENTIALS_FILE}${RESET}"
-echo "  The complete list - including the Plone admin password, which is"
-echo "  added later by phase 7b - is printed at the END of run-phases.sh."
-echo "  Save it then."
-echo ""
-
-echo ""
-echo "${BOLD}${YELLOW}=============================================================${RESET}"
-echo "${BOLD}${YELLOW}  IMPORTANT - DOWNLOAD CREDENTIALS BEFORE NUKING THIS SERVER${RESET}"
-echo "${BOLD}${YELLOW}=============================================================${RESET}"
-cat <<EOF
-  Two files are ready for download. They are readable as
-  ${BOLD}${DOWNLOAD_AS_USER}${RESET}:
-    ${CYAN}${DOWNLOAD_CRED_FILE}${RESET}
-    ${CYAN}${DOWNLOAD_QREF_FILE}${RESET}
-  ${BOLD}When convenient, do this:${RESET}
-    1. Open MobaXterm's left sidebar (SFTP browser).
-    2. Navigate to ${CYAN}${DOWNLOAD_DIR}/${RESET}
-    3. Right-click each file -> Download. Save them somewhere
-       you control (password manager, encrypted folder, etc).
-  These files will not be regenerated. Build continues automatically.
-EOF
-echo ""
-
-# ============================================================================
 # DONE
 # ============================================================================
 cat <<EOF
