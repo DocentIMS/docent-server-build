@@ -208,3 +208,14 @@ multiple lines, so the corruption path does not exist.)
       On the template server, run:
         cd ~/server-build/scripts && ./phase8-monitoring.sh <domain>
   Fix both the checklist line (601) and the NEXT ACTION block (629).
+
+### Credentials list omits the Plone admin password
+- `PLONE_ADMIN_PW` is appended to `CREDENTIALS.txt` by phase7b, which runs long
+  after phase0/phase1 already told the operator to "save these credentials" - so
+  the copy the operator saved lacks the Plone password.
+  - Preferred fix: print the full credentials summary again at the very END of
+    the build (after phase 7) so it includes Plone, prompting the operator to
+    save the final copy.
+  - Minimum fix: in the early credentials output, add a note: "The Plone admin
+    password is added later; retrieve it with:
+    grep -i plone /root/server-build/CREDENTIALS.txt".
