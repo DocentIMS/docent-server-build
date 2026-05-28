@@ -721,7 +721,7 @@ else
 fi
 
 # Test that Roundcube can connect to its database
-if MYSQL_PWD="$ROUNDCUBE_DB_PW" mysql -u "$ROUNDCUBE_DB_USER" "$ROUNDCUBE_DB" -e "SELECT 1;" 2>/dev/null | grep -q 1; then
+if MYSQL_PWD="$ROUNDCUBE_DB_PW" mysql --no-defaults -u "$ROUNDCUBE_DB_USER" "$ROUNDCUBE_DB" -e "SELECT 1;" 2>/dev/null | grep -q 1; then
     vp "Roundcube DB user can connect to $ROUNDCUBE_DB"
 else
     vf "Roundcube DB user CANNOT connect to $ROUNDCUBE_DB (check password in config)"

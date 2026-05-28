@@ -8,22 +8,11 @@ carries a status:
 - **OPEN** — not yet addressed; awaiting a decision or scheduling.
 - **WON'T FIX** — investigated and judged not-a-bug or correct by design.
 
-Status counts: 19 fixed, 1 deferred, 2 open, 2 won't-fix.
+Status counts: 19 fixed, 1 deferred, 1 open, 3 won't-fix.
 
 Commits: `8a34cca` (first batch), `cd59ad3` (phase5b/audit/add-source-block),
 the password-rotation follow-up, and the phase8 + low-items follow-up that also
 carries this update.
-
----
-
-## Open — High
-
-### 1. Plone admin password in group-readable buildout.cfg — OPEN (design)
-- `phase7b-plone-buildout.sh:274,289` — `PLONE_ADMIN_PW` written cleartext into
-  `buildout.cfg` (mode 640, group `plone`); group members can read it. Low real
-  risk today (the only `plone`-group member, `espen`, already has `sudo`).
-  Left open until a less-privileged account is introduced. The related
-  `CREDENTIALS.txt` perm gap has been fixed (see Fixed below).
 
 ---
 
@@ -62,6 +51,9 @@ carries this update.
   `grep -q` (regex). Callers in `phase1.sh`/`phase2.sh` intentionally pass
   anchored regex patterns (`^port …$`, `^22/tcp`), so switching to `grep -F`
   would break them.
+- `phase7b-plone-buildout.sh:274,289` — group-readable Plone admin password in
+  `buildout.cfg`. Operator accepts the risk (only sudo-capable accounts are in
+  the `plone` group); dropped from the list.
 
 (Former item: `refactor-to-common.py` multi-line-def corruption — removed. The
 migration has already run and no phase script defines `log_*`/`step` across
@@ -167,3 +159,60 @@ multiple lines, so the corruption path does not exist.)
   - Context: the main `docent-server-build` repo is already cloned over SSH in
     `bootstrap.sh`; the public `docent-plone-addons` `products.cfg` fetch needs
     no auth.
+
+---
+
+## Resolved during chelsea build (2026-05-27)
+
+### phase5/phase6 DB-connect verify failed: MYSQL_PWD overridden by /root/.my.cnf
+- Root cause: the earlier hardening that switched the verify from `-p"$PW"` to
+  `MYSQL_PWD="$PW" mysql ...` broke when run as root. `mysql` reads
+  `/root/.my.cnf` (written by phase3 with the *root* DB password), and an
+  option-file password takes precedence over `MYSQL_PWD`, so the verify tried
+  the roundcube/wp user with root's password -> "Access denied" -> false FAIL.
+  The old `-p` form worked only because a command-line password outranks the
+  option file. (The "intermittent" appearance was a red herring: a manual test
+  with empty `-u` had silently connected as root via `/root/.my.cnf`.)
+- Fix: add `--no-defaults` to the `MYSQL_PWD` verify in `phase5.sh` and
+  `phase6.sh` so `/root/.my.cnf` is ignored and `MYSQL_PWD` is used. Keeps the
+  password off the command line.
+
+---
+
+## To do (build improvements)
+
+### Wire the Plone egg-cache into the repo so it's used automatically — DONE
+- `phase7b-plone-buildout.sh` now pre-seeds the egg cache before buildout: if
+  `/root/docent-egg-cache.tar.gz` exists it extracts into `$PLONE_INSTANCE_DIR`,
+  chowns `eggs/` to the plone user, and buildout reuses the compiled eggs;
+  absent/failed extract falls back to a normal (slower) download. (Ported from
+  the previously-unpushed local commit `20db3af`.)
+- Still open: document how the cache tarball is built/refreshed on the template
+  server.
+
+### Reword the post-build monitoring "NEXT ACTION" instruction — DONE
+- `run-phases.sh` — dropped the `ssh` wrapper. The end-of-build banner now reads
+  "PHASE 8 — CREATE MONITORS ON UPTIMEROBOT", lists the 6 monitors, and says
+  "go to the template server and run: cd ~/server-build/scripts &&
+  ./phase8-monitoring.sh <domain>". Checklist line updated to match.
+
+### Credentials list omits the Plone admin password — DONE
+- `phase0-bootstrap.sh` no longer dumps the credential list (it was printed
+  before phase7b adds `PLONE_ADMIN_PW`); it now points the operator to the
+  end-of-build list. `run-phases.sh` prints the complete `CREDENTIALS.txt`
+  (Plone password included) as the final block, under "CREDENTIALS - SAVE TO
+  PASSWORD MANAGER NOW". Single copy-and-save moment, at the end.
+
+### Review the installed add-on product list — DONE
+- `products.cfg` (in `docent-plone-addons`) trimmed: `medialog.newsletter` and
+  `DocentIMS.dashboard` removed; the latter moved to a dashboard-only overlay.
+  Note: `collective.defaultpage`/`embeddedpage`/`searchandreplace` are NOT in
+  `products.cfg` or the build scripts - they come in as dependencies of an
+  installed add-on (or are merely "available", not activated). If they need to
+  be removed, trace which add-on requires them.
+
+### Separate add-on product set for "dashboard" tenants — DONE
+- `products-dashboard.cfg` (in `docent-plone-addons`) created and committed -
+  installs only `DocentIMS.dashboard` (private, SSH). For a dashboard tenant set
+  `PRODUCTS_CFG_URL=.../docent-plone-addons/main/products-dashboard.cfg` in
+  `tenant.local` before phase 7d; standard tenants use the default `products.cfg`.
