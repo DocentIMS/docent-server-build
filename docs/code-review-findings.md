@@ -203,7 +203,8 @@ multiple lines, so the corruption path does not exist.)
 ### Reword the post-build monitoring "NEXT ACTION" instruction
 - `run-phases.sh:601` and `:625-629` — the end-of-build message reads "From your
   own computer (not this server), paste this one line: ssh -p 2222 wayne@<tmpl>
-  ... phase8-monitoring.sh <domain>". Confusing. Reword to: run it ON the
-  template server directly (e.g. "On the template server, run:
-  ./phase8-monitoring.sh <domain>") and drop the ssh wrapper, or delete the line.
+  ... phase8-monitoring.sh <domain>". Confusing. Drop the ssh wrapper and reword
+  to exactly:
+      On the template server, run:
+        cd ~/server-build/scripts && ./phase8-monitoring.sh <domain>
   Fix both the checklist line (601) and the NEXT ACTION block (629).
