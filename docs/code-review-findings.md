@@ -224,3 +224,11 @@ multiple lines, so the corruption path does not exist.)
 - Review the products enabled in the `docent-plone-addons` `products.cfg`
   (`[sources]`, `auto-checkout`, and `[instance] eggs`) and comment out the ones
   not wanted on tenant sites. Decide the canonical default set.
+
+### Separate add-on product set for "dashboard" tenants
+- Need a distinct buildout product list (different `products.cfg`) for dashboard
+  sites vs. standard tenant sites. `phase7d` already supports this: set
+  `PRODUCTS_CFG_URL` in `tenant.local` to point at the dashboard variant (a
+  different file/branch in `docent-plone-addons`). To do: create and maintain the
+  dashboard `products.cfg`, and document which `PRODUCTS_CFG_URL` to set per
+  tenant type.
