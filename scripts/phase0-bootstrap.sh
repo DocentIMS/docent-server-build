@@ -933,10 +933,13 @@ fi
 # ============================================================================
 echo ""
 echo "${BOLD}${YELLOW}=============================================================${RESET}"
-echo "${BOLD}${YELLOW}  CREDENTIALS - SAVE TO PASSWORD MANAGER NOW${RESET}"
+echo "${BOLD}${YELLOW}  CREDENTIALS GENERATED (full list shown at end of build)${RESET}"
 echo "${BOLD}${YELLOW}=============================================================${RESET}"
 echo ""
-cat "$CREDENTIALS_FILE"
+echo "  Saved to: ${CYAN}${CREDENTIALS_FILE}${RESET}"
+echo "  The complete list - including the Plone admin password, which is"
+echo "  added later by phase 7b - is printed at the END of run-phases.sh."
+echo "  Save it then."
 echo ""
 
 echo ""

@@ -206,16 +206,12 @@ multiple lines, so the corruption path does not exist.)
   "go to the template server and run: cd ~/server-build/scripts &&
   ./phase8-monitoring.sh <domain>". Checklist line updated to match.
 
-### Credentials list omits the Plone admin password
-- `PLONE_ADMIN_PW` is appended to `CREDENTIALS.txt` by phase7b, which runs long
-  after phase0/phase1 already told the operator to "save these credentials" - so
-  the copy the operator saved lacks the Plone password.
-  - Preferred fix: print the full credentials summary again at the very END of
-    the build (after phase 7) so it includes Plone, prompting the operator to
-    save the final copy.
-  - Minimum fix: in the early credentials output, add a note: "The Plone admin
-    password is added later; retrieve it with:
-    grep -i plone /root/server-build/CREDENTIALS.txt".
+### Credentials list omits the Plone admin password — DONE
+- `phase0-bootstrap.sh` no longer dumps the credential list (it was printed
+  before phase7b adds `PLONE_ADMIN_PW`); it now points the operator to the
+  end-of-build list. `run-phases.sh` prints the complete `CREDENTIALS.txt`
+  (Plone password included) as the final block, under "CREDENTIALS - SAVE TO
+  PASSWORD MANAGER NOW". Single copy-and-save moment, at the end.
 
 ### Review the installed add-on product list
 - Review the products enabled in the `docent-plone-addons` `products.cfg`

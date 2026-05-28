@@ -638,3 +638,19 @@ echo "  To proceed, go to the template server and run:"
 echo ""
 echo "    ${BOLD}cd ~/server-build/scripts && ./phase8-monitoring.sh ${DOMAIN}${RESET}"
 echo ""
+
+# ----------------------------------------------------------------------------
+# Final: print the full credentials list. By this point CREDENTIALS.txt is
+# complete - phase 7b has appended the Plone admin password - so this is the
+# single copy-and-save moment (phase 0 deliberately no longer dumps the list).
+# ----------------------------------------------------------------------------
+CRED_FILE="$REPO_ROOT/CREDENTIALS.txt"
+if [ -f "$CRED_FILE" ]; then
+    echo ""
+    echo "${BOLD}${YELLOW}============================================================${RESET}"
+    echo "${BOLD}${YELLOW}  CREDENTIALS - SAVE TO PASSWORD MANAGER NOW${RESET}"
+    echo "${BOLD}${YELLOW}============================================================${RESET}"
+    echo ""
+    cat "$CRED_FILE"
+    echo ""
+fi
