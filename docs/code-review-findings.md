@@ -205,15 +205,16 @@ multiple lines, so the corruption path does not exist.)
   (Plone password included) as the final block, under "CREDENTIALS - SAVE TO
   PASSWORD MANAGER NOW". Single copy-and-save moment, at the end.
 
-### Review the installed add-on product list
-- Review the products enabled in the `docent-plone-addons` `products.cfg`
-  (`[sources]`, `auto-checkout`, and `[instance] eggs`) and comment out the ones
-  not wanted on tenant sites. Decide the canonical default set.
+### Review the installed add-on product list — DONE
+- `products.cfg` (in `docent-plone-addons`) trimmed: `medialog.newsletter` and
+  `DocentIMS.dashboard` removed; the latter moved to a dashboard-only overlay.
+  Note: `collective.defaultpage`/`embeddedpage`/`searchandreplace` are NOT in
+  `products.cfg` or the build scripts - they come in as dependencies of an
+  installed add-on (or are merely "available", not activated). If they need to
+  be removed, trace which add-on requires them.
 
-### Separate add-on product set for "dashboard" tenants
-- Need a distinct buildout product list (different `products.cfg`) for dashboard
-  sites vs. standard tenant sites. `phase7d` already supports this: set
-  `PRODUCTS_CFG_URL` in `tenant.local` to point at the dashboard variant (a
-  different file/branch in `docent-plone-addons`). To do: create and maintain the
-  dashboard `products.cfg`, and document which `PRODUCTS_CFG_URL` to set per
-  tenant type.
+### Separate add-on product set for "dashboard" tenants — DONE
+- `products-dashboard.cfg` (in `docent-plone-addons`) created and committed -
+  installs only `DocentIMS.dashboard` (private, SSH). For a dashboard tenant set
+  `PRODUCTS_CFG_URL=.../docent-plone-addons/main/products-dashboard.cfg` in
+  `tenant.local` before phase 7d; standard tenants use the default `products.cfg`.
