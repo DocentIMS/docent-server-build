@@ -8,22 +8,11 @@ carries a status:
 - **OPEN** — not yet addressed; awaiting a decision or scheduling.
 - **WON'T FIX** — investigated and judged not-a-bug or correct by design.
 
-Status counts: 19 fixed, 1 deferred, 1 open, 3 won't-fix.
+Status counts: 20 fixed, 0 deferred, 1 open, 3 won't-fix.
 
 Commits: `8a34cca` (first batch), `cd59ad3` (phase5b/audit/add-source-block),
 the password-rotation follow-up, and the phase8 + low-items follow-up that also
 carries this update.
-
----
-
-## Deferred
-
-### 2. phase7c systemd PIDFile hardcoded — DEFERRED (needs live testing)
-- `phase7c-plone-frontend.sh:223` — `PIDFile=…/Z4.pid` with `Type=forking` is
-  version-fragile; systemd may mis-track Plone. Recommended fix is `Type=simple`
-  + `ExecStart=…/bin/instance console`, dropping `PIDFile`/`ExecStop`/`ExecReload`.
-  Changes service semantics (restart, journald logging) and must be verified
-  against a running Plone instance before merging.
 
 ---
 
@@ -223,3 +212,12 @@ multiple lines, so the corruption path does not exist.)
   a manual nameserver step). GoDaddy exposes an API for this.
 - GoDaddy also has a domain-availability API ("connector") to check/suggest
   available domain names - could be wired into the provisioning flow.
+
+### phase7c systemd PIDFile — DONE
+- `phase7c-plone-frontend.sh` — unit switched from `Type=forking` (with the
+  fragile hardcoded `Z4.pid` PIDFile + ExecStop/ExecReload) to `Type=simple`
+  with `ExecStart=$PLONE_INSTANCE_DIR/bin/instance console`. systemd now tracks
+  Plone's main PID directly and routes its stdout/stderr to journald. Verified
+  on a live chelseamallproject instance: `active (running)`, single Main PID,
+  Plone "Ready to handle requests" on 127.0.0.1:8080. Removed the Deferred
+  section (was its only item).
