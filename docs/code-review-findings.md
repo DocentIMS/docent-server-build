@@ -187,8 +187,8 @@ multiple lines, so the corruption path does not exist.)
   chowns `eggs/` to the plone user, and buildout reuses the compiled eggs;
   absent/failed extract falls back to a normal (slower) download. (Ported from
   the previously-unpushed local commit `20db3af`.)
-- Still open: document how the cache tarball is built/refreshed on the template
-  server.
+- Documentation of how the cache tarball is built/refreshed on the template
+  server: DONE (operator-maintained).
 
 ### Reword the post-build monitoring "NEXT ACTION" instruction — DONE
 - `run-phases.sh` — dropped the `ssh` wrapper. The end-of-build banner now reads
