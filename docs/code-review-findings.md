@@ -181,16 +181,14 @@ multiple lines, so the corruption path does not exist.)
 
 ## To do (build improvements)
 
-### Wire the Plone egg-cache into the repo so it's used automatically
-- `phase-pre-hetzner.sh` already scp's `docent-egg-cache.tar.gz` (~90 MB) to the
-  new server's `/root/`, but the `phase7b` code that extracts/uses it exists only
-  as an unpushed local commit (`20db3af`, on docenttemplate). So the GitHub copy
-  of `phase7b` ignores the cache and rebuilds Plone from dist.plone.org every
-  time (slow). Push the egg-cache-extraction logic into `phase7b-plone-buildout.sh`
-  so it auto-detects `/root/docent-egg-cache.tar.gz`, extracts it into buildout's
-  eggs/download cache before running buildout, and falls back cleanly when the
-  file is absent. Also document how the cache tarball is built/refreshed on the
-  template server.
+### Wire the Plone egg-cache into the repo so it's used automatically — DONE
+- `phase7b-plone-buildout.sh` now pre-seeds the egg cache before buildout: if
+  `/root/docent-egg-cache.tar.gz` exists it extracts into `$PLONE_INSTANCE_DIR`,
+  chowns `eggs/` to the plone user, and buildout reuses the compiled eggs;
+  absent/failed extract falls back to a normal (slower) download. (Ported from
+  the previously-unpushed local commit `20db3af`.)
+- Still open: document how the cache tarball is built/refreshed on the template
+  server.
 
 ### Reword the post-build monitoring "NEXT ACTION" instruction — DONE
 - `run-phases.sh` — dropped the `ssh` wrapper. The end-of-build banner now reads

@@ -314,6 +314,25 @@ BIN_BUILDOUT="$PLONE_INSTANCE_DIR/bin/buildout"
 if [ -x "$BIN_INSTANCE" ]; then
     log_skip "bin/instance already exists. Re-run buildout manually with 'sudo -u plone bin/buildout' if you need to refresh."
 else
+    # --- Pre-seed the egg cache (TODO 6) ---------------------------------
+    # phase-pre-hetzner ships a pre-built egg cache to /root/ on this tenant.
+    # Extracting it into the instance's eggs/ before buildout runs lets
+    # buildout reuse the already-compiled eggs and skip the slow
+    # download+compile. Pure optimization: if the tarball is absent or the
+    # extract fails, buildout simply downloads everything as normal.
+    EGG_CACHE_TARBALL="/root/docent-egg-cache.tar.gz"
+    if [ -f "$EGG_CACHE_TARBALL" ]; then
+        echo "  Pre-seeding egg cache from $EGG_CACHE_TARBALL ..."
+        if tar xzf "$EGG_CACHE_TARBALL" -C "$PLONE_INSTANCE_DIR"; then
+            chown -R "$PLONE_USER:$PLONE_USER" "$PLONE_INSTANCE_DIR/eggs"
+            log_done "Egg cache extracted into $PLONE_INSTANCE_DIR/eggs - buildout will be fast"
+        else
+            log_warn "Egg cache extraction failed - buildout will download everything (slower)"
+        fi
+    else
+        log_warn "No egg cache at $EGG_CACHE_TARBALL - buildout will download everything (slower)"
+    fi
+
     # Bootstrap: produces bin/buildout
     if [ ! -x "$BIN_BUILDOUT" ]; then
         if ! sudo -u "$PLONE_USER" bash -c "cd '$PLONE_INSTANCE_DIR' && venv/bin/buildout bootstrap"; then
