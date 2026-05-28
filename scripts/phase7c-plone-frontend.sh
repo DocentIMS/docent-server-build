@@ -213,14 +213,11 @@ Description=Plone instance for $PLONE_SITE_NAME ($PLONE_PUBLIC_HOST)
 After=network.target
 
 [Service]
-Type=forking
+Type=simple
 User=$PLONE_USER
 Group=$PLONE_USER
 WorkingDirectory=$PLONE_INSTANCE_DIR
-ExecStart=$PLONE_INSTANCE_DIR/bin/instance start
-ExecStop=$PLONE_INSTANCE_DIR/bin/instance stop
-ExecReload=$PLONE_INSTANCE_DIR/bin/instance restart
-PIDFile=$PLONE_INSTANCE_DIR/var/instance/Z4.pid
+ExecStart=$PLONE_INSTANCE_DIR/bin/instance console
 Restart=on-failure
 RestartSec=10
 TimeoutStartSec=120
