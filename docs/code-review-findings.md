@@ -8,22 +8,11 @@ carries a status:
 - **OPEN** — not yet addressed; awaiting a decision or scheduling.
 - **WON'T FIX** — investigated and judged not-a-bug or correct by design.
 
-Status counts: 19 fixed, 1 deferred, 2 open, 2 won't-fix.
+Status counts: 19 fixed, 1 deferred, 1 open, 3 won't-fix.
 
 Commits: `8a34cca` (first batch), `cd59ad3` (phase5b/audit/add-source-block),
 the password-rotation follow-up, and the phase8 + low-items follow-up that also
 carries this update.
-
----
-
-## Open — High
-
-### 1. Plone admin password in group-readable buildout.cfg — OPEN (design)
-- `phase7b-plone-buildout.sh:274,289` — `PLONE_ADMIN_PW` written cleartext into
-  `buildout.cfg` (mode 640, group `plone`); group members can read it. Low real
-  risk today (the only `plone`-group member, `espen`, already has `sudo`).
-  Left open until a less-privileged account is introduced. The related
-  `CREDENTIALS.txt` perm gap has been fixed (see Fixed below).
 
 ---
 
@@ -62,6 +51,9 @@ carries this update.
   `grep -q` (regex). Callers in `phase1.sh`/`phase2.sh` intentionally pass
   anchored regex patterns (`^port …$`, `^22/tcp`), so switching to `grep -F`
   would break them.
+- `phase7b-plone-buildout.sh:274,289` — group-readable Plone admin password in
+  `buildout.cfg`. Operator accepts the risk (only sudo-capable accounts are in
+  the `plone` group); dropped from the list.
 
 (Former item: `refactor-to-common.py` multi-line-def corruption — removed. The
 migration has already run and no phase script defines `log_*`/`step` across
