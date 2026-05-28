@@ -219,3 +219,8 @@ multiple lines, so the corruption path does not exist.)
   - Minimum fix: in the early credentials output, add a note: "The Plone admin
     password is added later; retrieve it with:
     grep -i plone /root/server-build/CREDENTIALS.txt".
+
+### Review the installed add-on product list
+- Review the products enabled in the `docent-plone-addons` `products.cfg`
+  (`[sources]`, `auto-checkout`, and `[instance] eggs`) and comment out the ones
+  not wanted on tenant sites. Decide the canonical default set.
