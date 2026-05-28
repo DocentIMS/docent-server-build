@@ -216,3 +216,10 @@ multiple lines, so the corruption path does not exist.)
   installs only `DocentIMS.dashboard` (private, SSH). For a dashboard tenant set
   `PRODUCTS_CFG_URL=.../docent-plone-addons/main/products-dashboard.cfg` in
   `tenant.local` before phase 7d; standard tenants use the default `products.cfg`.
+
+### Consider moving registrar/DNS from IONOS to GoDaddy
+- Evaluate migrating the domain registrar (and/or DNS) from IONOS to GoDaddy so
+  the build code can set nameservers programmatically (IONOS currently requires
+  a manual nameserver step). GoDaddy exposes an API for this.
+- GoDaddy also has a domain-availability API ("connector") to check/suggest
+  available domain names - could be wired into the provisioning flow.
