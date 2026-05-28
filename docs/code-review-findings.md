@@ -200,14 +200,11 @@ multiple lines, so the corruption path does not exist.)
   file is absent. Also document how the cache tarball is built/refreshed on the
   template server.
 
-### Reword the post-build monitoring "NEXT ACTION" instruction
-- `run-phases.sh:601` and `:625-629` — the end-of-build message reads "From your
-  own computer (not this server), paste this one line: ssh -p 2222 wayne@<tmpl>
-  ... phase8-monitoring.sh <domain>". Confusing. Drop the ssh wrapper and reword
-  to exactly:
-      On the template server, run:
-        cd ~/server-build/scripts && ./phase8-monitoring.sh <domain>
-  Fix both the checklist line (601) and the NEXT ACTION block (629).
+### Reword the post-build monitoring "NEXT ACTION" instruction — DONE
+- `run-phases.sh` — dropped the `ssh` wrapper. The end-of-build banner now reads
+  "PHASE 8 — CREATE MONITORS ON UPTIMEROBOT", lists the 6 monitors, and says
+  "go to the template server and run: cd ~/server-build/scripts &&
+  ./phase8-monitoring.sh <domain>". Checklist line updated to match.
 
 ### Credentials list omits the Plone admin password
 - `PLONE_ADMIN_PW` is appended to `CREDENTIALS.txt` by phase7b, which runs long
