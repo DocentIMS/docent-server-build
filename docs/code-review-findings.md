@@ -8,7 +8,7 @@ carries a status:
 - **OPEN** — not yet addressed; awaiting a decision or scheduling.
 - **WON'T FIX** — investigated and judged not-a-bug or correct by design.
 
-Status counts: 20 fixed, 0 deferred, 1 open, 3 won't-fix.
+Status counts: 20 fixed, 0 deferred, 1 open, 4 won't-fix.
 
 Commits: `8a34cca` (first batch), `cd59ad3` (phase5b/audit/add-source-block),
 the password-rotation follow-up, and the phase8 + low-items follow-up that also
@@ -18,13 +18,9 @@ carries this update.
 
 ## Open — Low
 
-- Remote buildout/requirements fetched and executed with no checksum pinning
-  (`phase7b-plone-buildout.sh:237` pip `--pre -r <remote requirements.txt>`;
-  `phase7d-plone-products.sh:49` `products.cfg` from the `main` branch). Not
-  auto-fixed: a safe fix needs maintained known-good hashes (upstream Plone's
-  requirements.txt isn't hash-pinned) or pinning to a specific reviewed commit/
-  tag. TLS already protects the transport; this is defense against a compromised
-  upstream. Decide whether to pin and supply the reference.
+- `phase7d-plone-products.sh:49` — the default `PRODUCTS_CFG_URL` fetches
+  `products.cfg` from the mutable `main` branch. Pin it to a specific commit SHA
+  (our own repo, cheap) and document bumping the SHA when `products.cfg` changes.
 
 ---
 
@@ -43,6 +39,11 @@ carries this update.
 - `phase7b-plone-buildout.sh:274,289` — group-readable Plone admin password in
   `buildout.cfg`. Operator accepts the risk (only sudo-capable accounts are in
   the `plone` group); dropped from the list.
+- `phase7b-plone-buildout.sh:237` — pip installs Plone's requirements from
+  `dist.plone.org` with no hash pinning. Not worth it: Plone doesn't publish
+  hashes, so `--require-hashes` would mean generating/maintaining our own hash
+  list every Plone release; TLS already protects the transport and
+  `dist.plone.org` is the trusted source. Accepted risk.
 
 (Former item: `refactor-to-common.py` multi-line-def corruption — removed. The
 migration has already run and no phase script defines `log_*`/`step` across
