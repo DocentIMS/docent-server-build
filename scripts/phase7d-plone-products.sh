@@ -44,9 +44,12 @@ PLONE_HOME="/home/plone"
 PLONE_INSTANCE_DIR=""   # set after tenant.local is sourced (see below)
 
 # Where to fetch the add-on overlay from: the docent-plone-addons GitHub repo
-# (public). Override PRODUCTS_CFG_URL in tenant.local to point at a different
-# branch or fork (e.g. a 'staging' branch) without editing this script.
-PRODUCTS_CFG_URL="${PRODUCTS_CFG_URL:-https://raw.githubusercontent.com/DocentIMS/docent-plone-addons/main/products.cfg}"
+# (public). Pinned to a specific commit SHA (not a mutable branch) so a build is
+# reproducible and a compromised/edited `main` can't silently change what gets
+# installed. When you update products.cfg in docent-plone-addons, bump the SHA
+# below to that commit. Override PRODUCTS_CFG_URL in tenant.local to point at a
+# different commit/branch/fork (e.g. products-dashboard.cfg for dashboard tenants).
+PRODUCTS_CFG_URL="${PRODUCTS_CFG_URL:-https://raw.githubusercontent.com/DocentIMS/docent-plone-addons/9d18ce7fc7a47ce93bc11223e29f82c6fd125afc/products.cfg}"
 
 # Private add-on sources: any repo referenced by products.cfg as git@github.com:
 # (SSH) is cloned by mr.developer as the plone user. Step 3 installs the SSH key
