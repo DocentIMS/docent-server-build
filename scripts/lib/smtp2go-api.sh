@@ -22,11 +22,29 @@
 #   POST /v3/domain/view     fetch a sender domain's record (DNS records, etc.)
 #   POST /v3/domain/verify   ask SMTP2GO to re-check the DNS records
 #
-# Note: SMTP2GO's published reference (developers.smtp2go.com) is gated to
-# unauthenticated fetches at the time of writing, so the EXACT response field
-# names are confirmed by phase4b on its first live run (it dumps the raw JSON
-# to a debug file). Adjust the jq paths in phase4b if SMTP2GO's response shape
-# differs from what we assume there.
+# Confirmed response shape (from the docs sample, used by phase4b):
+#   {
+#     "data": {
+#       "domains": [
+#         {
+#           "domain": {
+#             "fulldomain":      "<domain>",
+#             "dkim_selector":   "s123456",
+#             "dkim_value":      "dkim.smtp2go.net",
+#             "dkim_verified":   bool,
+#             "rpath_selector":  "em123456",
+#             "rpath_value":     "return.smtp2go.net",
+#             "rpath_verified":  bool
+#           },
+#           "trackers": [
+#             { "subdomain": "link", "cname_value": "...", "enabled": bool, ... }
+#           ]
+#         }
+#       ]
+#     }
+#   }
+# Both POST /v3/domain/add and POST /v3/domain/view return objects with this
+# shape (add returns the just-added domain wrapped in the same list form).
 
 set -u
 
@@ -68,10 +86,14 @@ smtp2go_request() {
 # Domain helpers
 # ----------------------------------------------------------------------------
 
-# Register a sender domain. $1 = domain (e.g. chelseamallproject.com)
+# Register a sender domain. $1 = domain (e.g. chelseamallproject.com).
+# auto_verify=false: the caller is expected to publish the CNAMEs in DNS
+# first, then call smtp2go_domain_verify explicitly. This avoids the
+# add-then-fail-verification-then-poll-every-7-min cycle when DNS isn't ready.
 smtp2go_domain_add() {
     local domain="$1"
-    smtp2go_request "domain/add" "$(jq -n --arg d "$domain" '{domain: $d}')"
+    smtp2go_request "domain/add" \
+        "$(jq -n --arg d "$domain" '{domain: $d, auto_verify: false}')"
 }
 
 # Fetch the current record for a sender domain (DNS records, verified status).
@@ -88,15 +110,13 @@ smtp2go_domain_verify() {
     smtp2go_request "domain/verify" "$(jq -n --arg d "$domain" '{domain: $d}')"
 }
 
-# Returns 0 if a domain is reported as verified by /domain/view, 1 otherwise.
-# Tries a few common field-name spellings since the live response shape is
-# being confirmed empirically.
+# Returns 0 if a domain has both DKIM and return-path verified by SMTP2GO,
+# 1 otherwise (or if the API call fails).
 smtp2go_domain_is_verified() {
     local domain="$1" resp
     resp=$(smtp2go_domain_view "$domain") || return 1
     echo "$resp" | jq -e '
-        .data
-        | (.verified // .is_verified // .dns_verified // .domain_verified // false)
-        | if type == "boolean" then . else . == "true" end
+        .data.domains[0].domain
+        | (.dkim_verified == true and .rpath_verified == true)
     ' >/dev/null 2>&1
 }

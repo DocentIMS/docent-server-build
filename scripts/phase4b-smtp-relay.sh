@@ -238,48 +238,58 @@ if [ -n "${SMTP2GO_API_KEY:-}" ] && [ -f "$REPO_ROOT/hetzner.local" ]; then
         export HETZNER_CLOUD_TOKEN
         DEBUG_JSON="/tmp/phase4b-smtp2go-${DOMAIN}.json"
 
-        # 1. Register (idempotent: returns the existing record if already added).
-        smtp2go_domain_add "$DOMAIN" >/dev/null 2>&1 || true
+        # 1. Register the sender domain (auto_verify=false; we verify after
+        #    we've published the CNAMEs in DNS). domain/add returns the same
+        #    object shape as domain/view, so we can read CNAMEs straight out
+        #    of the add response.
+        RECORD_RESP=$(smtp2go_domain_add "$DOMAIN" 2>/dev/null || true)
 
-        # 2. Fetch the domain record (DNS targets, verified status).
-        VIEW_RESP=$(smtp2go_domain_view "$DOMAIN" 2>/dev/null || true)
-        if [ -n "$VIEW_RESP" ]; then
-            printf '%s\n' "$VIEW_RESP" > "$DEBUG_JSON"
-            chmod 600 "$DEBUG_JSON"
-            log_done "Saved SMTP2GO domain/view response to $DEBUG_JSON"
+        # 2. If add didn't return a usable record (e.g. the domain already
+        #    exists and the API didn't echo the record), fall back to view.
+        if ! printf '%s' "$RECORD_RESP" | jq -e '.data.domains[0].domain.dkim_selector' >/dev/null 2>&1; then
+            RECORD_RESP=$(smtp2go_domain_view "$DOMAIN" 2>/dev/null || true)
         fi
 
-        # 3. Extract the CNAME list. We try several common field-name spellings
-        #    since SMTP2GO's published reference is gated to unauthenticated
-        #    fetches; first non-empty result wins. If none match, the raw JSON
-        #    at DEBUG_JSON tells us how to update these queries.
-        CNAMES_JSON=""
-        for query in '.data.dns_records | map(select(.type=="CNAME"))' \
-                     '.data.cnames' \
-                     '.data.records | map(select(.type=="CNAME"))' \
-                     '.dns_records | map(select(.type=="CNAME"))' ; do
-            candidate=$(printf '%s' "$VIEW_RESP" | jq -c "$query" 2>/dev/null || true)
-            if [ -n "$candidate" ] && [ "$candidate" != "null" ] && [ "$candidate" != "[]" ]; then
-                CNAMES_JSON="$candidate"
-                break
-            fi
-        done
+        # Always save the raw response - useful for debugging if a tracker is
+        # disabled, a value is empty, etc.
+        printf '%s\n' "$RECORD_RESP" > "$DEBUG_JSON"
+        chmod 600 "$DEBUG_JSON"
+        log_done "Saved SMTP2GO response to $DEBUG_JSON"
 
-        if [ -z "$CNAMES_JSON" ]; then
-            log_warn "Could not parse CNAME records from SMTP2GO response. Inspect $DEBUG_JSON and update the jq queries in phase4b."
+        # 3. Build the list of (name, value) CNAMEs to publish. Per the
+        #    confirmed shape: the DKIM record uses selector + "._domainkey",
+        #    the return-path uses the rpath_selector verbatim, and trackers
+        #    contribute one CNAME each (only when enabled and non-empty).
+        CNAMES_TSV=$(printf '%s' "$RECORD_RESP" | jq -r '
+            (.data.domains[0] // {}) as $d
+            | [
+                { name: ($d.domain.dkim_selector + "._domainkey"), value: $d.domain.dkim_value },
+                { name: $d.domain.rpath_selector,                  value: $d.domain.rpath_value }
+              ]
+              + (
+                  ($d.trackers // [])
+                  | map(select(.enabled == true and ((.cname_value // "") != "")))
+                  | map({ name: .subdomain, value: .cname_value })
+                )
+            | map(select((.name // "") != "" and (.value // "") != ""))
+            | .[] | [.name, .value] | @tsv
+        ' 2>/dev/null || true)
+
+        if [ -z "$CNAMES_TSV" ]; then
+            log_warn "Could not extract CNAME records from SMTP2GO response. Inspect $DEBUG_JSON."
         else
             ZONE_ID=$(hcloud_zone_id_by_name "$DOMAIN")
             if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
                 log_warn "No Hetzner DNS zone found for $DOMAIN; falling back to manual DNS step."
             else
-                # 4. Publish each CNAME into Hetzner DNS.
+                # 4. Publish each CNAME into Hetzner DNS (idempotent upsert).
                 created=0
                 while IFS=$'\t' read -r cname value; do
                     [ -z "$cname" ] && continue
                     # Hetzner stores subdomain-only; strip the apex if present.
                     sub="${cname%.${DOMAIN}.}"
                     sub="${sub%.${DOMAIN}}"
-                    # Hetzner stores CNAME targets with a trailing dot.
+                    # CNAME targets get a trailing dot.
                     [ "${value: -1}" = "." ] || value="${value}."
                     if hcloud_rrset_upsert "$ZONE_ID" "$sub" "CNAME" "$value" 3600; then
                         log_done "CNAME $sub -> $value"
@@ -287,9 +297,9 @@ if [ -n "${SMTP2GO_API_KEY:-}" ] && [ -f "$REPO_ROOT/hetzner.local" ]; then
                     else
                         log_warn "Failed to write CNAME $sub -> $value"
                     fi
-                done < <(printf '%s' "$CNAMES_JSON" | jq -r '.[] | [(.name // .hostname // .host // ""), (.value // .target // .content // "")] | @tsv')
+                done <<< "$CNAMES_TSV"
 
-                # 5. Update the @ TXT (SPF) record to include SMTP2GO.
+                # 5. Update @ TXT (SPF) to include SMTP2GO's senders.
                 SPF_NEW='"v=spf1 mx include:'"$SPF_INCLUDE"' ~all"'
                 if hcloud_rrset_upsert "$ZONE_ID" "@" "TXT" "$SPF_NEW" 3600; then
                     log_done "Updated SPF TXT @ -> include:$SPF_INCLUDE"
@@ -297,7 +307,7 @@ if [ -n "${SMTP2GO_API_KEY:-}" ] && [ -f "$REPO_ROOT/hetzner.local" ]; then
                     log_warn "Failed to update SPF TXT @ (update it manually if needed)"
                 fi
 
-                # 6. Ask SMTP2GO to re-verify (may need a few minutes to propagate).
+                # 6. Trigger SMTP2GO verification now that CNAMEs are published.
                 if smtp2go_domain_verify "$DOMAIN" >/dev/null 2>&1; then
                     log_done "Triggered SMTP2GO verification (DNS may take a few minutes to propagate)"
                 else
