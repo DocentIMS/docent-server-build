@@ -23,10 +23,19 @@
 #      was the single biggest time-saver during the initial chelseamallproject
 #      relay setup.
 #   2. The tenant's $DOMAIN must be a Verified Sender in SMTP2GO so SPF and
-#      domain-aligned DKIM can authenticate. This phase prompts the operator
-#      with the exact CNAME + SPF records to add at the authoritative DNS host
-#      (Hetzner in our setup) - the values are per-account from SMTP2GO and
-#      can't be auto-fetched without an SMTP2GO API key.
+#      domain-aligned DKIM can authenticate.
+#
+# Optional (recommended): set SMTP2GO_API_KEY in org-secrets.local too. When
+# present, this phase will:
+#   - register $DOMAIN in SMTP2GO automatically (POST /v3/domain/add)
+#   - read back the per-account CNAME records (return-path, DKIM selector,
+#     linktrack) via /v3/domain/view
+#   - publish those CNAMEs in Hetzner DNS using lib/hetzner-api.sh
+#   - update the @ TXT SPF record to include spf.smtp2go.com
+#   - trigger SMTP2GO's domain verification (/v3/domain/verify)
+# i.e. the manual "add these CNAMEs in your DNS console" prompt disappears.
+# Without SMTP2GO_API_KEY the operator is prompted with the records to add
+# manually, same as the original phase4b draft.
 #
 # Run as root: sudo bash phase4b-smtp-relay.sh
 #
@@ -205,11 +214,111 @@ else
 fi
 
 # ============================================================================
-# STEP 5: DNS records the operator must add at the authoritative DNS host
+# STEP 5: Sender domain DNS records (auto via SMTP2GO + Hetzner APIs, or manual)
 # ============================================================================
-step "Step 5: DNS records to add (manual, at the authoritative DNS host)"
+# If SMTP2GO_API_KEY is set AND hetzner.local is present, register the domain
+# in SMTP2GO, read back the per-account CNAME values, and publish them in
+# Hetzner DNS automatically. Otherwise fall back to the operator-prompted
+# manual step.
+API_DRIVEN_OK=0
 
-cat <<EOF
+if [ -n "${SMTP2GO_API_KEY:-}" ] && [ -f "$REPO_ROOT/hetzner.local" ]; then
+    step "Step 5 (auto): Register $DOMAIN in SMTP2GO + publish CNAMEs in Hetzner DNS"
+
+    # shellcheck disable=SC1090
+    source "$REPO_ROOT/hetzner.local"
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/lib/hetzner-api.sh"
+    # shellcheck disable=SC1091
+    source "$SCRIPT_DIR/lib/smtp2go-api.sh"
+
+    if [ -z "${HETZNER_CLOUD_TOKEN:-}" ]; then
+        log_warn "HETZNER_CLOUD_TOKEN not set after sourcing hetzner.local; falling back to manual DNS step."
+    else
+        export HETZNER_CLOUD_TOKEN
+        DEBUG_JSON="/tmp/phase4b-smtp2go-${DOMAIN}.json"
+
+        # 1. Register (idempotent: returns the existing record if already added).
+        smtp2go_domain_add "$DOMAIN" >/dev/null 2>&1 || true
+
+        # 2. Fetch the domain record (DNS targets, verified status).
+        VIEW_RESP=$(smtp2go_domain_view "$DOMAIN" 2>/dev/null || true)
+        if [ -n "$VIEW_RESP" ]; then
+            printf '%s\n' "$VIEW_RESP" > "$DEBUG_JSON"
+            chmod 600 "$DEBUG_JSON"
+            log_done "Saved SMTP2GO domain/view response to $DEBUG_JSON"
+        fi
+
+        # 3. Extract the CNAME list. We try several common field-name spellings
+        #    since SMTP2GO's published reference is gated to unauthenticated
+        #    fetches; first non-empty result wins. If none match, the raw JSON
+        #    at DEBUG_JSON tells us how to update these queries.
+        CNAMES_JSON=""
+        for query in '.data.dns_records | map(select(.type=="CNAME"))' \
+                     '.data.cnames' \
+                     '.data.records | map(select(.type=="CNAME"))' \
+                     '.dns_records | map(select(.type=="CNAME"))' ; do
+            candidate=$(printf '%s' "$VIEW_RESP" | jq -c "$query" 2>/dev/null || true)
+            if [ -n "$candidate" ] && [ "$candidate" != "null" ] && [ "$candidate" != "[]" ]; then
+                CNAMES_JSON="$candidate"
+                break
+            fi
+        done
+
+        if [ -z "$CNAMES_JSON" ]; then
+            log_warn "Could not parse CNAME records from SMTP2GO response. Inspect $DEBUG_JSON and update the jq queries in phase4b."
+        else
+            ZONE_ID=$(hcloud_zone_id_by_name "$DOMAIN")
+            if [ -z "$ZONE_ID" ] || [ "$ZONE_ID" = "null" ]; then
+                log_warn "No Hetzner DNS zone found for $DOMAIN; falling back to manual DNS step."
+            else
+                # 4. Publish each CNAME into Hetzner DNS.
+                created=0
+                while IFS=$'\t' read -r cname value; do
+                    [ -z "$cname" ] && continue
+                    # Hetzner stores subdomain-only; strip the apex if present.
+                    sub="${cname%.${DOMAIN}.}"
+                    sub="${sub%.${DOMAIN}}"
+                    # Hetzner stores CNAME targets with a trailing dot.
+                    [ "${value: -1}" = "." ] || value="${value}."
+                    if hcloud_rrset_upsert "$ZONE_ID" "$sub" "CNAME" "$value" 3600; then
+                        log_done "CNAME $sub -> $value"
+                        created=$((created+1))
+                    else
+                        log_warn "Failed to write CNAME $sub -> $value"
+                    fi
+                done < <(printf '%s' "$CNAMES_JSON" | jq -r '.[] | [(.name // .hostname // .host // ""), (.value // .target // .content // "")] | @tsv')
+
+                # 5. Update the @ TXT (SPF) record to include SMTP2GO.
+                SPF_NEW='"v=spf1 mx include:'"$SPF_INCLUDE"' ~all"'
+                if hcloud_rrset_upsert "$ZONE_ID" "@" "TXT" "$SPF_NEW" 3600; then
+                    log_done "Updated SPF TXT @ -> include:$SPF_INCLUDE"
+                else
+                    log_warn "Failed to update SPF TXT @ (update it manually if needed)"
+                fi
+
+                # 6. Ask SMTP2GO to re-verify (may need a few minutes to propagate).
+                if smtp2go_domain_verify "$DOMAIN" >/dev/null 2>&1; then
+                    log_done "Triggered SMTP2GO verification (DNS may take a few minutes to propagate)"
+                else
+                    log_warn "smtp2go_domain_verify returned non-zero (likely just hasn't propagated yet)"
+                fi
+
+                if [ "$created" -ge 2 ]; then
+                    log_done "Auto-published $created CNAME(s) + SPF for $DOMAIN; no manual DNS step needed"
+                    API_DRIVEN_OK=1
+                else
+                    log_warn "Only $created CNAME(s) created from the API path; falling back to manual DNS instructions for the rest."
+                fi
+            fi
+        fi
+    fi
+fi
+
+if [ "$API_DRIVEN_OK" -eq 0 ]; then
+    step "Step 5: DNS records to add (manual, at the authoritative DNS host)"
+
+    cat <<EOF
 
   Postfix is now relaying through $RELAY_HOST:$RELAY_PORT. For mail to land in
   the inbox at Gmail/Outlook/etc., add these records at the host that's
@@ -233,12 +342,16 @@ cat <<EOF
 
   DMARC (_dmarc) and MX records do NOT need to change.
 
+  (Set SMTP2GO_API_KEY in org-secrets.local on the next build to skip this
+  manual step entirely - phase4b will publish the records automatically.)
+
 EOF
 
-if ! ask_yes_no "Have you added these DNS records?"; then
-    log_warn "DNS records not confirmed. Mail will relay but will likely land in spam at major providers until SPF + DKIM align with $DOMAIN."
-else
-    log_done "Operator confirmed DNS records are in place"
+    if ! ask_yes_no "Have you added these DNS records?"; then
+        log_warn "DNS records not confirmed. Mail will relay but will likely land in spam at major providers until SPF + DKIM align with $DOMAIN."
+    else
+        log_done "Operator confirmed DNS records are in place"
+    fi
 fi
 
 # ============================================================================
