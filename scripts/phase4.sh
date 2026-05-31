@@ -427,7 +427,7 @@ postconf -e "smtpd_tls_cert_file = $CERT_DIR/fullchain.pem"
 postconf -e "smtpd_tls_key_file = $CERT_DIR/privkey.pem"
 postconf -e "smtpd_use_tls = yes"
 postconf -e "smtpd_tls_security_level = may"
-postconf -e "smtp_tls_security_level = may"
+postconf -e "smtp_tls_security_level = encrypt"
 postconf -e "smtpd_tls_session_cache_database = btree:\${data_directory}/smtpd_scache"
 postconf -e "smtp_tls_session_cache_database = btree:\${data_directory}/smtp_scache"
 

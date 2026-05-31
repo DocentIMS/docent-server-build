@@ -30,10 +30,6 @@
 #
 # Run as root: sudo bash phase4b-smtp-relay.sh
 #
-# Caveat: phase4.sh sets `smtp_tls_security_level = may`. This script
-# overrides it to `encrypt` (relay over 587 must be encrypted). If you re-run
-# phase4 after this script, re-run phase4b too.
-#
 
 set -u
 
