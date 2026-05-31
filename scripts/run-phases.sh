@@ -71,6 +71,7 @@ PHASES=(
     "2:phase2.sh"
     "3:phase3.sh"
     "4:phase4.sh"
+    "4b:phase4b-smtp-relay.sh"
     "post-dkim:phase-post-hetzner-dkim.sh"
     "5:phase5.sh"
     "5a:phase5a-rc-plus.sh"
@@ -171,7 +172,7 @@ if [ -n "$ONLY_PHASE" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --only $ONLY_PHASE: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 post-dkim 5 5a 5b 5c 6 7a 7b 7c 7d"
+        echo "Valid phase labels: 1 2 3 4 4b post-dkim 5 5a 5b 5c 6 7a 7b 7c 7d"
         exit 1
     fi
 elif [ -n "$START_FROM" ]; then
@@ -199,7 +200,7 @@ elif [ -n "$START_FROM" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --from $START_FROM: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 post-dkim 5 5a 5b 5c 6 7a 7b 7c 7d"
+        echo "Valid phase labels: 1 2 3 4 4b post-dkim 5 5a 5b 5c 6 7a 7b 7c 7d"
         exit 1
     fi
     # Only prompt for Plone if we started in core (we'll have stopped before 7a)
