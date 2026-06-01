@@ -185,27 +185,3 @@ else
     echo "$RESP" | jq -r '.error.message // .' >&2
     exit 1
 fi
-
-# ============================================================================
-# VERIFICATION
-# ============================================================================
-step "Verification"
-
-cat <<EOF
-
-  DKIM record published. To verify externally (give DNS a few minutes
-  to propagate first):
-
-    dig +short TXT ${DKIM_NAME}.${DOMAIN}
-
-  Or with a public resolver:
-
-    dig +short TXT ${DKIM_NAME}.${DOMAIN} @1.1.1.1
-
-  You should see the v=DKIM1 record. If it shows the wrong value or no
-  value, check Hetzner Console -> DNS -> ${DOMAIN}.
-
-  Send a test mail to https://www.mail-tester.com to confirm DKIM
-  signing works end-to-end (Postfix + OpenDKIM + DNS).
-
-EOF

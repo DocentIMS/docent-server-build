@@ -377,33 +377,6 @@ for line in "${REPORT[@]}"; do
 done
 echo ""
 
-# ============================================================================
-# MANUAL NEXT STEPS
-# ============================================================================
-echo "==================================================================="
-echo "  MANUAL NEXT STEPS"
-echo "==================================================================="
-echo ""
-echo "  The add-ons are now BUILT INTO the Plone instance, but they are NOT"
-echo "  yet activated inside the Plone site."
-echo ""
-echo "  To activate an add-on:"
-echo "    1. Log in to Plone as admin."
-echo "       (admin password: PLONE_ADMIN_PW in $REPO_ROOT/CREDENTIALS.txt)"
-echo "    2. Go to: Site Setup -> Add-ons"
-echo "    3. Click 'Install' next to each add-on you want active."
-echo ""
-echo "  Useful commands:"
-echo "    sudo systemctl status  $PLONE_SYSTEMD_UNIT"
-echo "    sudo systemctl restart $PLONE_SYSTEMD_UNIT"
-echo "    sudo journalctl -u $PLONE_SYSTEMD_UNIT -f"
-echo ""
-echo "  To change which add-ons are installed, edit products.cfg in the"
-echo "  docent-plone-addons GitHub repo, then re-run phase 7d."
-echo ""
-echo "==================================================================="
-echo ""
-
 # Exit non-zero if any verification check failed, so run-phases.sh notices.
 if [ "$VERIFY_FAILED" -gt 0 ]; then
     echo "  *** $VERIFY_FAILED CHECK(S) FAILED - review the failures above. ***"

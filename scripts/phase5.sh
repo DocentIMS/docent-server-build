@@ -616,21 +616,6 @@ for line in "${REPORT[@]}"; do
 done
 
 # ============================================================================
-# CREDENTIALS
-# ============================================================================
-echo ""
-echo "==================================================================="
-echo "  PASSWORDS"
-echo "==================================================================="
-echo ""
-echo "  All passwords are in CREDENTIALS.txt at the repo root."
-echo "  This script does NOT print passwords (to avoid scrollback exposure)."
-echo ""
-echo "  The Roundcube DB password and DES key are also stored in:"
-echo "    /etc/roundcube/config.inc.php"
-echo ""
-
-# ============================================================================
 # AUTOMATED VERIFICATION
 # ============================================================================
 echo ""
@@ -762,48 +747,6 @@ if [ "$VERIFY_FAIL" -gt 0 ]; then
     echo ""
 fi
 
-# ============================================================================
-# MANUAL VERIFICATION
-# ============================================================================
-echo "==================================================================="
-echo "  MANUAL VERIFICATION & NEXT STEPS"
-echo "==================================================================="
-cat <<EOF
-
-  1. Open a web browser and go to:
-       https://${DOMAIN}${ROUNDCUBE_URL_PATH}/
-
-     You should see the Roundcube login page.
-
-  2. Log in with the test mailbox credentials from Phase 4:
-       Username:  test@${DOMAIN}  (full email address required)
-       Password:  (the test mailbox password from Phase 4)
-
-  3. You should land in the inbox and see your existing messages
-     (the local test plus any others).
-
-  4. Try composing a new message and sending it. Check the mail log:
-       sudo tail -30 /var/log/mail.log
-
-     You should see SASL authentication and outbound delivery.
-
-  5. SIEVE FILTER TEST:
-     Click Settings (top right gear) -> Filters -> + (create rule)
-     If managesieve is working, you'll see Sieve rule editor.
-     The default global script (file X-Spam-Flag mail to Junk) is already
-     active - you don't need to recreate it. This is for adding
-     per-user custom rules.
-
-  6. Check for errors:
-       sudo tail /var/log/roundcube/errors.log
-       sudo tail /var/log/apache2/error.log
-
-  Roundcube is now available alongside Thunderbird/Outlook IMAP access.
-  Users can pick whichever interface they prefer. Both go through the
-  same Postfix and Dovecot - same mailbox, same folders.
-
-EOF
-echo "==================================================================="
 
 if [ "$VERIFY_FAIL" -gt 0 ]; then
     exit 1

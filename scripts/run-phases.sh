@@ -546,6 +546,30 @@ IP="${SERVER_IP:-<server-ip>}"
 NOTIF="${NOTIFICATION_EMAIL:-<notification-email>}"
 
 # ----------------------------------------------------------------------------
+# Phase 8 banner: UptimeRobot monitoring runs on docenttemplate (not on the
+# client server). Placed above the manual verification checklist so the next
+# concrete action stands out before the longer post-build to-do list.
+# ----------------------------------------------------------------------------
+echo ""
+echo "${BOLD}${YELLOW}============================================================${RESET}"
+echo "${BOLD}${YELLOW}  PHASE 8 — CREATE MONITORS ON UPTIMEROBOT${RESET}"
+echo "${BOLD}${YELLOW}============================================================${RESET}"
+echo ""
+echo "  This process creates these monitors:"
+echo ""
+echo "      plone       ${DOMAIN}"
+echo "      imaps       ${DOMAIN}"
+echo "      mail        ${DOMAIN}"
+echo "      smtp        ${DOMAIN}"
+echo "      submission  ${DOMAIN}"
+echo "      wordpress   ${DOMAIN}"
+echo ""
+echo "  To proceed, go to the template server and run:"
+echo ""
+echo "    ${BOLD}cd ~/server-build/scripts && ./phase8-monitoring.sh ${DOMAIN}${RESET}"
+echo ""
+
+# ----------------------------------------------------------------------------
 # Consolidated manual verification checklist
 #
 # Each phase prints its own manual-verification block during the run, but
@@ -614,30 +638,6 @@ echo "          Plone install is finished and verified. Only then is it"
 echo "          safe to remove them."
 echo ""
 echo "  See QUICK-REFERENCE.txt for day-to-day commands and recovery procedures."
-echo ""
-
-# ----------------------------------------------------------------------------
-# Final action banner: phase 8 (UptimeRobot monitoring) must run on
-# docenttemplate, not on the client server. This banner is the last thing
-# the user sees, so it's hard to miss.
-# ----------------------------------------------------------------------------
-echo ""
-echo "${BOLD}${YELLOW}============================================================${RESET}"
-echo "${BOLD}${YELLOW}  PHASE 8 — CREATE MONITORS ON UPTIMEROBOT${RESET}"
-echo "${BOLD}${YELLOW}============================================================${RESET}"
-echo ""
-echo "  This process creates these monitors:"
-echo ""
-echo "      plone       ${DOMAIN}"
-echo "      imaps       ${DOMAIN}"
-echo "      mail        ${DOMAIN}"
-echo "      smtp        ${DOMAIN}"
-echo "      submission  ${DOMAIN}"
-echo "      wordpress   ${DOMAIN}"
-echo ""
-echo "  To proceed, go to the template server and run:"
-echo ""
-echo "    ${BOLD}cd ~/server-build/scripts && ./phase8-monitoring.sh ${DOMAIN}${RESET}"
 echo ""
 
 # ----------------------------------------------------------------------------

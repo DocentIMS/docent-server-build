@@ -1061,42 +1061,6 @@ done
 # CREDENTIALS
 # ============================================================================
 # ============================================================================
-# PASSWORDS
-# ============================================================================
-echo ""
-echo "==================================================================="
-echo "  PASSWORDS"
-echo "==================================================================="
-echo ""
-echo "  All passwords are in CREDENTIALS.txt at the repo root."
-echo "  This script does NOT print passwords (to avoid scrollback exposure)."
-echo ""
-echo "  The mail DB password is also stored in:"
-echo "    /etc/postfix/mysql-*.cf"
-echo "    /etc/dovecot/dovecot.conf"
-echo ""
-
-# ============================================================================
-# DNS RECORDS - HANDLED AUTOMATICALLY
-# ============================================================================
-echo ""
-echo "==================================================================="
-echo "  DNS RECORDS - HANDLED AUTOMATICALLY"
-echo "==================================================================="
-cat <<EOF
-
-  No manual DNS work is needed. All mail DNS records for $DOMAIN are
-  created automatically in Hetzner DNS:
-
-    - A, MX, SPF, DMARC and CAA records are created by phase-pre-hetzner.sh.
-    - The DKIM TXT record is published by the post-dkim phase, which
-      run-phases.sh runs automatically right after this phase.
-
-  You can confirm them in the Hetzner Cloud Console -> DNS -> $DOMAIN.
-
-EOF
-
-# ============================================================================
 # AUTOMATED VERIFICATION
 # ============================================================================
 echo ""
@@ -1319,82 +1283,6 @@ if [ "$VERIFY_FAIL" -gt 0 ]; then
     echo "  *** $VERIFY_FAIL CHECK(S) FAILED. Review failures above before proceeding. ***"
     echo ""
 fi
-
-# ============================================================================
-# MANUAL VERIFICATION
-# ============================================================================
-echo "==================================================================="
-echo "  MANUAL VERIFICATION & NEXT STEPS"
-echo "==================================================================="
-cat <<EOF
-
-  INTERNAL TESTING (works without PTR or DNS records):
-
-  1. Confirm CREDENTIALS.txt is saved in your password manager. The
-     test mailbox password is in section 4. The Mail DB password is
-     in BACKEND PASSWORDS.
-
-  2. Send a test message from the local server to the test mailbox:
-       echo "test body" | mail -s "test subject" $TEST_MAILBOX
-
-  3. Confirm it landed in the maildir:
-       sudo find $VMAIL_HOME/$DOMAIN -name 'new' -type d
-       sudo ls -la $VMAIL_HOME/$DOMAIN/$TEST_MAILBOX_LOCAL/new/
-
-  4. Check the mail logs for any errors:
-       sudo tail -50 /var/log/mail.log
-
-  EXTERNAL CONFIGURATION (DNS):
-
-  5. DNS is already done - nothing to add by hand. The MX, SPF, DKIM,
-     DMARC and CAA records for $DOMAIN are created automatically in
-     Hetzner DNS (phase-pre-hetzner.sh plus the post-dkim phase).
-     Confirm them in Hetzner Cloud Console -> DNS -> $DOMAIN.
-
-  6. After DNS has propagated (usually < 1 minute), verify:
-       dig @8.8.8.8 MX $DOMAIN
-       dig @8.8.8.8 TXT $DOMAIN
-       dig @8.8.8.8 TXT ${DKIM_SELECTOR}._domainkey.$DOMAIN
-       dig @8.8.8.8 TXT _dmarc.$DOMAIN
-
-  EXTERNAL TESTING (limited until PTR is set):
-
-  7. Configure Thunderbird/Outlook to connect to:
-       IMAP server:    $MAIL_HOSTNAME  port 993  SSL/TLS
-       SMTP server:    $MAIL_HOSTNAME  port 587  STARTTLS
-       Username:       $TEST_MAILBOX  (full email address)
-       Password:       (the test mailbox password)
-       (POP3 is deliberately not supported - use IMAP only)
-
-  8. Send mail TO $TEST_MAILBOX from your existing Gmail/Outlook/etc.
-     Should arrive in the test mailbox. (Inbound is not affected by PTR.)
-
-  9. Send mail FROM $TEST_MAILBOX to a tolerant address. Will likely
-     land in spam at major providers until PTR is set. This is expected.
-
-  10. SPAM FILTER TEST:
-      To verify SpamAssassin + Sieve are filing junk into Junk folder, send
-      a test message containing the GTUBE string (a standard test marker that
-      SpamAssassin always scores as spam):
-
-         XJS*C4JDBQADN1.NSBN3*2IDNEN*GTUBE-STANDARD-ANTI-UBE-TEST-EMAIL*C.34X
-
-      Send this from any external account TO $TEST_MAILBOX with that string
-      in the body. Within seconds it should land in the JUNK folder (not the
-      INBOX). Check the mail log:
-         sudo tail /var/log/mail.log
-      You'll see the X-Spam-Flag header added and Sieve filing it into Junk.
-
-  11. Clear scrollback:  clear && history -c
-
-  Once a PTR record is set, outbound deliverability to Gmail/Outlook/etc.
-  improves dramatically without any code changes. To set it, return to
-  Hetzner and manually activate a PTR (reverse DNS) record for the
-  server's IP -> mail.$DOMAIN (Hetzner Cloud Console -> this server ->
-  reverse DNS). No support ticket is needed.
-
-EOF
-echo "==================================================================="
 
 if [ "$VERIFY_FAIL" -gt 0 ]; then
     exit 1

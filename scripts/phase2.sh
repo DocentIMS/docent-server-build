@@ -684,38 +684,6 @@ if [ "$VERIFY_FAIL" -gt 0 ]; then
     echo ""
 fi
 
-# ============================================================================
-# MANUAL VERIFICATION
-# ============================================================================
-echo "==================================================================="
-echo "  MANUAL VERIFICATION STEPS (cannot be automated)"
-echo "==================================================================="
-cat <<EOF
-
-  These steps require an external connection / human eyes and CANNOT
-  be checked by this script. Do them from your Windows machine.
-
-  1. Open https://$DOMAIN/ in a web browser.
-     - You should see the placeholder page with the domain name.
-     - The lock icon next to the URL should be CLOSED (green/secure).
-     - No certificate warnings.
-
-  2. Open http://$DOMAIN/ (no https) in the browser.
-     - The browser should automatically redirect you to https://.
-
-  3. Open https://www.$DOMAIN/ in the browser.
-     - Should also work, with no cert warnings.
-
-  4. (Optional) Run an SSL check at:
-       https://www.ssllabs.com/ssltest/analyze.html?d=$DOMAIN
-     A grade of A or A+ is expected for a default Let's Encrypt setup.
-
-  Once these checks pass, Phase 2 is fully complete and you are ready
-  for Phase 3 (Database - MySQL/MariaDB).
-
-EOF
-echo "==================================================================="
-
 # Exit non-zero if any automated check failed
 if [ "$VERIFY_FAIL" -gt 0 ]; then
     exit 1
