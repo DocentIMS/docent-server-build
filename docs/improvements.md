@@ -31,6 +31,14 @@ domain-availability API ("connector") to check/suggest available domain
 names — could be wired into the provisioning flow. Likely not worth it for
 <5 domains; revisit when we approach automated multi-tenant onboarding.
 
+### Create new Hetzner servers IPv4-only — LOW
+The current server-create request in `phase-pre-hetzner.sh` (lines ~476–484)
+doesn't specify `public_net`, so Hetzner defaults to dual-stack (IPv4 + IPv6).
+We use only IPv4 — DNS A records, PTR, mail, SSH, monitoring all reference
+the v4 address. The v6 address is unused and adds a small monthly charge per
+server. Add `public_net: { enable_ipv4: true, enable_ipv6: false }` to the
+create JSON body to provision IPv4-only.
+
 ---
 
 ## Won't fix (investigated, accepted as-is)
