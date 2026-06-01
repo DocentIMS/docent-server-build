@@ -463,7 +463,7 @@ STAFF_USER="${SHARED_ADMIN_USER}"
 
 HOSTNAME_FQDN="${DOMAIN}"
 HOSTNAME_SHORT="${HOSTNAME_SHORT}"
-ALT_DOMAINS=("www.${DOMAIN}")
+ALT_DOMAINS=("www.${DOMAIN}" "mail.${DOMAIN}")
 MAIL_HOSTNAME="mail.${DOMAIN}"
 WP_DOMAIN_ALT="www.${DOMAIN}"
 WP_DB_NAME="${WP_DB_NAME}"
@@ -604,7 +604,7 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
 ==============================================================
   WHAT IT'S FOR:    Logging into the Roundcube webmail to
                     test that email works.
-  WHERE YOU USE IT: https://${DOMAIN}/mail/
+  WHERE YOU USE IT: https://mail.${DOMAIN}/
 
   Email address: ${TEST_MAILBOX}
   Password:      ${TEST_MAILBOX_PW}
@@ -687,7 +687,7 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
     https://${DOMAIN}/
 
   Webmail (Roundcube):
-    https://${DOMAIN}/mail/
+    https://mail.${DOMAIN}/
     Username: ${TEST_MAILBOX_LOCAL}    (or full: ${TEST_MAILBOX})
     Password: ${TEST_MAILBOX_PW}
 

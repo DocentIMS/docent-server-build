@@ -25,7 +25,7 @@
 #   - https://team.<DOMAIN>/ serves the Plone site (NO manual setup step
 #     remaining - just log in at /login)
 #   - WordPress at https://<DOMAIN>/ is untouched
-#   - Roundcube at https://<DOMAIN>/mail/ is untouched
+#   - Roundcube at https://mail.<DOMAIN>/ is untouched
 #
 # Idempotent. Safe to re-run. Each step checks current state before acting.
 # Run as root via run-phases.sh, or directly: sudo bash phase7c-plone-frontend.sh
