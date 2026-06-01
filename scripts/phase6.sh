@@ -494,26 +494,6 @@ for line in "${REPORT[@]}"; do
 done
 
 # ============================================================================
-# CREDENTIALS
-# ============================================================================
-echo ""
-echo "==================================================================="
-echo "  PASSWORDS"
-echo "==================================================================="
-echo ""
-echo "  All passwords are in CREDENTIALS.txt at the repo root."
-echo "  This script does NOT print passwords (to avoid scrollback exposure)."
-echo ""
-echo "  The WordPress DB password is also stored in:"
-echo "    $WP_CONFIG (mode 640, www-data:www-data)"
-echo ""
-echo "  WordPress admin login (created automatically by Step 7):"
-echo "    URL:      https://$DOMAIN/wp-admin/"
-echo "    Username: $WP_ADMIN_USERNAME"
-echo "    Password: see CREDENTIALS.txt (WP_ADMIN_PW)"
-echo "    Email:    $WP_ADMIN_EMAIL"
-
-# ============================================================================
 # AUTOMATED VERIFICATION
 # ============================================================================
 echo ""
@@ -737,44 +717,6 @@ if [ "$VERIFY_FAIL" -gt 0 ]; then
     echo ""
 fi
 
-# ============================================================================
-# MANUAL VERIFICATION
-# ============================================================================
-echo "==================================================================="
-echo "  MANUAL VERIFICATION & NEXT STEPS"
-echo "==================================================================="
-cat <<EOF
-
-  1. Confirm CREDENTIALS.txt is saved in your password manager.
-     Both WordPress passwords (admin and database) are in
-     BACKEND PASSWORDS.
-
-  2. Log in to WordPress:
-       URL:      https://$DOMAIN/wp-admin/
-       Username: $WP_ADMIN_USERNAME
-       Password: see CREDENTIALS.txt BACKEND PASSWORDS (WordPress admin)
-
-     The site is already installed (Step 7 ran the wizard via wp-cli).
-     Search engine visibility is set to 'discourage' (placeholder/template
-     content shouldn't be indexed). Toggle that off in Settings > Reading
-     once the site is publicly ready.
-
-  3. Theme/configure the site to look like a real Docent project page,
-     using whatever template/approach you've used before.
-
-  4. Set the PTR (reverse DNS) record:
-     - Return to Hetzner and manually activate a PTR record:
-         PTR $SERVER_IP -> mail.$DOMAIN
-       (Hetzner Cloud Console -> select this server -> set the reverse
-        DNS on the server's IPv4 address. No support ticket needed.)
-     - Without PTR, outbound mail to Gmail/Outlook/etc. will land in spam.
-       Inbound and webmail still work fine - PTR only affects outbound
-       deliverability reputation.
-
-  5. Clear scrollback:  clear && history -c
-
-EOF
-echo "==================================================================="
 
 if [ "$VERIFY_FAIL" -gt 0 ]; then
     exit 1

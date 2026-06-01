@@ -348,3 +348,137 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
   Re-running this script is safe - it preserves any plugin-specific config
   customizations you make in plugins/<plugin>/config.inc.php.
 ```
+
+---
+
+## From `phase5b-globaladdressbook.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
+
+```
+===================================================================
+  MANUAL VERIFICATION & NEXT STEPS
+===================================================================
+
+  1. Open Roundcube webmail in your browser and log in (or hard-refresh
+     if you already had it open).
+
+  2. Click the Contacts icon in the left sidebar.
+
+  3. You should see "$ADDRESSBOOK_DISPLAY_NAME" listed alongside
+     Personal Addresses, Collected Recipients, and Trusted Senders.
+
+  4. Add a test contact in $ADDRESSBOOK_DISPLAY_NAME. Log out and back
+     in as a different user — they should see the same contact.
+
+  5. To pre-populate $ADDRESSBOOK_DISPLAY_NAME for this tenant, use
+     Roundcube's Import feature in the contacts UI (vCard or CSV),
+     or insert directly into the contacts table with user_id set to
+     the dummy user ($ADDRESSBOOK_USER) created on first access.
+
+  6. Check for plugin errors after first use:
+       sudo tail /var/log/roundcube/errors.log
+       sudo tail /var/log/apache2/error.log
+
+  Re-running this script is safe - it skips already-completed steps
+  and preserves your plugin config customizations.
+```
+
+---
+
+## From `phase5c-email-ai.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
+
+```
+===================================================================
+  MANUAL VERIFICATION & NEXT STEPS
+===================================================================
+
+  (When XAI_API_KEY is empty, the original block also showed an
+   "IMPORTANT: API key not set" warning with steps to add it.)
+
+  1. Open Roundcube webmail and log in (hard-refresh if already open).
+
+  2. AI Composer:
+     - Click "Compose" to open the new-mail page
+     - Look for an AI button or icon in the compose toolbar
+     - Click it, fill in style/length/instructions, click Generate
+     - You should get drafted email text inserted into the body
+
+  3. AI Summary:
+     - Open a longer email (more than a couple paragraphs)
+     - You should see a one-sentence summary at the top
+     - The first time may take a few seconds (cached in DB after that)
+
+  4. If something doesn't work, check:
+       sudo tail /var/log/roundcube/errors.log
+       sudo tail /var/log/apache2/error.log
+
+  5. To monitor your OpenAI spend:
+       https://platform.openai.com/usage
+
+  6. To turn AI features off later, edit:
+       $XAI_CONFIG
+     Set xai_enable_message_generation = false (or _view_summaries = false).
+     Then: sudo systemctl reload apache2
+
+  Re-running this script is safe. It preserves any plugin-specific
+  config customizations you make in $XAI_CONFIG.
+```
+
+---
+
+## From `phase6.sh` (removed) — PASSWORDS
+
+```
+===================================================================
+  PASSWORDS
+===================================================================
+
+  All passwords are in CREDENTIALS.txt at the repo root.
+  This script does NOT print passwords (to avoid scrollback exposure).
+
+  The WordPress DB password is also stored in:
+    $WP_CONFIG (mode 640, www-data:www-data)
+
+  WordPress admin login (created automatically by Step 7):
+    URL:      https://$DOMAIN/wp-admin/
+    Username: $WP_ADMIN_USERNAME
+    Password: see CREDENTIALS.txt (WP_ADMIN_PW)
+    Email:    $WP_ADMIN_EMAIL
+```
+
+---
+
+## From `phase6.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
+
+```
+===================================================================
+  MANUAL VERIFICATION & NEXT STEPS
+===================================================================
+
+  1. Confirm CREDENTIALS.txt is saved in your password manager.
+     Both WordPress passwords (admin and database) are in
+     BACKEND PASSWORDS.
+
+  2. Log in to WordPress:
+       URL:      https://$DOMAIN/wp-admin/
+       Username: $WP_ADMIN_USERNAME
+       Password: see CREDENTIALS.txt BACKEND PASSWORDS (WordPress admin)
+
+     The site is already installed (Step 7 ran the wizard via wp-cli).
+     Search engine visibility is set to 'discourage' (placeholder/template
+     content shouldn't be indexed). Toggle that off in Settings > Reading
+     once the site is publicly ready.
+
+  3. Theme/configure the site to look like a real Docent project page,
+     using whatever template/approach you've used before.
+
+  4. Set the PTR (reverse DNS) record:
+     - Return to Hetzner and manually activate a PTR record:
+         PTR $SERVER_IP -> mail.$DOMAIN
+       (Hetzner Cloud Console -> select this server -> set the reverse
+        DNS on the server's IPv4 address. No support ticket needed.)
+     - Without PTR, outbound mail to Gmail/Outlook/etc. will land in spam.
+       Inbound and webmail still work fine - PTR only affects outbound
+       deliverability reputation.
+
+  5. Clear scrollback:  clear && history -c
+```

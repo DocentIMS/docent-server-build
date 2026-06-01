@@ -276,39 +276,6 @@ if [ "$VERIFY_FAIL" -gt 0 ]; then
     echo "  *** $VERIFY_FAIL CHECK(S) FAILED. Review above before proceeding. ***"
 fi
 
-# ============================================================================
-# MANUAL VERIFICATION & NEXT STEPS
-# ============================================================================
-echo "==================================================================="
-echo "  MANUAL VERIFICATION & NEXT STEPS"
-echo "==================================================================="
-cat <<EOF
-
-  1. Open Roundcube webmail in your browser and log in (or hard-refresh
-     if you already had it open).
-
-  2. Click the Contacts icon in the left sidebar.
-
-  3. You should see "$ADDRESSBOOK_DISPLAY_NAME" listed alongside
-     Personal Addresses, Collected Recipients, and Trusted Senders.
-
-  4. Add a test contact in $ADDRESSBOOK_DISPLAY_NAME. Log out and back
-     in as a different user — they should see the same contact.
-
-  5. To pre-populate $ADDRESSBOOK_DISPLAY_NAME for this tenant, use
-     Roundcube's Import feature in the contacts UI (vCard or CSV),
-     or insert directly into the contacts table with user_id set to
-     the dummy user ($ADDRESSBOOK_USER) created on first access.
-
-  6. Check for plugin errors after first use:
-       sudo tail /var/log/roundcube/errors.log
-       sudo tail /var/log/apache2/error.log
-
-  Re-running this script is safe - it skips already-completed steps
-  and preserves your plugin config customizations.
-
-EOF
-echo "==================================================================="
 
 if [ "$VERIFY_FAIL" -gt 0 ]; then
     exit 1
