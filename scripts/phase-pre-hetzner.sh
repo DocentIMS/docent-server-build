@@ -403,8 +403,20 @@ packages:
   - jq
   - curl
   - ca-certificates
-runcmd:
-  - [ bash, -c, "echo 'docent-build: phase-pre-hetzner provisioning complete' > /etc/motd" ]
+write_files:
+  - path: /etc/motd
+    permissions: '0644'
+    owner: root:root
+    content: |
+      docent-build: phase-pre-hetzner provisioning complete
+
+      Next step on this server:
+          bash /root/bootstrap.sh
+            (bootstrap.sh registers this server's key with GitHub, clones
+             the repo with that key, moves the three handoff files into the
+             repo, and chains straight into phase 0 - which runs with no
+             prompts since DOMAIN, SERVER_IP and the RC+ key are already
+             supplied.)
 CLOUD_INIT_EOF
 )
 
@@ -848,12 +860,8 @@ ${BOLD}Next:${RESET}
      ${EGG_CACHE_NOTE}
   3. SSH to the new server:
        ssh root@${SERVER_IP}
-  4. Run: bash /root/bootstrap.sh
-     (bootstrap.sh registers this server's key with GitHub, clones the
-      repo with that key, moves the three handoff files into the repo,
-      and chains straight into phase 0 - which runs with no prompts since
-      DOMAIN, SERVER_IP and the RC+ key are already supplied)
-  5. When phase 0 finishes, run:
+     The /etc/motd shown on login tells you the next command to run.
+  4. When phase 0 finishes, run:
        sudo bash /root/server-build/scripts/run-phases.sh
      (runs phases 1-6 plus the DKIM DNS record automatically; it will
       prompt before the optional Plone phases)
