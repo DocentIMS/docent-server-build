@@ -13,13 +13,11 @@
 # Example:
 #   ./phase8-monitoring.sh docent.us
 #
-# Creates 6 monitors per tenant:
+# Creates 4 monitors per tenant:
 #   - HTTP keyword: WordPress    (https://<domain>/         keyword "Docent IMS")
 #   - HTTP keyword: Plone        (https://team.<domain>/    keyword "Plone")
 #   - HTTP keyword: Roundcube    (https://<domain>/mail/    keyword "Roundcube")
 #   - Port: SMTP                 (<domain>:25)
-#   - Port: Submission           (<domain>:587)
-#   - Port: IMAPS                (<domain>:993)
 #
 # Writes monitor IDs to /home/wayne/uptimerobot-monitors/<domain>.txt
 # This file is the source of truth for retire-tenant.sh and audit-monitors.sh.
@@ -141,7 +139,7 @@ if [ -z "$CURRENT_COUNT" ]; then
 fi
 
 PLAN_CAP=50  # Solo plan
-NEW_MONITORS=6
+NEW_MONITORS=4
 PROJECTED=$((CURRENT_COUNT + NEW_MONITORS))
 
 echo "  Current monitors: $CURRENT_COUNT"
@@ -287,7 +285,7 @@ create_monitor() {
 }
 
 # ----------------------------------------------------------------------------
-# Create the 6 monitors, capture IDs as we go
+# Create the 4 monitors, capture IDs as we go
 # ----------------------------------------------------------------------------
 echo ""
 echo "Creating monitors for $DOMAIN..."
@@ -334,16 +332,6 @@ ID=$(create_monitor "$KEYWORD_PREFIX smtp $DOMAIN" 4 "$DOMAIN" \
   -d "sub_type=99" -d "port=25")
 write_id "smtp" "$ID"
 
-# Monitor 5: Submission port 587 (port check)
-ID=$(create_monitor "$KEYWORD_PREFIX submission $DOMAIN" 4 "$DOMAIN" \
-  -d "sub_type=99" -d "port=587")
-write_id "submission" "$ID"
-
-# Monitor 6: IMAPS port 993 (port check)
-ID=$(create_monitor "$KEYWORD_PREFIX imaps $DOMAIN" 4 "$DOMAIN" \
-  -d "sub_type=99" -d "port=993")
-write_id "imaps" "$ID"
-
 # ----------------------------------------------------------------------------
 # Done (the audit file was written incrementally as monitors were created)
 # ----------------------------------------------------------------------------
@@ -359,7 +347,7 @@ fi
 
 echo ""
 echo "============================================================"
-echo "  Done. Created 6 monitors for $DOMAIN."
+echo "  Done. Created 4 monitors for $DOMAIN."
 echo "  Audit file: $AUDIT_FILE"
 echo "============================================================"
 echo ""
