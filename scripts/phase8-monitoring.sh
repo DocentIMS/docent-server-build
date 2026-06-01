@@ -215,7 +215,13 @@ AUDIT_FILE="$MONITORS_DIR/$DOMAIN.txt"
 if [ -f "$AUDIT_FILE" ]; then
   echo "ERROR: audit file already exists: $AUDIT_FILE"
   echo "       This domain appears to have monitors already created."
-  echo "       Use retire-tenant.sh to remove them before re-creating."
+  echo ""
+  echo "       If the monitors are still in UptimeRobot, retire them first:"
+  echo "         retire-tenant.sh $DOMAIN"
+  echo ""
+  echo "       If the monitors were already deleted in UptimeRobot (or you"
+  echo "       just want to start fresh), delete the stale record:"
+  echo "         rm $AUDIT_FILE"
   exit 1
 fi
 
