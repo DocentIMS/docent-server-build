@@ -514,3 +514,30 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
     sudo systemctl restart $PLONE_SYSTEMD_UNIT
     sudo journalctl -u $PLONE_SYSTEMD_UNIT -f
 ```
+
+---
+
+## From `phase7d-plone-products.sh` (removed) — MANUAL NEXT STEPS
+
+```
+===================================================================
+  MANUAL NEXT STEPS
+===================================================================
+
+  The add-ons are now BUILT INTO the Plone instance, but they are NOT
+  yet activated inside the Plone site.
+
+  To activate an add-on:
+    1. Log in to Plone as admin.
+       (admin password: PLONE_ADMIN_PW in $REPO_ROOT/CREDENTIALS.txt)
+    2. Go to: Site Setup -> Add-ons
+    3. Click 'Install' next to each add-on you want active.
+
+  Useful commands:
+    sudo systemctl status  $PLONE_SYSTEMD_UNIT
+    sudo systemctl restart $PLONE_SYSTEMD_UNIT
+    sudo journalctl -u $PLONE_SYSTEMD_UNIT -f
+
+  To change which add-ons are installed, edit products.cfg in the
+  docent-plone-addons GitHub repo, then re-run phase 7d.
+```
