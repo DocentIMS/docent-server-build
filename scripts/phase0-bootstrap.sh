@@ -620,7 +620,7 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
   Password:      ${TEST_MAILBOX_PW}
 
 ==============================================================
-  BACKEND PASSWORDS (mostly software-only, listed for recovery)
+  5. BACKEND PASSWORDS (mostly software-only, listed for recovery)
 ==============================================================
   Most of these are used by software internally and you'll never
   type them into a login screen. The exception is WordPress admin,
@@ -636,10 +636,20 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
                                           login: https://${DOMAIN}/wp-admin/
 
 ==============================================================
-  PURCHASED LICENSE KEYS
+  6. PURCHASED LICENSE KEYS
 ==============================================================
   Roundcube Plus:      ${RC_PLUS_LICENSE_KEY}
   AI API key:          ${XAI_DISPLAY}
+
+==============================================================
+  Plone Site - ADD THE TEAM PLONE SITE
+==============================================================
+
+PLONE_ADMIN_USER=admin
+PLONE_ADMIN_PW=
+PLONE_VERSION=
+PLONE_INSTANCE_DIR=
+PLONE_URL_LOCAL=http://127.0.0.1:8080/
 
 ==============================================================
   *** SAVE THIS FILE TO YOUR PASSWORD MANAGER NOW. ***
