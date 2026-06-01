@@ -95,8 +95,8 @@ sudo bash /root/server-build/scripts/run-phases.sh
 
 ## Known issues / future work
 
-See `docs/future-improvements.docx` for the running list of known polish
-items, prioritized HIGH / MED / LOW / POLISH.
+See `docs/improvements.md` for the running list of open work, accepted
+risks, and finished items, prioritized HIGH / MED / LOW / POLISH.
 
 ## What's in this repo
 
@@ -124,7 +124,7 @@ docent-server-build/
     ├── dns-reference.docx               (DNS records walkthrough,
     │                                     Cloudflare migration plan)
     ├── secrets-and-config-inventory.md  (every configurable value mapped)
-    └── future-improvements.docx         (deferred polish items, prioritized)
+    └── improvements.md                  (open work + done log, prioritized)
 ```
 
 ## Reference deployment
