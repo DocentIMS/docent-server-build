@@ -1,38 +1,11 @@
-# Removed end-of-phase text (for consolidation into the final "manual steps" block)
-
-This file accumulates the per-phase summary / verification / next-steps blocks
-that have been removed from individual phase scripts (per operator preference:
-roll them into a single "manual steps" block at the very end of `run-phases`).
-Trim or fold into the consolidated final block; nothing here is live anymore.
-
----
-
-## From `phase1.sh` (removed) — end-of-phase PASSWORDS block
-
-```
 ===================================================================
-  PASSWORDS
+  MANUAL VERIFICATION STEPS
 ===================================================================
 
-  All passwords are in CREDENTIALS.txt at the repo root.
-  This script does NOT print passwords (to avoid scrollback exposure).
+Following are the manual steps that either configure or test the setup.
+Based on experience, you may not need to run all of them.
 
-  To view the credentials again:
-    cat /root/server-build/CREDENTIALS.txt
-```
-
----
-
-## From `phase1.sh` (removed) — MANUAL VERIFICATION STEPS
-
-```
-===================================================================
-  MANUAL VERIFICATION STEPS (cannot be automated)
-===================================================================
-
-  These steps require an external connection and CANNOT be checked
-  by this script. Do them from your Windows machine while keeping
-  this session open as a safety net.
+**** Phase 1 - Checking SSH configuration ****
 
   IMPORTANT: get the password for $ADMIN_USER from CREDENTIALS.txt
   BEFORE you try to SSH. Three wrong attempts = 1-hour fail2ban
@@ -48,24 +21,7 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
 
   3. Confirm CREDENTIALS.txt is saved in your password manager.
 
-  4. (Optional) Clear your terminal scrollback:
-       clear && history -c
-
-  Once these checks are done, Phase 1 is fully complete and you
-  can proceed to Phase 2 (Web server + TLS foundation).
-```
-
----
-
-## From `phase2.sh` (removed) — MANUAL VERIFICATION STEPS
-
-```
-===================================================================
-  MANUAL VERIFICATION STEPS (cannot be automated)
-===================================================================
-
-  These steps require an external connection / human eyes and CANNOT
-  be checked by this script. Do them from your Windows machine.
+**** Phase 2 - Checking the domain configuration ****
 
   1. Open https://$DOMAIN/ in a web browser.
      - You should see the placeholder page with the domain name.
@@ -82,24 +38,15 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
        https://www.ssllabs.com/ssltest/analyze.html?d=$DOMAIN
      A grade of A or A+ is expected for a default Let's Encrypt setup.
 
-  Once these checks pass, Phase 2 is fully complete and you are ready
-  for Phase 3 (Database - MySQL/MariaDB).
-```
+**** Phase 3 - No Checks  ****
 
----
 
-## From `phase4.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
+**** Phase 4 - Checking the domain configuration ****
 
-```
-===================================================================
-  MANUAL VERIFICATION & NEXT STEPS
-===================================================================
-
-  INTERNAL TESTING (works without PTR or DNS records):
-
-  1. Confirm CREDENTIALS.txt is saved in your password manager. The
-     test mailbox password is in section 4. The Mail DB password is
-     in BACKEND PASSWORDS.
+  1. configure the reverse lookup on Hetzner.  To set it, return to
+     Hetzner and manually activate a PTR (reverse DNS) record for the
+     server's IP -> mail.$DOMAIN (Hetzner Cloud Console -> this server ->
+     reverse DNS).
 
   2. Send a test message from the local server to the test mailbox:
        echo "test body" | mail -s "test subject" $TEST_MAILBOX
@@ -113,7 +60,7 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
 
   EXTERNAL CONFIGURATION (DNS):
 
-  5. DNS is already done - nothing to add by hand. The MX, SPF, DKIM,
+  5. DNS is already done,   The MX, SPF, DKIM,
      DMARC and CAA records for $DOMAIN are created automatically in
      Hetzner DNS (phase-pre-hetzner.sh plus the post-dkim phase).
      Confirm them in Hetzner Cloud Console -> DNS -> $DOMAIN.
@@ -123,8 +70,6 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
        dig @8.8.8.8 TXT $DOMAIN
        dig @8.8.8.8 TXT ${DKIM_SELECTOR}._domainkey.$DOMAIN
        dig @8.8.8.8 TXT _dmarc.$DOMAIN
-
-  EXTERNAL TESTING (limited until PTR is set):
 
   7. Configure Thunderbird/Outlook to connect to:
        IMAP server:    $MAIL_HOSTNAME  port 993  SSL/TLS
@@ -152,138 +97,7 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
          sudo tail /var/log/mail.log
       You'll see the X-Spam-Flag header added and Sieve filing it into Junk.
 
-  11. Clear scrollback:  clear && history -c
-
-  Once a PTR record is set, outbound deliverability to Gmail/Outlook/etc.
-  improves dramatically without any code changes. To set it, return to
-  Hetzner and manually activate a PTR (reverse DNS) record for the
-  server's IP -> mail.$DOMAIN (Hetzner Cloud Console -> this server ->
-  reverse DNS). No support ticket is needed.
-```
-
----
-
-## From `phase3.sh` (removed) — PASSWORDS
-
-```
-===================================================================
-  PASSWORDS
-===================================================================
-
-  All passwords are in CREDENTIALS.txt at the repo root.
-  This script does NOT print passwords (to avoid scrollback exposure).
-
-  The MariaDB root password is also stored in /root/.my.cnf
-  (root-only readable) so 'mysql' and 'mysqldump' work without -p
-  prompts when run as root.
-```
-
----
-
-## From `phase3.sh` (removed) — MANUAL VERIFICATION STEPS
-
-```
-===================================================================
-  MANUAL VERIFICATION STEPS
-===================================================================
-
-  Quick sanity checks (run as root):
-
-  1. Connect to MariaDB and confirm version:
-       sudo mysql -e 'SELECT VERSION();'
-
-  2. List databases (should see only system databases at this stage):
-       sudo mysql -e 'SHOW DATABASES;'
-
-  3. Confirm CREDENTIALS.txt is saved in your password manager.
-
-  Once these are done, Phase 3 is complete and you are ready for
-  Phase 4 (Mail server: Postfix + Dovecot + OpenDKIM + OpenDMARC + SpamAssassin).
-```
-
----
-
-## From `phase4.sh` (removed) — PASSWORDS
-
-```
-===================================================================
-  PASSWORDS
-===================================================================
-
-  All passwords are in CREDENTIALS.txt at the repo root.
-  This script does NOT print passwords (to avoid scrollback exposure).
-
-  The mail DB password is also stored in:
-    /etc/postfix/mysql-*.cf
-    /etc/dovecot/dovecot.conf
-```
-
----
-
-## From `phase4.sh` (removed) — DNS RECORDS - HANDLED AUTOMATICALLY
-
-```
-===================================================================
-  DNS RECORDS - HANDLED AUTOMATICALLY
-===================================================================
-
-  No manual DNS work is needed. All mail DNS records for $DOMAIN are
-  created automatically in Hetzner DNS:
-
-    - A, MX, SPF, DMARC and CAA records are created by phase-pre-hetzner.sh.
-    - The DKIM TXT record is published by the post-dkim phase, which
-      run-phases.sh runs automatically right after this phase.
-
-  You can confirm them in the Hetzner Cloud Console -> DNS -> $DOMAIN.
-```
-
----
-
-## From `phase-post-hetzner-dkim.sh` (removed) — Verification
-
-```
-=== Verification ===
-
-  DKIM record published. To verify externally (give DNS a few minutes
-  to propagate first):
-
-    dig +short TXT ${DKIM_NAME}.${DOMAIN}
-
-  Or with a public resolver:
-
-    dig +short TXT ${DKIM_NAME}.${DOMAIN} @1.1.1.1
-
-  You should see the v=DKIM1 record. If it shows the wrong value or no
-  value, check Hetzner Console -> DNS -> ${DOMAIN}.
-
-  Send a test mail to https://www.mail-tester.com to confirm DKIM
-  signing works end-to-end (Postfix + OpenDKIM + DNS).
-```
-
----
-
-## From `phase5.sh` (removed) — PASSWORDS
-
-```
-===================================================================
-  PASSWORDS
-===================================================================
-
-  All passwords are in CREDENTIALS.txt at the repo root.
-  This script does NOT print passwords (to avoid scrollback exposure).
-
-  The Roundcube DB password and DES key are also stored in:
-    /etc/roundcube/config.inc.php
-```
-
----
-
-## From `phase5.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
-
-```
-===================================================================
-  MANUAL VERIFICATION & NEXT STEPS
-===================================================================
+**** Phase 5 - Round Cube Testing ****
 
   1. Open a web browser and go to:
        https://${DOMAIN}${ROUNDCUBE_URL_PATH}/
@@ -294,38 +108,23 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
        Username:  test@${DOMAIN}  (full email address required)
        Password:  (the test mailbox password from Phase 4)
 
-  3. You should land in the inbox and see your existing messages
-     (the local test plus any others).
-
-  4. Try composing a new message and sending it. Check the mail log:
+  3. Try composing a new message and sending it. Check the mail log:
        sudo tail -30 /var/log/mail.log
 
      You should see SASL authentication and outbound delivery.
 
-  5. SIEVE FILTER TEST:
+  4. SIEVE FILTER TEST:
      Click Settings (top right gear) -> Filters -> + (create rule)
      If managesieve is working, you'll see Sieve rule editor.
      The default global script (file X-Spam-Flag mail to Junk) is already
      active - you don't need to recreate it. This is for adding
      per-user custom rules.
 
-  6. Check for errors:
+  5. Check for errors:
        sudo tail /var/log/roundcube/errors.log
        sudo tail /var/log/apache2/error.log
 
-  Roundcube is now available alongside Thunderbird/Outlook IMAP access.
-  Users can pick whichever interface they prefer. Both go through the
-  same Postfix and Dovecot - same mailbox, same folders.
-```
-
----
-
-## From `phase5a-rc-plus.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
-
-```
-===================================================================
-  MANUAL VERIFICATION & NEXT STEPS
-===================================================================
+  **** Phase 5a-rc-plus - Round Cube Skin ****
 
   1. Open https://${DOMAIN}/mail/ in your browser (or hard-refresh
      if you already had it open) and log in.
@@ -345,18 +144,7 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
   5. AI Assistant (xai) is installed by Phase 5c (Email AI), not this phase.
      Run that next if you want AI features in Roundcube.
 
-  Re-running this script is safe - it preserves any plugin-specific config
-  customizations you make in plugins/<plugin>/config.inc.php.
-```
-
----
-
-## From `phase5b-globaladdressbook.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
-
-```
-===================================================================
-  MANUAL VERIFICATION & NEXT STEPS
-===================================================================
+**** Phase 5b - Global Address Book ****
 
   1. Open Roundcube webmail in your browser and log in (or hard-refresh
      if you already had it open).
@@ -378,21 +166,7 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
        sudo tail /var/log/roundcube/errors.log
        sudo tail /var/log/apache2/error.log
 
-  Re-running this script is safe - it skips already-completed steps
-  and preserves your plugin config customizations.
-```
-
----
-
-## From `phase5c-email-ai.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
-
-```
-===================================================================
-  MANUAL VERIFICATION & NEXT STEPS
-===================================================================
-
-  (When XAI_API_KEY is empty, the original block also showed an
-   "IMPORTANT: API key not set" warning with steps to add it.)
+**** Phase 5c - Email AI ****
 
   1. Open Roundcube webmail and log in (hard-refresh if already open).
 
@@ -419,40 +193,7 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
      Set xai_enable_message_generation = false (or _view_summaries = false).
      Then: sudo systemctl reload apache2
 
-  Re-running this script is safe. It preserves any plugin-specific
-  config customizations you make in $XAI_CONFIG.
-```
-
----
-
-## From `phase6.sh` (removed) — PASSWORDS
-
-```
-===================================================================
-  PASSWORDS
-===================================================================
-
-  All passwords are in CREDENTIALS.txt at the repo root.
-  This script does NOT print passwords (to avoid scrollback exposure).
-
-  The WordPress DB password is also stored in:
-    $WP_CONFIG (mode 640, www-data:www-data)
-
-  WordPress admin login (created automatically by Step 7):
-    URL:      https://$DOMAIN/wp-admin/
-    Username: $WP_ADMIN_USERNAME
-    Password: see CREDENTIALS.txt (WP_ADMIN_PW)
-    Email:    $WP_ADMIN_EMAIL
-```
-
----
-
-## From `phase6.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
-
-```
-===================================================================
-  MANUAL VERIFICATION & NEXT STEPS
-===================================================================
+**** Phase 6 - Wordpress ****
 
   1. Confirm CREDENTIALS.txt is saved in your password manager.
      Both WordPress passwords (admin and database) are in
@@ -463,81 +204,128 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
        Username: $WP_ADMIN_USERNAME
        Password: see CREDENTIALS.txt BACKEND PASSWORDS (WordPress admin)
 
-     The site is already installed (Step 7 ran the wizard via wp-cli).
-     Search engine visibility is set to 'discourage' (placeholder/template
-     content shouldn't be indexed). Toggle that off in Settings > Reading
-     once the site is publicly ready.
-
   3. Theme/configure the site to look like a real Docent project page,
      using whatever template/approach you've used before.
 
-  4. Set the PTR (reverse DNS) record:
-     - Return to Hetzner and manually activate a PTR record:
-         PTR $SERVER_IP -> mail.$DOMAIN
-       (Hetzner Cloud Console -> select this server -> set the reverse
-        DNS on the server's IPv4 address. No support ticket needed.)
-     - Without PTR, outbound mail to Gmail/Outlook/etc. will land in spam.
-       Inbound and webmail still work fine - PTR only affects outbound
-       deliverability reputation.
-
-  5. Clear scrollback:  clear && history -c
-```
-
----
-
-## From `phase7c-plone-frontend.sh` (removed) — MANUAL NEXT STEPS
-
-```
-===================================================================
-  MANUAL NEXT STEPS
-===================================================================
-
-  Plone is now publicly reachable AND the site exists at /$PLONE_SITE_ID.
-  The Plone Site was created with distribution='classic', so Folder,
-  Page, News Item, and the rest of the Classic UI content types are
-  installed and the Add menu is functional.
+**** Phase 7 - Plone ****
 
   To log in:
     1. Open: https://$PLONE_PUBLIC_HOST/login
     2. Username: admin
        Password: see $REPO_ROOT/CREDENTIALS.txt (PLONE_ADMIN_PW)
 
-  (The same password also works for /manage - the Zope Management
-   Interface - via the Zope-root admin user, which is a different
-   account in a different user folder, just sharing the password.)
-
-  WordPress at https://$DOMAIN/ is untouched.
-  Roundcube at https://$DOMAIN/mail/ is untouched.
-
   Useful commands going forward:
     sudo systemctl status  $PLONE_SYSTEMD_UNIT
     sudo systemctl restart $PLONE_SYSTEMD_UNIT
     sudo journalctl -u $PLONE_SYSTEMD_UNIT -f
-```
 
----
+==============================================================
+  CREDENTIALS FOR $DOMAIN ($SERVER_IP)
+  DocentIMS tenant server - $DOMAIN
+  Generated: <generated_timestamp_utc>
+==============================================================
+  1. HETZNER CLOUD ACCOUNT (your account at hetzner.com)
+==============================================================
+  WHAT IT'S FOR:    Logging into the Hetzner Cloud Console to
+                    manage your servers, view billing, see your
+                    server list, or open a console to a server.
+  WHERE YOU USE IT: https://console.hetzner.cloud (in browser)
+  Username:         (your Hetzner account email)
+  Password:         (your Hetzner account password)
 
-## From `phase7d-plone-products.sh` (removed) — MANUAL NEXT STEPS
+  >>> NOT GENERATED BY THIS SCRIPT - this is your account
+      with Hetzner, set up when you signed up. <<<
 
-```
-===================================================================
-  MANUAL NEXT STEPS
-===================================================================
+==============================================================
+  2. HETZNER SERVER EMERGENCY ACCESS (when SSH is broken)
+==============================================================
+  WHAT IT'S FOR:    Reaching this server when SSH won't connect.
+                    Emergency recovery only.
+  WHERE YOU USE IT: Hetzner Cloud Console -> select this server.
+                    Two tools there, neither needs SSH:
+                      - "Console": a browser VNC window onto the
+                        server's screen (the "$PLONE_SITE_NAME login:" prompt)
+                      - "Rescue": reboots into a recovery Linux so
+                        you can mount and repair the disk
+  Login:            This server was provisioned with SSH-key auth
+                    and root password login DISABLED - there is no
+                    root password. Recover via Rescue mode, or use
+                    the VNC Console once a user password exists
+                    (phase 1 sets the wayne password).
 
-  The add-ons are now BUILT INTO the Plone instance, but they are NOT
-  yet activated inside the Plone site.
+  >>> NO PASSWORD GENERATED BY THIS SCRIPT - access is via your
+      SSH key plus the Hetzner Cloud Console. <<<
 
-  To activate an add-on:
-    1. Log in to Plone as admin.
-       (admin password: PLONE_ADMIN_PW in $REPO_ROOT/CREDENTIALS.txt)
-    2. Go to: Site Setup -> Add-ons
-    3. Click 'Install' next to each add-on you want active.
+==============================================================
+  3. SSH ADMIN LOGIN  (your day-to-day server access)
+==============================================================
+  WHAT IT'S FOR:    Logging into the server via SSH using
+                    MobaXterm, PuTTY, or any SSH client.
+  WHERE YOU USE IT: ssh -p $SSH_PORT wayne@$SERVER_IP
 
-  Useful commands:
-    sudo systemctl status  $PLONE_SYSTEMD_UNIT
-    sudo systemctl restart $PLONE_SYSTEMD_UNIT
-    sudo journalctl -u $PLONE_SYSTEMD_UNIT -f
+                    Note: SSH is set to port $SSH_PORT (not the
+                    default 22) in an attempt to reduce spam
+                    attacks.
 
-  To change which add-ons are installed, edit products.cfg in the
-  docent-plone-addons GitHub repo, then re-run phase 7d.
-```
+  Username:  wayne
+  Password:  <wayne_password>
+
+  Username:  admin
+  Password:  <admin_password>
+
+  Either user works. Both have full sudo. Use 'admin' if you
+  need to give someone else access without sharing your wayne
+  account.
+
+  Username:  espen     (Plone developer access)
+  Password:  <espen_password>
+
+  espen has NO sudo. Member of 'plone' group, can do all Plone
+  work in /home/plone/ as themselves (no sudo needed thanks to
+  group-writable setgid permissions on /home/plone/<tenant>/).
+
+==============================================================
+  4. WEBMAIL TEST MAILBOX  (logging into Roundcube)
+==============================================================
+  WHAT IT'S FOR:    Logging into the Roundcube webmail to
+                    test that email works.
+  WHERE YOU USE IT: https://$DOMAIN/mail/
+
+  Email address: $TEST_MAILBOX
+  Password:      <test_mailbox_password>
+
+==============================================================
+  BACKEND PASSWORDS (mostly software-only, listed for recovery)
+==============================================================
+  Most of these are used by software internally and you'll never
+  type them into a login screen. The exception is WordPress admin,
+  which IS a login you'll use - it lives here for convenience so all
+  generated passwords are in one place.
+
+  MariaDB root:        <mariadb_root_password>
+  Mail database:       <mail_db_password>
+  Roundcube database:  <roundcube_db_password>
+  Roundcube DES key:   <roundcube_des_key>
+  WordPress database:  <wordpress_db_password>
+  WordPress admin:     <wordpress_admin_password>
+			(user: $WP_ADMIN_USERNAME)
+                        login: https://$DOMAIN/wp-admin/
+  Plone admin:         <plone_admin_password>
+			(user: admin)
+                         login: https://team.$DOMAIN/login
+
+==============================================================
+  PURCHASED LICENSE KEYS
+==============================================================
+  Roundcube Plus:      <roundcube_plus_license_key>
+  AI API key:          <ai_api_key>
+
+==============================================================
+  *** SAVE THIS FILE TO YOUR PASSWORD MANAGER NOW. ***
+
+  Keep this file on the server until the whole build - including
+  the Plone phases (7a-7d) - is finished and verified. The Plone
+  phases read PLONE_ADMIN_PW from this file. Once Plone is done
+  and everything is confirmed working, you may delete it with:
+      rm $REPO_ROOT/CREDENTIALS.txt
+==============================================================
