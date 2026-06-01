@@ -858,8 +858,13 @@ ${BOLD}Next:${RESET}
        cd ${REPO_ROOT}
        scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local${EGG_CACHE_SCP} root@${SERVER_IP}:/root/
      ${EGG_CACHE_NOTE}
-  3. SSH to the new server:
-       ssh root@${SERVER_IP}
+  3. Open a ${BOLD}NEW MobaXterm SSH session${RESET} (NOT a nested ssh inside
+     this template tab) so the new tab is for $SERVER_NAME and you don't
+     lose track of which server you're on:
+       Host:  ${SERVER_IP}
+       User:  root
+       Port:  22
+       Auth:  your SSH key (no password yet - phase 1 creates passwords)
      The /etc/motd shown on login tells you the next command to run.
   4. When phase 0 finishes, run:
        sudo bash /root/server-build/scripts/run-phases.sh

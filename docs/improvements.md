@@ -26,9 +26,7 @@ TXT value set by `phase-pre-hetzner.sh`; bump it per tenant once that
 tenant's outbound mail history is clean.
 
 ### Consider moving registrar/DNS from IONOS to GoDaddy — LOW
-Evaluate migrating the domain registrar (and/or DNS) from IONOS to GoDaddy so
-the build code can set nameservers programmatically (IONOS currently requires
-a manual nameserver step). GoDaddy exposes an API for this and also has a
+GoDaddy exposes an API for this and also has a
 domain-availability API ("connector") to check/suggest available domain
 names — could be wired into the provisioning flow. Likely not worth it for
 <5 domains; revisit when we approach automated multi-tenant onboarding.
@@ -145,7 +143,10 @@ names — could be wired into the provisioning flow. Likely not worth it for
   `PRODUCTS_CFG_URL=…/products-dashboard.cfg` in `tenant.local`.
 - `DocentIMS.ActionItems` — `setuphandlers_meadows.py` `_create_content`
   AttributeError on Plone 6.2 fixed by guarding the `Members` folder lookup
-  (`if folder:` before assignment).
+  (`if folder:` before assignment). Committed to `master` of the
+  `DocentIMS.ActionItems` repo; `docent-plone-addons/products.cfg`
+  references the add-on with no rev pin (`mr.developer` clones the default
+  branch), so every new tenant build picks the fix up automatically.
 
 ### CREDENTIALS.txt format
 - Numbered: `5. BACKEND PASSWORDS`, `6. PURCHASED LICENSE KEYS`.
