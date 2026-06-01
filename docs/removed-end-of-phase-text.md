@@ -482,3 +482,35 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
 
   5. Clear scrollback:  clear && history -c
 ```
+
+---
+
+## From `phase7c-plone-frontend.sh` (removed) — MANUAL NEXT STEPS
+
+```
+===================================================================
+  MANUAL NEXT STEPS
+===================================================================
+
+  Plone is now publicly reachable AND the site exists at /$PLONE_SITE_ID.
+  The Plone Site was created with distribution='classic', so Folder,
+  Page, News Item, and the rest of the Classic UI content types are
+  installed and the Add menu is functional.
+
+  To log in:
+    1. Open: https://$PLONE_PUBLIC_HOST/login
+    2. Username: admin
+       Password: see $REPO_ROOT/CREDENTIALS.txt (PLONE_ADMIN_PW)
+
+  (The same password also works for /manage - the Zope Management
+   Interface - via the Zope-root admin user, which is a different
+   account in a different user folder, just sharing the password.)
+
+  WordPress at https://$DOMAIN/ is untouched.
+  Roundcube at https://$DOMAIN/mail/ is untouched.
+
+  Useful commands going forward:
+    sudo systemctl status  $PLONE_SYSTEMD_UNIT
+    sudo systemctl restart $PLONE_SYSTEMD_UNIT
+    sudo journalctl -u $PLONE_SYSTEMD_UNIT -f
+```
