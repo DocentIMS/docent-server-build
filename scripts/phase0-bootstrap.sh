@@ -362,10 +362,6 @@ fi
 # Advisory: user can override with a yes if they're building before DNS.
 check_dns_resolution "$DOMAIN" "$SERVER_IP"
 
-# Purpose is auto-derived (no prompt). It is used only as a one-line label
-# at the top of CREDENTIALS.txt; nothing downstream reads it.
-SERVER_PURPOSE="DocentIMS tenant server - ${DOMAIN}"
-
 # Hardcoded admin accounts and host settings (assigned silently;
 # documented in CREDENTIALS.txt after write).
 ADMIN_USER="wayne"
@@ -453,7 +449,6 @@ cat > "$TENANT_FILE" << TENANT_LOCAL_EOF
 
 DOMAIN="${DOMAIN}"
 SERVER_IP="${SERVER_IP}"
-SERVER_PURPOSE="${SERVER_PURPOSE}"
 ADMIN_USER="${ADMIN_USER}"
 SHARED_ADMIN_USER="${SHARED_ADMIN_USER}"
 ESPEN_USER="${ESPEN_USER}"
@@ -534,11 +529,6 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
   CREDENTIALS FOR ${DOMAIN} (${SERVER_IP})
   Generated: $(date '+%Y-%m-%d %H:%M %Z')
 ==============================================================
-
-==============================================================
-  PURPOSE OF THIS SERVER
-==============================================================
-  ${SERVER_PURPOSE}
 
 ==============================================================
   1. HETZNER CLOUD ACCOUNT (your account at hetzner.com)
