@@ -1061,42 +1061,6 @@ done
 # CREDENTIALS
 # ============================================================================
 # ============================================================================
-# PASSWORDS
-# ============================================================================
-echo ""
-echo "==================================================================="
-echo "  PASSWORDS"
-echo "==================================================================="
-echo ""
-echo "  All passwords are in CREDENTIALS.txt at the repo root."
-echo "  This script does NOT print passwords (to avoid scrollback exposure)."
-echo ""
-echo "  The mail DB password is also stored in:"
-echo "    /etc/postfix/mysql-*.cf"
-echo "    /etc/dovecot/dovecot.conf"
-echo ""
-
-# ============================================================================
-# DNS RECORDS - HANDLED AUTOMATICALLY
-# ============================================================================
-echo ""
-echo "==================================================================="
-echo "  DNS RECORDS - HANDLED AUTOMATICALLY"
-echo "==================================================================="
-cat <<EOF
-
-  No manual DNS work is needed. All mail DNS records for $DOMAIN are
-  created automatically in Hetzner DNS:
-
-    - A, MX, SPF, DMARC and CAA records are created by phase-pre-hetzner.sh.
-    - The DKIM TXT record is published by the post-dkim phase, which
-      run-phases.sh runs automatically right after this phase.
-
-  You can confirm them in the Hetzner Cloud Console -> DNS -> $DOMAIN.
-
-EOF
-
-# ============================================================================
 # AUTOMATED VERIFICATION
 # ============================================================================
 echo ""

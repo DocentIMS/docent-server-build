@@ -200,3 +200,39 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
   Once these are done, Phase 3 is complete and you are ready for
   Phase 4 (Mail server: Postfix + Dovecot + OpenDKIM + OpenDMARC + SpamAssassin).
 ```
+
+---
+
+## From `phase4.sh` (removed) — PASSWORDS
+
+```
+===================================================================
+  PASSWORDS
+===================================================================
+
+  All passwords are in CREDENTIALS.txt at the repo root.
+  This script does NOT print passwords (to avoid scrollback exposure).
+
+  The mail DB password is also stored in:
+    /etc/postfix/mysql-*.cf
+    /etc/dovecot/dovecot.conf
+```
+
+---
+
+## From `phase4.sh` (removed) — DNS RECORDS - HANDLED AUTOMATICALLY
+
+```
+===================================================================
+  DNS RECORDS - HANDLED AUTOMATICALLY
+===================================================================
+
+  No manual DNS work is needed. All mail DNS records for $DOMAIN are
+  created automatically in Hetzner DNS:
+
+    - A, MX, SPF, DMARC and CAA records are created by phase-pre-hetzner.sh.
+    - The DKIM TXT record is published by the post-dkim phase, which
+      run-phases.sh runs automatically right after this phase.
+
+  You can confirm them in the Hetzner Cloud Console -> DNS -> $DOMAIN.
+```
