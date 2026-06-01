@@ -39,6 +39,17 @@ the v4 address. The v6 address is unused and adds a small monthly charge per
 server. Add `public_net: { enable_ipv4: true, enable_ipv6: false }` to the
 create JSON body to provision IPv4-only.
 
+### Auto-fill Plone mail settings from tenant config — LOW
+The Plone Site Setup → Mail panel is filled in by hand after every build.
+Outbound host is always 127.0.0.1 (the local Postfix from phase 4); only
+`From name` and `From address` differ per tenant. Add a small step in
+phase 7d (or a follow-on phase) that writes the registry records:
+`plone.email_from_name`, `plone.email_from_address`,
+`plone.smtp_host=127.0.0.1`, `plone.smtp_port=25`, no SASL. From name and
+address pulled from `tenant.local` (add `MAIL_FROM_NAME` and
+`MAIL_FROM_ADDRESS` there, defaulted from `WP_SITE_TITLE` and
+`postmaster@${DOMAIN}`). Saves a manual checklist step per tenant.
+
 ---
 
 ## Won't fix (investigated, accepted as-is)
