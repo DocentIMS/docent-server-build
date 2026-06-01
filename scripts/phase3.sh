@@ -315,22 +315,6 @@ for line in "${REPORT[@]}"; do
 done
 
 # ============================================================================
-# PASSWORDS
-# ============================================================================
-echo ""
-echo "==================================================================="
-echo "  PASSWORDS"
-echo "==================================================================="
-echo ""
-echo "  All passwords are in CREDENTIALS.txt at the repo root."
-echo "  This script does NOT print passwords (to avoid scrollback exposure)."
-echo ""
-echo "  The MariaDB root password is also stored in $ROOT_DEFAULTS_FILE"
-echo "  (root-only readable) so 'mysql' and 'mysqldump' work without -p"
-echo "  prompts when run as root."
-echo ""
-
-# ============================================================================
 # AUTOMATED VERIFICATION
 # ============================================================================
 echo ""
@@ -492,30 +476,6 @@ if [ "$VERIFY_FAIL" -gt 0 ]; then
     echo "  *** $VERIFY_FAIL CHECK(S) FAILED. Review failures above before proceeding. ***"
     echo ""
 fi
-
-# ============================================================================
-# MANUAL VERIFICATION
-# ============================================================================
-echo "==================================================================="
-echo "  MANUAL VERIFICATION STEPS"
-echo "==================================================================="
-cat <<EOF
-
-  Quick sanity checks (run as root):
-
-  1. Connect to MariaDB and confirm version:
-       sudo mysql -e 'SELECT VERSION();'
-
-  2. List databases (should see only system databases at this stage):
-       sudo mysql -e 'SHOW DATABASES;'
-
-  3. Confirm CREDENTIALS.txt is saved in your password manager.
-
-  Once these are done, Phase 3 is complete and you are ready for
-  Phase 4 (Mail server: Postfix + Dovecot + OpenDKIM + OpenDMARC + SpamAssassin).
-
-EOF
-echo "==================================================================="
 
 # Exit non-zero if any automated check failed
 if [ "$VERIFY_FAIL" -gt 0 ]; then
