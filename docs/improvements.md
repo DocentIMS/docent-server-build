@@ -45,10 +45,10 @@ Outbound host is always 127.0.0.1 (the local Postfix from phase 4); only
 `From name` and `From address` differ per tenant. Add a small step in
 phase 7d (or a follow-on phase) that writes the registry records:
 `plone.email_from_name`, `plone.email_from_address`,
-`plone.smtp_host=127.0.0.1`, `plone.smtp_port=25`, no SASL. From name and
-address pulled from `tenant.local` (add `MAIL_FROM_NAME` and
-`MAIL_FROM_ADDRESS` there, defaulted from `WP_SITE_TITLE` and
-`postmaster@${DOMAIN}`). Saves a manual checklist step per tenant.
+`plone.smtp_host=127.0.0.1`, `plone.smtp_port=25`, no SASL. Defaults:
+From name = `Project Manager`, From address = `test@${DOMAIN}` (the real
+PM isn't known at initial setup; PM updates these in Site Setup → Mail
+once they take over). Saves a manual checklist step per tenant.
 
 ---
 
