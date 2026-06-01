@@ -1061,38 +1061,6 @@ if [ "$VERIFY_FAIL" -gt 0 ]; then
     echo "  *** $VERIFY_FAIL CHECK(S) FAILED. Review above before proceeding. ***"
 fi
 
-# ============================================================================
-# MANUAL VERIFICATION & NEXT STEPS
-# ============================================================================
-echo "==================================================================="
-echo "  MANUAL VERIFICATION & NEXT STEPS"
-echo "==================================================================="
-cat <<EOF
-
-  1. Open https://${DOMAIN}/mail/ in your browser (or hard-refresh
-     if you already had it open) and log in.
-
-  2. The interface should now use the "outlook_plus" skin (Outlook-style
-     navigation, modern layout, mobile-capable).
-
-  3. Verify the plugin works:
-       - Signature Designer (xsignature): go to Settings -> Identities -> edit
-         your identity. There should now be a richer signature editor than
-         the default plain text box.
-
-  4. Check for any plugin errors:
-       sudo tail /var/log/roundcube/errors.log
-       sudo tail /var/log/apache2/error.log
-
-  5. AI Assistant (xai) is installed by Phase 5c (Email AI), not this phase.
-     Run that next if you want AI features in Roundcube.
-
-  Re-running this script is safe - it preserves any plugin-specific config
-  customizations you make in plugins/<plugin>/config.inc.php.
-
-EOF
-echo "==================================================================="
-
 if [ "$VERIFY_FAIL" -gt 0 ]; then
     exit 1
 fi

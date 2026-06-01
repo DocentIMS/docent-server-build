@@ -236,3 +236,115 @@ Trim or fold into the consolidated final block; nothing here is live anymore.
 
   You can confirm them in the Hetzner Cloud Console -> DNS -> $DOMAIN.
 ```
+
+---
+
+## From `phase-post-hetzner-dkim.sh` (removed) — Verification
+
+```
+=== Verification ===
+
+  DKIM record published. To verify externally (give DNS a few minutes
+  to propagate first):
+
+    dig +short TXT ${DKIM_NAME}.${DOMAIN}
+
+  Or with a public resolver:
+
+    dig +short TXT ${DKIM_NAME}.${DOMAIN} @1.1.1.1
+
+  You should see the v=DKIM1 record. If it shows the wrong value or no
+  value, check Hetzner Console -> DNS -> ${DOMAIN}.
+
+  Send a test mail to https://www.mail-tester.com to confirm DKIM
+  signing works end-to-end (Postfix + OpenDKIM + DNS).
+```
+
+---
+
+## From `phase5.sh` (removed) — PASSWORDS
+
+```
+===================================================================
+  PASSWORDS
+===================================================================
+
+  All passwords are in CREDENTIALS.txt at the repo root.
+  This script does NOT print passwords (to avoid scrollback exposure).
+
+  The Roundcube DB password and DES key are also stored in:
+    /etc/roundcube/config.inc.php
+```
+
+---
+
+## From `phase5.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
+
+```
+===================================================================
+  MANUAL VERIFICATION & NEXT STEPS
+===================================================================
+
+  1. Open a web browser and go to:
+       https://${DOMAIN}${ROUNDCUBE_URL_PATH}/
+
+     You should see the Roundcube login page.
+
+  2. Log in with the test mailbox credentials from Phase 4:
+       Username:  test@${DOMAIN}  (full email address required)
+       Password:  (the test mailbox password from Phase 4)
+
+  3. You should land in the inbox and see your existing messages
+     (the local test plus any others).
+
+  4. Try composing a new message and sending it. Check the mail log:
+       sudo tail -30 /var/log/mail.log
+
+     You should see SASL authentication and outbound delivery.
+
+  5. SIEVE FILTER TEST:
+     Click Settings (top right gear) -> Filters -> + (create rule)
+     If managesieve is working, you'll see Sieve rule editor.
+     The default global script (file X-Spam-Flag mail to Junk) is already
+     active - you don't need to recreate it. This is for adding
+     per-user custom rules.
+
+  6. Check for errors:
+       sudo tail /var/log/roundcube/errors.log
+       sudo tail /var/log/apache2/error.log
+
+  Roundcube is now available alongside Thunderbird/Outlook IMAP access.
+  Users can pick whichever interface they prefer. Both go through the
+  same Postfix and Dovecot - same mailbox, same folders.
+```
+
+---
+
+## From `phase5a-rc-plus.sh` (removed) — MANUAL VERIFICATION & NEXT STEPS
+
+```
+===================================================================
+  MANUAL VERIFICATION & NEXT STEPS
+===================================================================
+
+  1. Open https://${DOMAIN}/mail/ in your browser (or hard-refresh
+     if you already had it open) and log in.
+
+  2. The interface should now use the "outlook_plus" skin (Outlook-style
+     navigation, modern layout, mobile-capable).
+
+  3. Verify the plugin works:
+       - Signature Designer (xsignature): go to Settings -> Identities -> edit
+         your identity. There should now be a richer signature editor than
+         the default plain text box.
+
+  4. Check for any plugin errors:
+       sudo tail /var/log/roundcube/errors.log
+       sudo tail /var/log/apache2/error.log
+
+  5. AI Assistant (xai) is installed by Phase 5c (Email AI), not this phase.
+     Run that next if you want AI features in Roundcube.
+
+  Re-running this script is safe - it preserves any plugin-specific config
+  customizations you make in plugins/<plugin>/config.inc.php.
+```
