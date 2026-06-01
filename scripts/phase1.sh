@@ -790,37 +790,6 @@ if [ "$VERIFY_FAIL" -eq 0 ]; then
     done
 fi
 
-echo "==================================================================="
-echo "  MANUAL VERIFICATION STEPS (cannot be automated)"
-echo "==================================================================="
-cat <<EOF
-
-  These steps require an external connection and CANNOT be checked
-  by this script. Do them from your Windows machine while keeping
-  this session open as a safety net.
-
-  IMPORTANT: get the password for $ADMIN_USER from CREDENTIALS.txt
-  BEFORE you try to SSH. Three wrong attempts = 1-hour fail2ban
-  lockout from your IP.
-
-  1. Open a NEW terminal window and SSH in as your personal admin:
-       ssh -p $SSH_PORT $ADMIN_USER@$SERVER_IP
-     This proves the new port and user account work end-to-end.
-
-  2. Verify root SSH is rejected (do this from another new session):
-       ssh -p $SSH_PORT root@$SERVER_IP
-     This should fail with "Permission denied".
-
-  3. Confirm CREDENTIALS.txt is saved in your password manager.
-
-  4. (Optional) Clear your terminal scrollback:
-       clear && history -c
-
-  Once these checks are done, Phase 1 is fully complete and you
-  can proceed to Phase 2 (Web server + TLS foundation).
-
-EOF
-echo "==================================================================="
 
 # Exit with non-zero status if any automated check failed
 if [ "$VERIFY_FAIL" -gt 0 ]; then
