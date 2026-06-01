@@ -143,7 +143,10 @@ names — could be wired into the provisioning flow. Likely not worth it for
   `PRODUCTS_CFG_URL=…/products-dashboard.cfg` in `tenant.local`.
 - `DocentIMS.ActionItems` — `setuphandlers_meadows.py` `_create_content`
   AttributeError on Plone 6.2 fixed by guarding the `Members` folder lookup
-  (`if folder:` before assignment).
+  (`if folder:` before assignment). Committed to `master` of the
+  `DocentIMS.ActionItems` repo; `docent-plone-addons/products.cfg`
+  references the add-on with no rev pin (`mr.developer` clones the default
+  branch), so every new tenant build picks the fix up automatically.
 
 ### CREDENTIALS.txt format
 - Numbered: `5. BACKEND PASSWORDS`, `6. PURCHASED LICENSE KEYS`.
