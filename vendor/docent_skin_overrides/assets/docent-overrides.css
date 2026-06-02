@@ -1455,3 +1455,39 @@ body.task-mail #layout-content > .header #toolbar-menu .dropbutton > a::before {
 body.task-mail #layout-content > .header #toolbar-menu > li > a:hover {
     background-color: var(--docent-fluent-blue-faint) !important;
 }
+
+
+/* =====================================================================
+ * SECTION 8: xai (AI Assistant) dialog - make the close (x) button visible
+ * =====================================================================
+ * The xai plugin renders <button class="xdialog-close">&times</button> in
+ * the .xdialog-title bar, but styles it with a transparent background and a
+ * bare glyph, so it's faint and easy to miss (users reported "no way to
+ * close the AI Assistant"). This dialog is a custom Angular dialog, NOT a
+ * jQuery dialog, so Escape does not close it - that x is the only exit.
+ * Pin it to the top-right of the title bar and give it a clear, clickable
+ * appearance. Applies to the compose dialog and its error sub-dialog.
+ */
+.xdialog-title {
+    position: relative !important;
+}
+.xdialog-title .xdialog-close {
+    position: absolute !important;
+    top: 50% !important;
+    right: 10px !important;
+    transform: translateY(-50%) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 2rem !important;
+    height: 2rem !important;
+    font-size: 1.6rem !important;
+    line-height: 1 !important;
+    color: var(--docent-fluent-blue, #0067b8) !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+    border-radius: 4px !important;
+}
+.xdialog-title .xdialog-close:hover {
+    background: var(--docent-fluent-blue-faint, rgba(0,103,184,0.1)) !important;
+}
