@@ -24,7 +24,7 @@ A single Ubuntu 26.04 VPS hosting:
 - Postfix + Dovecot 2.4 mail server (virtual users in MariaDB)
 - OpenDKIM signing, OpenDMARC processing
 - SpamAssassin + spamass-milter spam filtering with Sieve auto-filing
-- Roundcube webmail (with Roundcube Plus skin/plugins)
+- Roundcube webmail at `mail.<domain>` (with Roundcube Plus skin/plugins)
 - WordPress (the template's "real-looking" site for PTR ticket purposes)
 - Plone (eventual goal — Phase 7)
 

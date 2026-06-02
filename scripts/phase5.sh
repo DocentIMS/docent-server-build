@@ -2,7 +2,9 @@
 #
 # phase5.sh - Phase 5: Roundcube webmail
 #
-# Installs Roundcube webmail and serves it at https://<domain>/mail/.
+# Installs Roundcube webmail and serves it at https://mail.<domain>/ (its own
+# Apache vhost + Let's Encrypt cert, mirroring how phase 7c gives Plone its own
+# team.<domain>). The legacy https://<domain>/mail/ path 301-redirects there.
 # Connects to local Postfix (SMTP submission on 587) and Dovecot (IMAPS on 993)
 # from Phase 4. Stores user preferences/contacts/identities in its own
 # MariaDB database (separate from the Phase 4 mail user db).
@@ -25,7 +27,7 @@ set -u
 DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
 MAIL_HOSTNAME="mail.docenttemplate.com"  # default - overridden by tenant.local
 ROUNDCUBE_DIR="/usr/share/roundcube"   # package install location
-ROUNDCUBE_URL_PATH="/mail"             # served at https://<domain>/mail/
+ROUNDCUBE_URL_PATH="/mail"             # legacy path, now 301-redirects to mail.<domain>
 ROUNDCUBE_DB="roundcube"
 ROUNDCUBE_DB_USER="roundcube"
 ROOT_DEFAULTS_FILE="/root/.my.cnf"
@@ -42,6 +44,14 @@ source "$SCRIPT_DIR/lib/common.sh"
 # correct DOMAIN value.
 APACHE_VHOST="/etc/apache2/sites-available/${DOMAIN}-le-ssl.conf"
 CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
+
+# Webmail is published on its own subdomain (mail.<domain>) - same string as
+# MAIL_HOSTNAME (the IMAP/SMTP host). Serving webmail there on 443 does not
+# conflict with the mail ports (993/587/4190). mail.<domain> already resolves
+# to this server via the A record created by phase-pre-hetzner.
+MAIL_PUBLIC_HOST="mail.${DOMAIN}"
+MAIL_CERT_DIR="/etc/letsencrypt/live/${MAIL_PUBLIC_HOST}"
+MAIL_VHOST_FILE="/etc/apache2/sites-available/${MAIL_PUBLIC_HOST}.conf"
 
 # ============================================================================
 # REPORT TRACKING
@@ -111,7 +121,7 @@ fi
 
 echo "==================================================================="
 echo "  Phase 5 - Roundcube webmail for $DOMAIN"
-echo "  Will be served at: https://$DOMAIN$ROUNDCUBE_URL_PATH/"
+echo "  Will be served at: https://$MAIL_PUBLIC_HOST/"
 echo "  $(date)"
 echo "==================================================================="
 
@@ -466,24 +476,26 @@ else
 fi
 
 # ============================================================================
-# STEP 5: Configure Apache to serve Roundcube
+# STEP 5: Serve Roundcube on its own subdomain (https://mail.<domain>/)
 # ============================================================================
-step "Step 5: Configuring Apache to serve Roundcube at $ROUNDCUBE_URL_PATH"
+# Roundcube gets a dedicated Apache vhost + Let's Encrypt cert on mail.<domain>,
+# mirroring how phase 7c gives Plone its own team.<domain>. The old
+# https://<domain>/mail/ path is kept as a 301 redirect so existing links and
+# bookmarks still work.
+step "Step 5: Serving Roundcube at https://$MAIL_PUBLIC_HOST/"
 
-# Approach: instead of modifying the live vhost file (fragile, hard to roll
-# back, easy to corrupt), we ship Roundcube directives in a separate config
-# file at /etc/apache2/conf-available/roundcube-mail.conf and enable it with
-# a2enconf. This loads the directives globally - the Alias and <Directory>
-# blocks apply to all vhosts that match the path. Apache "Alias" directives
-# work this way regardless of which <VirtualHost> they sit under, as long
-# as no vhost has an overriding Alias for the same path.
-#
-# This is the same pattern Roundcube's own package uses (the package ships
-# /etc/apache2/conf-available/roundcube.conf with the /roundcube alias).
-#
-# To roll back: a2disconf roundcube-mail && systemctl reload apache2
+# Required Apache modules for the SSL vhost + redirects.
+for mod in ssl rewrite headers; do
+    if ! apache2ctl -M 2>/dev/null | grep -q "${mod}_module"; then
+        a2enmod "$mod" >/dev/null 2>&1 && log_done "Apache mod_$mod enabled"
+    fi
+done
+PHP_VER=$(ls /etc/apache2/mods-available/ 2>/dev/null | grep -oP 'php\d+(\.\d+)?\.conf' | head -1 | sed 's/\.conf//')
+if [ -n "$PHP_VER" ]; then
+    a2enmod "$PHP_VER" >/dev/null 2>&1 && log_done "Apache $PHP_VER enabled"
+fi
 
-# Disable the package-default /roundcube alias - we use /mail instead
+# Disable the package-default /roundcube alias - we serve on mail.<domain>.
 if [ -f /etc/apache2/conf-enabled/roundcube.conf ]; then
     a2disconf roundcube >/dev/null 2>&1
     log_done "Disabled default /roundcube alias"
@@ -491,86 +503,161 @@ else
     log_skip "Default /roundcube alias not enabled"
 fi
 
-# Create our Roundcube config file
-ROUNDCUBE_APACHE_CONF=/etc/apache2/conf-available/roundcube-mail.conf
-
-cat > "$ROUNDCUBE_APACHE_CONF" <<EOF
-# phase5-roundcube - Roundcube webmail at $ROUNDCUBE_URL_PATH/
-# Managed by phase5.sh - to roll back: a2disconf roundcube-mail
-#
-# Why AllowOverride None: Roundcube ships an .htaccess at
-# /var/lib/roundcube/public_html/.htaccess with rewrite rules designed for
-# a / mount, not /$ROUNDCUBE_URL_PATH/. The regex denies any URL whose
-# first path segment has no dot - which kills /skins/, /program/, /plugins/
-# when accessed via our alias. We replicate the security rules below in
-# a form that works for the alias path.
-
-Alias $ROUNDCUBE_URL_PATH /var/lib/roundcube/public_html
-
-<Directory /var/lib/roundcube/public_html>
-    Options FollowSymLinks
-    AllowOverride None
-    Require all granted
-</Directory>
-
-# Allow asset access throughout the symlinked tree
-<Directory /usr/share/roundcube>
-    Options FollowSymLinks
-    AllowOverride None
-    Require all granted
-</Directory>
-
-# Block sensitive Roundcube directories (replicates rules from the .htaccess
-# we disabled with AllowOverride None)
-<Directory /usr/share/roundcube/SQL>
-    Require all denied
-</Directory>
-<Directory /usr/share/roundcube/bin>
-    Require all denied
-</Directory>
-<Directory /usr/share/roundcube/program/include>
-    Require all denied
-</Directory>
-<Directory /usr/share/roundcube/program/lib>
-    Require all denied
-</Directory>
-<Directory /usr/share/roundcube/program/localization>
-    Require all denied
-</Directory>
-<Directory /usr/share/roundcube/program/steps>
-    Require all denied
-</Directory>
-<Directory /var/lib/roundcube/config>
-    Require all denied
-</Directory>
-<Directory /var/lib/roundcube/temp>
-    Require all denied
-</Directory>
-<Directory /var/lib/roundcube/logs>
-    Require all denied
-</Directory>
-
-# Block sensitive files anywhere under the tree
-<FilesMatch "(?i)^(README.*|CHANGELOG.*|SECURITY.*|composer\..*|jsdeps\.json|meta\.json|\.htaccess|\.htpasswd|\.git.*)\$">
-    Require all denied
-</FilesMatch>
-EOF
-
-log_done "Wrote $ROUNDCUBE_APACHE_CONF"
-
-# Enable our config (creates symlink in /etc/apache2/conf-enabled/)
-a2enconf roundcube-mail >/dev/null 2>&1
-log_done "Enabled roundcube-mail config (a2enconf)"
-
-# Make sure mod_rewrite and php are enabled
-a2enmod rewrite >/dev/null 2>&1 && log_done "Apache mod_rewrite enabled"
-PHP_VER=$(ls /etc/apache2/mods-available/ 2>/dev/null | grep -oP 'php\d+(\.\d+)?\.conf' | head -1 | sed 's/\.conf//')
-if [ -n "$PHP_VER" ]; then
-    a2enmod "$PHP_VER" >/dev/null 2>&1 && log_done "Apache $PHP_VER enabled"
+# ----------------------------------------------------------------------------
+# Step 5a: Let's Encrypt cert for mail.<domain>
+# ----------------------------------------------------------------------------
+# Same --webroot pattern as phase 2 / phase 7c: certbot writes the ACME
+# challenge into the default site webroot (served for any hostname), so we get
+# the cert without having to stand the vhost up first.
+if [ -d "$MAIL_CERT_DIR" ] && [ -f "$MAIL_CERT_DIR/fullchain.pem" ]; then
+    log_skip "Certificate for $MAIL_PUBLIC_HOST already exists"
+else
+    if ! command -v certbot >/dev/null 2>&1; then
+        log_fail "certbot not found - phase 2 must run first"
+        exit 1
+    fi
+    WEBROOT_PATH="${DEFAULT_SITE_DIR:-/srv/www/default}"
+    if [ ! -d "$WEBROOT_PATH" ]; then
+        log_fail "Webroot $WEBROOT_PATH does not exist - did phase 2 run?"
+        exit 1
+    fi
+    if ! certbot certonly \
+            --webroot \
+            --webroot-path "$WEBROOT_PATH" \
+            --non-interactive \
+            --agree-tos \
+            --email "${NOTIFICATION_EMAIL:-admin@$DOMAIN}" \
+            -d "$MAIL_PUBLIC_HOST"; then
+        log_fail "certbot failed for $MAIL_PUBLIC_HOST"
+        log_fail "Common causes: mail.$DOMAIN not resolving to this server, port 80 blocked,"
+        log_fail "or a Let's Encrypt rate limit on this domain."
+        exit 1
+    fi
+    log_done "Obtained Let's Encrypt cert for $MAIL_PUBLIC_HOST"
 fi
 
+# Roundcube (running as www-data) and Apache need to read the cert/key.
+if [ -d /etc/letsencrypt/live ] && [ -d /etc/letsencrypt/archive ]; then
+    chgrp -R www-data /etc/letsencrypt/live /etc/letsencrypt/archive
+    chmod -R g+rX /etc/letsencrypt/live /etc/letsencrypt/archive
+fi
+
+# ----------------------------------------------------------------------------
+# Step 5b: Apache vhost serving Roundcube at the root of mail.<domain>
+# ----------------------------------------------------------------------------
+# DocumentRoot is Roundcube's public_html. At a / mount the shipped layout
+# works cleanly (the .htaccess pain in the old /mail alias came from mounting
+# under a subpath). AllowOverride None + the explicit deny blocks below
+# replicate Roundcube's .htaccess protections without relying on it.
+if [ -f "$MAIL_VHOST_FILE" ] && grep -q "phase5-marker" "$MAIL_VHOST_FILE" 2>/dev/null; then
+    log_skip "Apache vhost $MAIL_VHOST_FILE already managed by phase5"
+else
+    cat > "$MAIL_VHOST_FILE" <<EOF
+# phase5-marker - managed by phase5.sh
+# Roundcube webmail served at https://$MAIL_PUBLIC_HOST/
+# To roll back: a2dissite ${MAIL_PUBLIC_HOST}.conf && systemctl reload apache2
+
+<VirtualHost *:80>
+    ServerName $MAIL_PUBLIC_HOST
+    RewriteEngine On
+    RewriteCond %{HTTPS} !=on
+    RewriteRule ^/?(.*) https://$MAIL_PUBLIC_HOST/\$1 [R=301,L]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName $MAIL_PUBLIC_HOST
+
+    SSLEngine on
+    SSLCertificateFile $MAIL_CERT_DIR/fullchain.pem
+    SSLCertificateKeyFile $MAIL_CERT_DIR/privkey.pem
+
+    DocumentRoot /var/lib/roundcube/public_html
+    DirectoryIndex index.php
+
+    <Directory /var/lib/roundcube/public_html>
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    # Allow asset access throughout the symlinked tree
+    <Directory /usr/share/roundcube>
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+    </Directory>
+
+    # Block sensitive Roundcube directories (replicates the disabled .htaccess)
+    <Directory /usr/share/roundcube/SQL>
+        Require all denied
+    </Directory>
+    <Directory /usr/share/roundcube/bin>
+        Require all denied
+    </Directory>
+    <Directory /usr/share/roundcube/program/include>
+        Require all denied
+    </Directory>
+    <Directory /usr/share/roundcube/program/lib>
+        Require all denied
+    </Directory>
+    <Directory /usr/share/roundcube/program/localization>
+        Require all denied
+    </Directory>
+    <Directory /usr/share/roundcube/program/steps>
+        Require all denied
+    </Directory>
+    <Directory /var/lib/roundcube/config>
+        Require all denied
+    </Directory>
+    <Directory /var/lib/roundcube/temp>
+        Require all denied
+    </Directory>
+    <Directory /var/lib/roundcube/logs>
+        Require all denied
+    </Directory>
+
+    # Block sensitive files anywhere under the tree
+    <FilesMatch "(?i)^(README.*|CHANGELOG.*|SECURITY.*|composer\..*|jsdeps\.json|meta\.json|\.htaccess|\.htpasswd|\.git.*)\$">
+        Require all denied
+    </FilesMatch>
+
+    ErrorLog \${APACHE_LOG_DIR}/$MAIL_PUBLIC_HOST-error.log
+    CustomLog \${APACHE_LOG_DIR}/$MAIL_PUBLIC_HOST-access.log combined
+</VirtualHost>
+EOF
+    chmod 644 "$MAIL_VHOST_FILE"
+    if [ ! -s "$MAIL_VHOST_FILE" ]; then
+        log_fail "Heredoc wrote zero bytes to $MAIL_VHOST_FILE"
+        exit 1
+    fi
+    log_done "Wrote $MAIL_VHOST_FILE"
+fi
+
+if [ -L "/etc/apache2/sites-enabled/${MAIL_PUBLIC_HOST}.conf" ]; then
+    log_skip "Apache vhost $MAIL_PUBLIC_HOST already enabled"
+else
+    a2ensite "${MAIL_PUBLIC_HOST}.conf" >/dev/null 2>&1
+    log_done "Enabled apache2 site $MAIL_PUBLIC_HOST"
+fi
+
+# ----------------------------------------------------------------------------
+# Step 5c: Redirect the legacy https://<domain>/mail/ path to the subdomain
+# ----------------------------------------------------------------------------
+# Keeps old bookmarks/links working. Shipped as a global conf so it applies to
+# the <domain> and www.<domain> vhosts; mail.<domain> serves at root so it
+# never hits /mail.
+ROUNDCUBE_REDIRECT_CONF=/etc/apache2/conf-available/roundcube-mail.conf
+cat > "$ROUNDCUBE_REDIRECT_CONF" <<EOF
+# phase5-marker - managed by phase5.sh
+# Legacy path redirect: https://<domain>/mail -> https://$MAIL_PUBLIC_HOST
+# (webmail moved to its own subdomain; see the $MAIL_PUBLIC_HOST vhost)
+Redirect 301 /mail https://$MAIL_PUBLIC_HOST
+EOF
+a2enconf roundcube-mail >/dev/null 2>&1
+log_done "Legacy /mail path now 301-redirects to https://$MAIL_PUBLIC_HOST"
+
 # Validate Apache config before reload - if config is broken, do NOT reload
-# (a broken reload would take the WordPress site down with it)
+# (a broken reload would take the WordPress/Plone sites down with it)
 if apache2ctl configtest 2>&1 | grep -q "Syntax OK"; then
     systemctl reload apache2
     log_done "Apache config valid, reloaded"
@@ -579,6 +666,7 @@ else
     apache2ctl configtest 2>&1 | tail -10
     echo ""
     echo "  To roll back manually:"
+    echo "    sudo a2dissite ${MAIL_PUBLIC_HOST}.conf"
     echo "    sudo a2disconf roundcube-mail"
     echo "    sudo systemctl reload apache2"
     exit 1
@@ -678,10 +766,22 @@ else
     vf "Apache roundcube-mail config is NOT enabled"
 fi
 
-if grep -q "Alias $ROUNDCUBE_URL_PATH /var/lib/roundcube/public_html" /etc/apache2/conf-available/roundcube-mail.conf 2>/dev/null; then
-    vp "Roundcube Alias points at correct path"
+if [ -L "/etc/apache2/sites-enabled/${MAIL_PUBLIC_HOST}.conf" ] && grep -q "phase5-marker" "$MAIL_VHOST_FILE" 2>/dev/null; then
+    vp "Apache vhost for $MAIL_PUBLIC_HOST is enabled and phase5-managed"
 else
-    vf "Roundcube Alias missing or wrong path"
+    vf "Apache vhost for $MAIL_PUBLIC_HOST missing or not enabled"
+fi
+
+if [ -f "$MAIL_CERT_DIR/fullchain.pem" ]; then
+    vp "Let's Encrypt cert exists for $MAIL_PUBLIC_HOST"
+else
+    vf "Let's Encrypt cert NOT found for $MAIL_PUBLIC_HOST"
+fi
+
+if grep -q "Redirect 301 /mail" /etc/apache2/conf-available/roundcube-mail.conf 2>/dev/null; then
+    vp "Legacy /mail path redirect is configured"
+else
+    vf "Legacy /mail path redirect missing"
 fi
 
 if apache2ctl configtest 2>&1 | grep -q "Syntax OK"; then
@@ -696,13 +796,15 @@ else
     vf "Apache is NOT running"
 fi
 
-# Test that Roundcube responds at https://<domain>/mail/
+# Test that Roundcube responds at https://mail.<domain>/. Use --resolve so the
+# check works even before public DNS for mail.<domain> has propagated.
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    "https://${DOMAIN}${ROUNDCUBE_URL_PATH}/" 2>/dev/null || echo "000")
+    --resolve "${MAIL_PUBLIC_HOST}:443:127.0.0.1" \
+    "https://${MAIL_PUBLIC_HOST}/" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
-    vp "Roundcube responds at https://${DOMAIN}${ROUNDCUBE_URL_PATH}/ (HTTP $HTTP_CODE)"
+    vp "Roundcube responds at https://${MAIL_PUBLIC_HOST}/ (HTTP $HTTP_CODE)"
 else
-    vf "Roundcube does NOT respond at https://${DOMAIN}${ROUNDCUBE_URL_PATH}/ (HTTP $HTTP_CODE)"
+    vf "Roundcube does NOT respond at https://${MAIL_PUBLIC_HOST}/ (HTTP $HTTP_CODE)"
 fi
 
 # Test that Roundcube can connect to its database

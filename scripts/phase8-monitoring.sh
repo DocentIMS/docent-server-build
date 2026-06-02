@@ -16,7 +16,7 @@
 # Creates 4 monitors per tenant:
 #   - HTTP keyword: WordPress    (https://<domain>/         keyword "Docent IMS")
 #   - HTTP keyword: Plone        (https://team.<domain>/    keyword "Plone")
-#   - HTTP keyword: Roundcube    (https://<domain>/mail/    keyword "Roundcube")
+#   - HTTP keyword: Roundcube    (https://mail.<domain>/    keyword "Roundcube")
 #   - Port: SMTP                 (<domain>:25)
 #
 # Writes monitor IDs to /home/wayne/uptimerobot-monitors/<domain>.txt
@@ -328,7 +328,7 @@ ID=$(create_monitor "$KEYWORD_PREFIX plone $DOMAIN" 2 "https://team.$DOMAIN/" \
 write_id "plone" "$ID"
 
 # Monitor 3: Roundcube (keyword check)
-ID=$(create_monitor "$KEYWORD_PREFIX mail $DOMAIN" 2 "https://$DOMAIN/mail/" \
+ID=$(create_monitor "$KEYWORD_PREFIX mail $DOMAIN" 2 "https://mail.$DOMAIN/" \
   -d "keyword_type=2" -d "keyword_case_type=0" -d "keyword_value=Roundcube")
 write_id "mail" "$ID"
 
