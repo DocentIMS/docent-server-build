@@ -213,16 +213,49 @@ mkdir -p "$MONITORS_DIR"
 AUDIT_FILE="$MONITORS_DIR/$DOMAIN.txt"
 
 if [ -f "$AUDIT_FILE" ]; then
-  echo "ERROR: audit file already exists: $AUDIT_FILE"
-  echo "       This domain appears to have monitors already created."
-  echo ""
-  echo "       If the monitors are still in UptimeRobot, retire them first:"
-  echo "         retire-tenant.sh $DOMAIN"
-  echo ""
-  echo "       If the monitors were already deleted in UptimeRobot (or you"
-  echo "       just want to start fresh), delete the stale record:"
-  echo "         rm $AUDIT_FILE"
-  exit 1
+  # The audit file records the monitor IDs created for this domain. But the
+  # file can be stale - e.g. it was copied from another build host, or the
+  # monitors were deleted in UptimeRobot directly. Before blocking, ask
+  # UptimeRobot whether any of the recorded monitors actually still exist.
+  EXISTING_IDS=$(grep -oE '^(wp|plone|mail|smtp)=[0-9]+' "$AUDIT_FILE" | cut -d= -f2 | paste -sd '-' -)
+
+  STILL_LIVE=0
+  if [ -n "$EXISTING_IDS" ]; then
+    LIVE_JSON=$(curl -sS -X POST "$UR_API/getMonitors" \
+      -d "api_key=$UPTIMEROBOT_API_KEY" \
+      -d "monitors=$EXISTING_IDS" \
+      -d "format=json")
+    if ! echo "$LIVE_JSON" | grep -q '"stat":"ok"'; then
+      # Couldn't verify - be conservative and do NOT touch the file.
+      echo "ERROR: audit file exists ($AUDIT_FILE) and the check for whether its"
+      echo "       monitors are still live failed (UptimeRobot API error)."
+      echo "       Refusing to proceed. Response: $LIVE_JSON"
+      exit 1
+    fi
+    STILL_LIVE=$(echo "$LIVE_JSON" | grep -o '"total":[0-9]*' | head -1 | cut -d: -f2)
+    [ -z "$STILL_LIVE" ] && STILL_LIVE=0
+  fi
+
+  if [ "$STILL_LIVE" -gt 0 ]; then
+    # Real duplicate: the monitors this file records are still live in UR.
+    echo "ERROR: audit file already exists: $AUDIT_FILE"
+    echo "       $STILL_LIVE of its monitor(s) still exist in UptimeRobot."
+    echo ""
+    echo "       Retire them first:"
+    echo "         retire-tenant.sh $DOMAIN"
+    echo ""
+    echo "       Or, to start fresh, delete the record:"
+    echo "         rm $AUDIT_FILE"
+    exit 1
+  fi
+
+  # Stale: none of the recorded monitors exist in UptimeRobot anymore. Archive
+  # the record and continue instead of forcing a manual cleanup - this is the
+  # common case after migrating audit files between build hosts.
+  STALE_BACKUP="${AUDIT_FILE}.stale-$(date +%Y%m%d-%H%M%S)"
+  mv "$AUDIT_FILE" "$STALE_BACKUP"
+  echo "NOTE: $AUDIT_FILE existed but none of its monitors are live in UptimeRobot."
+  echo "      Treating it as stale - archived to $STALE_BACKUP and continuing."
 fi
 
 # ----------------------------------------------------------------------------
