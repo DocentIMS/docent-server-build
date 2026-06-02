@@ -526,21 +526,16 @@ body.task-addressbook #taskmenu a.contacts * {
 }
 
 
-/* ---------- 3.1b Hide app-launcher (the 3x3 grid "multi-dot icon") ----------
- * Per user request. The icon is #taskmenu a.apps (or #button-apps).
- * Hide both the launcher button and the popup it would have opened.
+/* ---------- 3.1b App-launcher (3x3 grid "multi-dot icon") - SHOWN ----------
+ * Previously hidden; restored per operator request. This launcher is where
+ * RoundcubePlus add-ons/apps are reached, so it stays visible.
  */
-#taskmenu a.apps,
-#button-apps,
-#apps-menu {
-    display: none !important;
-}
 
 
-/* ---------- 3.2 Hide gear (settings) icon - retained from v1 ---------- */
-#taskmenu a.settings {
-    display: none !important;
-}
+/* ---------- 3.2 Settings (gear) icon - SHOWN ----------
+ * Previously hidden; restored per operator request so users can reach
+ * Settings -> Preferences, Identities, Filters, and plugin/add-on config.
+ */
 
 
 /* ---------- 3.3 Three-dot "more" menu next to email address ----------
