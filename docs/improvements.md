@@ -50,6 +50,21 @@ From name = `Project Manager`, From address = `test@${DOMAIN}` (the real
 PM isn't known at initial setup; PM updates these in Site Setup → Mail
 once they take over). Saves a manual checklist step per tenant.
 
+### Paginate the live server-type menu — LOW
+`hcloud_print_server_types` (`lib/hetzner-api.sh:238`) calls `/datacenters`
+and `/server_types` with no pagination. Hetzner's API returns only 25 results
+per page by default, and there are now well over 25 server types (the
+CX/CPX/CAX/CCX lines plus deprecated ones), so types beyond page 1 — including
+region-specific ones (e.g. some only sold in the German DCs) — never get
+matched and are missing from the menu the script prints. The operator then
+sees only a partial list (or the "could not fetch live list" fallback) and has
+to look the type up on Hetzner's website and type it manually. Fix: request
+`?per_page=50` and follow `meta.pagination.next_page` (or loop pages) on both
+the `/datacenters` and `/server_types` calls so every type in every region is
+listed. Until fixed, the manual-entry fallback works — but the location and
+type must match or the create call fails with "server type not available in
+this location."
+
 ---
 
 ## Won't fix (investigated, accepted as-is)
