@@ -480,7 +480,11 @@ else
             image: $img,
             ssh_keys: [$ssh],
             start_after_create: true,
-            user_data: $ud
+            user_data: $ud,
+            public_net: {
+                enable_ipv4: true,
+                enable_ipv6: false
+            }
         }')
 
     echo "  Submitting create request..."
@@ -638,8 +642,12 @@ else
     log_fail "TXT  @ (SPF)"
 fi
 
-# DMARC (TXT): _dmarc -> v=DMARC1; p=none; rua=mailto:<notification_email>
-DMARC_VALUE="\"v=DMARC1; p=none; rua=mailto:${NOTIFICATION_EMAIL}\""
+# DMARC (TXT): _dmarc -> v=DMARC1; p=quarantine; rua=mailto:<notification_email>
+# p=quarantine (not p=none): failing/forged mail-from-<domain> is junked by
+# recipients rather than merely logged. Safe from day one because phase 4 sets
+# up SPF + DKIM aligned, so legitimate outbound mail passes DMARC. Bump to
+# p=reject once a tenant's outbound history is proven clean (see improvements.md).
+DMARC_VALUE="\"v=DMARC1; p=quarantine; rua=mailto:${NOTIFICATION_EMAIL}\""
 if hcloud_rrset_upsert "$ZONE_ID" "_dmarc" "TXT" "$DMARC_VALUE" 3600; then
     log_done "TXT  _dmarc"
 else

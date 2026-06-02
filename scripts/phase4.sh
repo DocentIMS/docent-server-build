@@ -969,7 +969,7 @@ mail     IN  A      ${SERVER_IP}
 ${DKIM_SELECTOR}._domainkey IN TXT ${DKIM_RECORD}
 
 ; ----- DMARC: policy + reporting address -----
-_dmarc   IN  TXT    "v=DMARC1; p=none; rua=mailto:wglover@docentims.com"
+_dmarc   IN  TXT    "v=DMARC1; p=quarantine; rua=mailto:wglover@docentims.com"
 
 ; ----- CAA: only Let's Encrypt may issue certs for this domain -----
 @        IN  CAA  0 issue "letsencrypt.org"

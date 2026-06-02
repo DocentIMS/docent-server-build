@@ -230,6 +230,29 @@ hcloud_rrset_upsert() {
 }
 
 # ============================================================================
+# hcloud_get_paginated - GET a Hetzner list endpoint, following
+# meta.pagination across every page, and echo a single merged JSON object
+# {"<key>": [ ...all items... ]}. Hetzner returns only 25 items per page by
+# default (max 50), so a single GET silently drops everything past page 1 -
+# which hid newer / region-specific server types from the live menu.
+#   $1 = path (no query string)   $2 = top-level array key (e.g. "server_types")
+# Returns 1 if any page can't be parsed.
+hcloud_get_paginated() {
+    local path="$1" key="$2"
+    local page=1 resp next
+    local merged="[]"
+    while :; do
+        resp=$(hcloud_get "${path}?per_page=50&page=${page}")
+        echo "$resp" | jq -e ".$key" >/dev/null 2>&1 || return 1
+        merged=$(jq -n --argjson a "$merged" --argjson b "$(echo "$resp" | jq ".$key")" '$a + $b')
+        next=$(echo "$resp" | jq -r '.meta.pagination.next_page // empty' 2>/dev/null)
+        [ -z "$next" ] && break
+        page="$next"
+    done
+    jq -n --arg key "$key" --argjson arr "$merged" '{($key): $arr}'
+}
+
+# ============================================================================
 # hcloud_print_server_types - List server types actually available at a
 # given location, with specs. Used to build a live menu instead of a
 # hardcoded one. Prints "  name  N vCPU / N GB RAM / N GB disk  ~EURn/mo"
@@ -238,11 +261,13 @@ hcloud_rrset_upsert() {
 hcloud_print_server_types() {
     local location="$1"
     local dc_resp st_resp ids id
-    dc_resp=$(hcloud_get "/datacenters")
+    # Paginate both calls: a location's available list and the full server-type
+    # catalogue can each exceed one API page.
+    dc_resp=$(hcloud_get_paginated "/datacenters" "datacenters") || return 1
     ids=$(echo "$dc_resp" | jq -r --arg loc "$location" \
         '.datacenters[]? | select(.location.name == $loc) | .server_types.available[]' 2>/dev/null)
     [ -n "$ids" ] || return 1
-    st_resp=$(hcloud_get "/server_types")
+    st_resp=$(hcloud_get_paginated "/server_types" "server_types") || return 1
     echo "$st_resp" | jq -e '.server_types' >/dev/null 2>&1 || return 1
     for id in $ids; do
         echo "$st_resp" | jq -r --argjson id "$id" --arg loc "$location" \

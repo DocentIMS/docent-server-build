@@ -16,28 +16,11 @@ backlog).
 
 ## Open
 
-### DMARC policy: tighten from `p=none` to `p=quarantine` (or `p=reject`) — MED
-After mail deliverability is verified stable at major recipients (Gmail,
-Outlook, etc.), tighten the per-tenant DMARC TXT record at `_dmarc.<domain>`
-from `p=none` ("monitor, don't enforce") to `p=quarantine`, and eventually
-`p=reject`. Enforcement causes recipient servers to junk/reject forged
-mail-from-`<domain>` instead of merely logging it. Touch point: the DMARC
-TXT value set by `phase-pre-hetzner.sh`; bump it per tenant once that
-tenant's outbound mail history is clean.
-
 ### Consider moving registrar/DNS from IONOS to GoDaddy — LOW
 GoDaddy exposes an API for this and also has a
 domain-availability API ("connector") to check/suggest available domain
 names — could be wired into the provisioning flow. Likely not worth it for
 <5 domains; revisit when we approach automated multi-tenant onboarding.
-
-### Create new Hetzner servers IPv4-only — LOW
-The current server-create request in `phase-pre-hetzner.sh` (lines ~476–484)
-doesn't specify `public_net`, so Hetzner defaults to dual-stack (IPv4 + IPv6).
-We use only IPv4 — DNS A records, PTR, mail, SSH, monitoring all reference
-the v4 address. The v6 address is unused and adds a small monthly charge per
-server. Add `public_net: { enable_ipv4: true, enable_ipv6: false }` to the
-create JSON body to provision IPv4-only.
 
 ### Auto-fill Plone mail settings from tenant config — LOW
 The Plone Site Setup → Mail panel is filled in by hand after every build.
@@ -49,21 +32,6 @@ phase 7d (or a follow-on phase) that writes the registry records:
 From name = `Project Manager`, From address = `test@${DOMAIN}` (the real
 PM isn't known at initial setup; PM updates these in Site Setup → Mail
 once they take over). Saves a manual checklist step per tenant.
-
-### Paginate the live server-type menu — LOW
-`hcloud_print_server_types` (`lib/hetzner-api.sh:238`) calls `/datacenters`
-and `/server_types` with no pagination. Hetzner's API returns only 25 results
-per page by default, and there are now well over 25 server types (the
-CX/CPX/CAX/CCX lines plus deprecated ones), so types beyond page 1 — including
-region-specific ones (e.g. some only sold in the German DCs) — never get
-matched and are missing from the menu the script prints. The operator then
-sees only a partial list (or the "could not fetch live list" fallback) and has
-to look the type up on Hetzner's website and type it manually. Fix: request
-`?per_page=50` and follow `meta.pagination.next_page` (or loop pages) on both
-the `/datacenters` and `/server_types` calls so every type in every region is
-listed. Until fixed, the manual-entry fallback works — but the location and
-type must match or the create call fails with "server type not available in
-this location."
 
 ---
 
@@ -140,6 +108,19 @@ this location."
   after the plain-append path.
 
 ### Build-flow improvements
+- `phase-pre-hetzner.sh` — DMARC policy published at `p=quarantine` (was
+  `p=none`): recipients now junk forged mail-from-`<domain>` instead of just
+  logging it. Safe from the first build because phase 4 sets up aligned
+  SPF + DKIM. `phase4.sh`'s printed zone reference updated to match. Bump to
+  `p=reject` per tenant once outbound history is proven clean.
+- `phase-pre-hetzner.sh` — new servers are created IPv4-only
+  (`public_net: { enable_ipv4: true, enable_ipv6: false }`); the unused IPv6
+  address (and its small monthly charge) is no longer provisioned.
+- `lib/hetzner-api.sh` — new `hcloud_get_paginated` helper; the live
+  server-type menu (`hcloud_print_server_types`) now follows
+  `meta.pagination` across all pages of `/datacenters` and `/server_types`,
+  so newer / region-specific types past the first 25-item page are listed
+  instead of silently dropped.
 - `phase4b-smtp-relay.sh` — new phase: outbound mail relay via SMTP2GO on
   587 (Hetzner blocks 25). Automatic when `SMTP2GO_API_KEY` is set —
   registers the sender domain, fetches the per-account CNAMEs, publishes
