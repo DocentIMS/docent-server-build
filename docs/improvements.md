@@ -108,6 +108,12 @@ once they take over). Saves a manual checklist step per tenant.
   after the plain-append path.
 
 ### Build-flow improvements
+- `phase0-bootstrap.sh` / `phase5c-email-ai.sh` — disambiguate the two AI
+  keys. The AI Assistant prompt now spells out it wants the **OpenAI** key
+  (`sk-...` from platform.openai.com), explicitly *not* the RC+ `RCP-`
+  license (which is collected once and shared by all RC+ plugins). Both phase
+  0 and phase 5c now reject a value starting with `RCP-` so the license can't
+  be pasted into the OpenAI-key field and silently break AI features.
 - `phase-pre-hetzner.sh` — DMARC policy published at `p=quarantine` (was
   `p=none`): recipients now junk forged mail-from-`<domain>` instead of just
   logging it. Safe from the first build because phase 4 sets up aligned

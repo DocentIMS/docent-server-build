@@ -60,6 +60,17 @@ source "$SCRIPT_DIR/lib/common.sh"
 # still run (and warn) when the user hasn't supplied a real key yet.
 : "${XAI_API_KEY:=}"
 
+# Guard against the common mix-up: the Roundcube Plus license (RCP-...) pasted
+# where the OpenAI key (sk-...) belongs. The plugin would send the license to
+# OpenAI, which rejects it, and AI features fail silently. Treat an RCP- value
+# as "no key" so we write null (feature off) instead of a guaranteed-bad key.
+if [ "${XAI_API_KEY#RCP-}" != "$XAI_API_KEY" ]; then
+    echo "WARNING: XAI_API_KEY looks like a Roundcube Plus license (RCP-...), not an"
+    echo "         OpenAI key (sk-...). Ignoring it - fix XAI_API_KEY in secrets.local"
+    echo "         to your OpenAI key and re-run. AI features stay off until then."
+    XAI_API_KEY=""
+fi
+
 
 # ============================================================================
 # REPORT TRACKING

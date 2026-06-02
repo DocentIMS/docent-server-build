@@ -394,14 +394,37 @@ fi
 
 step "AI Assistant (optional)"
 
-# XAI_API_KEY may already be set from org-secrets.local sourced above.
+# This is the OpenAI API key (starts with "sk-"), NOT the Roundcube Plus
+# license. The AI plugin is licensed by the same RC+ key collected above; this
+# key is what the plugin uses to call OpenAI. The common, silent-breaking
+# mistake is pasting the RCP- license here, so we guard against it.
 if [ -n "${XAI_API_KEY:-}" ]; then
-    echo "  AI API key (from org-secrets.local): configured"
-else
-    echo "Optional: API key for the xai (AI Assistant) Roundcube plugin."
+    if [ "${XAI_API_KEY#RCP-}" != "$XAI_API_KEY" ]; then
+        echo "${RED}  WARNING: XAI_API_KEY in org-secrets.local looks like an RC+ license"
+        echo "  (RCP-...), not an OpenAI key (sk-...). AI features will not work with it.${RESET}"
+        echo "  Clearing it - fix XAI_API_KEY in org-secrets.local to your OpenAI key."
+        XAI_API_KEY=""
+    else
+        echo "  AI API key (from org-secrets.local): configured"
+    fi
+fi
+if [ -z "${XAI_API_KEY:-}" ]; then
+    echo "Optional: your ${BOLD}OpenAI${RESET} API key for the AI Assistant (AI Composer +"
+    echo "email summaries). It starts with ${CYAN}sk-${RESET} and comes from"
+    echo "platform.openai.com - this is ${BOLD}NOT${RESET} your Roundcube Plus (${CYAN}RCP-${RESET}) license."
     echo "Press Enter to skip if you don't want AI features."
     echo ""
-    XAI_API_KEY=$(ask "AI API key (e.g., sk-...)" "")
+    while true; do
+        XAI_API_KEY=$(ask "OpenAI API key (sk-...)" "")
+        if [ -z "$XAI_API_KEY" ]; then
+            break   # skipped - AI features stay off
+        elif [ "${XAI_API_KEY#RCP-}" != "$XAI_API_KEY" ]; then
+            echo "${RED}  That's your Roundcube Plus license (RCP-...), not an OpenAI key."
+            echo "  The OpenAI key starts with sk-. Try again, or press Enter to skip.${RESET}"
+        else
+            break
+        fi
+    done
 fi
 
 # ============================================================================
