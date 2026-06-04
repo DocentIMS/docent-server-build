@@ -108,6 +108,14 @@ once they take over). Saves a manual checklist step per tenant.
   after the plain-append path.
 
 ### Build-flow improvements
+- `phase1.sh` — admin users now get key-based SSH. New Step 7b copies root's
+  `authorized_keys` (the build key attached by phase-pre-hetzner) into `wayne`
+  and `admin` before root login is disabled, so `ssh -p 2222 wayne@<ip>` logs
+  in with the key and no password. Password auth stays as a fallback (no
+  lockout risk); de-dupes on re-run; a verification check confirms each admin
+  has an `authorized_keys`. Previously script-built servers were password-only
+  for the admin users because the key only ever worked for root, which phase 1
+  then disabled.
 - `phase7d-plone-products.sh` — finish the "overlay lives in this repo" switch.
   An earlier change swapped the `curl` download for `cp $REPO_ROOT/products.cfg`
   but left the download scaffolding, so the script still claimed to fetch from

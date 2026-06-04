@@ -398,6 +398,40 @@ else
 fi
 
 # ============================================================================
+# STEP 7b: Give the sudo admins the same SSH key(s) root has
+# ============================================================================
+# phase-pre-hetzner attaches the build SSH key to root's authorized_keys. The
+# SSH hardening below disables root login - which would make that key useless
+# unless the admin users carry it. Copy root's authorized_keys into wayne and
+# admin so they can log in over the key on port $SSH_PORT with NO password.
+# Password auth stays enabled as a fallback, so a missing/incorrect key never
+# locks anyone out. Idempotent: keys already present are not duplicated.
+step "Step 7b: Installing root's SSH key(s) for the sudo admins"
+
+ROOT_AUTH_KEYS="/root/.ssh/authorized_keys"
+if [ -s "$ROOT_AUTH_KEYS" ]; then
+    for _admin in "$ADMIN_USER" "$SHARED_ADMIN_USER"; do
+        _admin_ssh="/home/$_admin/.ssh"
+        _admin_keys="$_admin_ssh/authorized_keys"
+        mkdir -p "$_admin_ssh"
+        # Append only keys not already present, so re-runs don't pile up.
+        while IFS= read -r _key; do
+            [ -z "$_key" ] && continue
+            if [ ! -f "$_admin_keys" ] || ! grep -qxF "$_key" "$_admin_keys"; then
+                echo "$_key" >> "$_admin_keys"
+            fi
+        done < "$ROOT_AUTH_KEYS"
+        chown -R "$_admin:$_admin" "$_admin_ssh"
+        chmod 700 "$_admin_ssh"
+        chmod 600 "$_admin_keys"
+        log_done "Installed root's SSH key(s) for $_admin (key login on port $SSH_PORT, no password)"
+    done
+    unset _admin _admin_ssh _admin_keys _key
+else
+    log_warn "No keys in $ROOT_AUTH_KEYS - admin users will have password login only"
+fi
+
+# ============================================================================
 # STEP 8: SSH hardening - move port, disable root login
 # ============================================================================
 step "Step 8: SSH hardening"
@@ -640,6 +674,21 @@ if id "$SHARED_ADMIN_USER" &>/dev/null; then
 else
     echo "  [FAIL] Shareable admin user '$SHARED_ADMIN_USER' does not exist"
     VERIFY_FAIL=$((VERIFY_FAIL + 1))
+fi
+
+# Admin users carry root's SSH key (so key login still works after root SSH is
+# disabled). Only meaningful when root actually had a key to copy.
+if [ -s "/root/.ssh/authorized_keys" ]; then
+    for _admin in "$ADMIN_USER" "$SHARED_ADMIN_USER"; do
+        if [ -s "/home/$_admin/.ssh/authorized_keys" ]; then
+            echo "  [PASS] '$_admin' has an SSH key installed (key login enabled)"
+            VERIFY_PASS=$((VERIFY_PASS + 1))
+        else
+            echo "  [FAIL] '$_admin' has no authorized_keys (password-only login)"
+            VERIFY_FAIL=$((VERIFY_FAIL + 1))
+        fi
+    done
+    unset _admin
 fi
 
 # Plone-developer user
