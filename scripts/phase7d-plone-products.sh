@@ -173,7 +173,7 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 TMP_CFG="$(mktemp)"
-if ! curl -fsSL "$PRODUCTS_CFG_URL" -o "$TMP_CFG"; then
+if ! cp "$REPO_ROOT/products.cfg" "$TMP_CFG"; then
     rm -f "$TMP_CFG"
     log_fail "Could not download products.cfg from:"
     log_fail "  $PRODUCTS_CFG_URL"
