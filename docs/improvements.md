@@ -108,6 +108,14 @@ once they take over). Saves a manual checklist step per tenant.
   after the plain-append path.
 
 ### Build-flow improvements
+- `phase7d-plone-products.sh` — finish the "overlay lives in this repo" switch.
+  An earlier change swapped the `curl` download for `cp $REPO_ROOT/products.cfg`
+  but left the download scaffolding, so the script still claimed to fetch from
+  `docent-plone-addons`. Reworded the header/banner/errors to say it copies the
+  local overlay, dropped the obsolete `curl` prerequisite check and the dead
+  `PRODUCTS_CFG_URL` (now `PRODUCTS_CFG_SRC=$REPO_ROOT/products.cfg`). Deleted
+  the unused duplicate `scripts/assets/products.cfg` (it referenced the thinned
+  `docent-onlyoffice` repo). The active source list was verified reachable.
 - `phase0-bootstrap.sh` / `phase5c-email-ai.sh` — disambiguate the two AI
   keys. The AI Assistant prompt now spells out it wants the **OpenAI** key
   (`sk-...` from platform.openai.com), explicitly *not* the RC+ `RCP-`

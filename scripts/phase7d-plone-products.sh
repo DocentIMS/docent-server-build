@@ -8,9 +8,9 @@
 #
 # What this phase does:
 #   1. Verify phases 7a/7b/7c left the instance in the expected state.
-#   2. Download the add-on overlay (products.cfg) from the docent-plone-addons
-#      GitHub repo. That repo is the single source of truth for which add-ons
-#      get installed. products.cfg is an OVERLAY: it extends phase 7b's
+#   2. Copy the add-on overlay (products.cfg) from this repo's root into the
+#      instance. That file is the single source of truth for which add-ons get
+#      installed. products.cfg is an OVERLAY: it extends phase 7b's
 #      buildout.cfg and only ADDS products - it does not reinstall Plone or
 #      change the Plone version or the admin password.
 #   3. As the plone user: run 'bin/buildout -c products.cfg'. mr.developer
@@ -28,7 +28,7 @@
 #     installed into the site. Activation is a manual UI step - see MANUAL
 #     NEXT STEPS at the end.
 #
-# Idempotent. Safe to re-run. Re-running re-downloads products.cfg and re-runs
+# Idempotent. Safe to re-run. Re-running re-copies products.cfg and re-runs
 # buildout (itself idempotent - a no-op if nothing has changed).
 #
 # Run as root via run-phases.sh, or directly: sudo bash phase7d-plone-products.sh
@@ -43,13 +43,10 @@ PLONE_USER="plone"
 PLONE_HOME="/home/plone"
 PLONE_INSTANCE_DIR=""   # set after tenant.local is sourced (see below)
 
-# Where to fetch the add-on overlay from: the docent-plone-addons GitHub repo
-# (public). Pinned to a specific commit SHA (not a mutable branch) so a build is
-# reproducible and a compromised/edited `main` can't silently change what gets
-# installed. When you update products.cfg in docent-plone-addons, bump the SHA
-# below to that commit. Override PRODUCTS_CFG_URL in tenant.local to point at a
-# different commit/branch/fork (e.g. products-dashboard.cfg for dashboard tenants).
-PRODUCTS_CFG_URL="${PRODUCTS_CFG_URL:-https://raw.githubusercontent.com/DocentIMS/docent-plone-addons/9d18ce7fc7a47ce93bc11223e29f82c6fd125afc/products.cfg}"
+# The add-on overlay (products.cfg) lives in THIS repo's root and is applied
+# as-is - it is NOT downloaded from anywhere. To change which add-ons get
+# installed, edit /products.cfg in docent-server-build. The source path
+# (PRODUCTS_CFG_SRC) is set below, once REPO_ROOT is known.
 
 # Private add-on sources: any repo referenced by products.cfg as git@github.com:
 # (SSH) is cloned by mr.developer as the plone user. Step 3 installs the SSH key
@@ -85,7 +82,9 @@ PLONE_INSTANCE_DIR="${PLONE_HOME}/${PLONE_SITE_NAME}"
 # systemd unit name (must match what phase 7c created).
 PLONE_SYSTEMD_UNIT="plone-${PLONE_SITE_NAME}"
 
-# Overlay buildout: where it lands inside the instance dir (next to buildout.cfg).
+# Overlay buildout: the source (this repo's root) and where it lands inside the
+# instance dir (next to buildout.cfg).
+PRODUCTS_CFG_SRC="${REPO_ROOT}/products.cfg"
 PRODUCTS_CFG_DST="${PLONE_INSTANCE_DIR}/products.cfg"
 BUILDOUT_CFG="${PLONE_INSTANCE_DIR}/buildout.cfg"
 BIN_BUILDOUT="${PLONE_INSTANCE_DIR}/bin/buildout"
@@ -116,7 +115,7 @@ echo "==================================================================="
 echo "  PHASE 7D: Install Docent add-on products into Plone"
 echo "==================================================================="
 echo "  Instance dir:   $PLONE_INSTANCE_DIR"
-echo "  Overlay source: $PRODUCTS_CFG_URL"
+echo "  Overlay source: $PRODUCTS_CFG_SRC"
 echo "  Overlay target: $PRODUCTS_CFG_DST"
 echo "  Systemd unit:   $PLONE_SYSTEMD_UNIT.service"
 echo ""
@@ -163,41 +162,38 @@ fi
 log_done "systemd unit ${PLONE_SYSTEMD_UNIT}.service exists"
 
 # ============================================================================
-# STEP 2: Download the add-on overlay (products.cfg) from GitHub
+# STEP 2: Copy the add-on overlay (products.cfg) from this repo
 # ============================================================================
-step "Step 2: Downloading products.cfg from the docent-plone-addons repo"
+step "Step 2: Copying products.cfg from the repo into the instance"
 
-if ! command -v curl >/dev/null 2>&1; then
-    log_fail "curl is not installed - cannot download products.cfg."
+if [ ! -f "$PRODUCTS_CFG_SRC" ]; then
+    log_fail "Overlay not found: $PRODUCTS_CFG_SRC"
+    log_fail "Expected products.cfg at the docent-server-build repo root."
     exit 1
 fi
 
 TMP_CFG="$(mktemp)"
-if ! cp "$REPO_ROOT/products.cfg" "$TMP_CFG"; then
+if ! cp "$PRODUCTS_CFG_SRC" "$TMP_CFG"; then
     rm -f "$TMP_CFG"
-    log_fail "Could not download products.cfg from:"
-    log_fail "  $PRODUCTS_CFG_URL"
-    log_fail "Check that the docent-plone-addons repo is public, that the file"
-    log_fail "exists at that branch/path, and that the server has internet access."
+    log_fail "Could not copy products.cfg from $PRODUCTS_CFG_SRC"
     exit 1
 fi
 
 if [ ! -s "$TMP_CFG" ]; then
     rm -f "$TMP_CFG"
-    log_fail "The downloaded products.cfg is empty (zero bytes)."
+    log_fail "products.cfg is empty (zero bytes): $PRODUCTS_CFG_SRC"
     exit 1
 fi
 
 # Sanity check: it must be the OVERLAY (extends buildout.cfg) - not a full
-# replacement buildout, and not a stray GitHub error page.
+# replacement buildout.
 if ! grep -qE '^[[:space:]]*extends[[:space:]]*=[[:space:]]*buildout\.cfg' "$TMP_CFG"; then
     rm -f "$TMP_CFG"
-    log_fail "The downloaded file does not look like the add-on overlay."
+    log_fail "$PRODUCTS_CFG_SRC does not look like the add-on overlay."
     log_fail "It must contain a line: extends = buildout.cfg"
-    log_fail "Got something else (a full-replacement buildout, or an error page)."
     exit 1
 fi
-log_done "Downloaded products.cfg and confirmed it is the add-on overlay"
+log_done "Copied products.cfg and confirmed it is the add-on overlay"
 
 # Place it next to buildout.cfg in the instance dir, owned by the plone user.
 cp "$TMP_CFG" "$PRODUCTS_CFG_DST"
