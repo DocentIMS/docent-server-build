@@ -212,8 +212,7 @@ else
 </head>
 <body>
 <h1>$DOMAIN</h1>
-<p>This server is online and serving HTTPS.</p>
-<p>Status: template server, ready for site provisioning.</p>
+<p>If you see this page the dashboard for your company has not been properly configured.</p>
 </body>
 </html>
 EOF
