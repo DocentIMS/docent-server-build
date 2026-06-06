@@ -288,6 +288,8 @@ parts =
 [versions]
 # Pin Plone to the version declared in tenant.local / script default.
 Plone = $PLONE_VERSION
+plone.app.textfield = 4.0.1
+plone.restapi = 10.0.1
 
 [instance]
 recipe = plone.recipe.zope2instance
