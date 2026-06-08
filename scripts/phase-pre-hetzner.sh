@@ -250,7 +250,7 @@ step "Server configuration"
 
 # Server name is derived automatically from the domain - no prompt,
 # so it can never be mistyped (e.g. answering a yes/no by accident).
-SERVER_NAME="${DOMAIN_STEM}-docent"
+SERVER_NAME="docent-${DOMAIN_STEM}"
 echo "Server name (in Hetzner Console): ${SERVER_NAME}"
 
 # The default 'hil' (Hillsboro, OR) is the normal choice, so offer it as a
@@ -259,9 +259,9 @@ echo "Server name (in Hetzner Console): ${SERVER_NAME}"
 VALID_LOCATIONS="nbg1 fsn1 hel1 ash hil sin"
 while true; do
     echo ""
-    echo "Server location - the default is '${BOLD}hil${RESET}' (Hillsboro, OR, USA)."
-    if ask_yes_no "Use the default location 'hil'?"; then
-        SERVER_LOCATION="hil"
+    echo "Server location - the default is '${BOLD}fsn1${RESET}' (Falkenstein, Germany)."
+    if ask_yes_no "Use the default location 'fsn1'?"; then
+        SERVER_LOCATION="fsn1"
         break
     fi
 
@@ -288,7 +288,16 @@ while true; do
     fi
 done
 
+# The default 'cpx22' (3 vCPU / 4 GB) is the normal choice, so offer it as a
+# simple yes/no. Only show the live list and prompt if the answer is no.
 while true; do
+    echo ""
+    echo "Server type - the default is '${BOLD}cpx22${RESET}' (3 vCPU / 4 GB RAM)."
+    if ask_yes_no "Use the default server type 'cpx22'?"; then
+        SERVER_TYPE="cpx22"
+        break
+    fi
+
     echo ""
     echo "Server types available in ${SERVER_LOCATION}:"
     if hcloud_print_server_types "$SERVER_LOCATION"; then
@@ -377,7 +386,7 @@ if [ -n "$SSH_KEY_ID" ]; then
     log_skip "SSH key already in Hetzner (id $SSH_KEY_ID)"
 else
     # Upload with a descriptive name.
-    SSH_KEY_NAME="docent-build-${DOMAIN_STEM}-$(date +%Y%m%d)"
+    SSH_KEY_NAME="docent-build"
     SSH_KEY_ID=$(hcloud_ssh_key_upload "$SSH_KEY_NAME" "$SSH_PUBKEY_CONTENT")
     if [ -n "$SSH_KEY_ID" ] && [ "$SSH_KEY_ID" != "null" ]; then
         log_done "Uploaded SSH key (id $SSH_KEY_ID, name $SSH_KEY_NAME)"

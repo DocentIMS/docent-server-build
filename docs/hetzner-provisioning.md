@@ -105,10 +105,10 @@ bash scripts/phase-pre-hetzner.sh
 The script will prompt for:
 - Hetzner Cloud API token (stored in `hetzner.local`, gitignored)
 - Primary domain (e.g., `acmemuseum.com`)
-- Server name (default: `<domain-stem>-docent`)
-- Location: `nbg1` / `fsn1` / `hel1` / `ash` / `hil` / `sin`
-- Server type: `cx22` / `cx32` (recommended) / `cx42`
-- OS image (default: `ubuntu-24.04`)
+- Server name (default: `docent-<domain-stem>`)
+- Location (default: `fsn1`): `nbg1` / `fsn1` / `hel1` / `ash` / `hil` / `sin`
+- Server type (default: `cpx22`)
+- OS image (default: `ubuntu-26.04`)
 - Path to public SSH key
 - Notification email (for DMARC and CAA)
 
@@ -195,7 +195,7 @@ Contains the API token, so it's mode 600 and gitignored:
 ```bash
 HETZNER_CLOUD_TOKEN="<token>"
 HETZNER_SERVER_ID="<numeric server id>"
-HETZNER_SERVER_NAME="acmemuseum-docent"
+HETZNER_SERVER_NAME="docent-acmemuseum"
 HETZNER_ZONE_ID="<zone id string>"
 HETZNER_ZONE_NAME="acmemuseum.com"
 ```
