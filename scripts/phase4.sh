@@ -17,7 +17,7 @@ set -u
 # Non-domain-dependent constants. These are the same regardless of tenant.
 DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
 MAIL_HOSTNAME="mail.docenttemplate.com"  # default - overridden by tenant.local
-TEST_MAILBOX_LOCAL="test"             # default - tenant.local sets TEST_MAILBOX
+TEST_MAILBOX_LOCAL="siteadmin"             # default - tenant.local sets TEST_MAILBOX
 
 VMAIL_USER="vmail"
 VMAIL_UID=5000
@@ -362,7 +362,7 @@ else
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -e \
         "INSERT INTO virtual_mailboxes (domain_id, email, password)
          SELECT id, '$TEST_MAILBOX', '$HASHED_PW' FROM virtual_domains WHERE name='$DOMAIN';"
-    log_done "Created test mailbox $TEST_MAILBOX"
+    log_done "Created site-admin mailbox $TEST_MAILBOX"
 fi
 
 # ============================================================================

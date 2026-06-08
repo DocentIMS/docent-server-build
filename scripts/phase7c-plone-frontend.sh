@@ -596,6 +596,15 @@ else:
     )
     transaction.commit()
     print("Created Plone-level user 'admin' with Manager role")
+from plone import api as _ef_api
+import os as _ef_os
+_ef_addr = _ef_os.environ.get("PHASE7C_EMAIL_FROM", "").strip()
+if _ef_addr:
+    _ef_api.portal.set_registry_record("plone.email_from_name", "Site Administrator")
+    _ef_api.portal.set_registry_record("plone.email_from_address", _ef_addr)
+    import transaction as _ef_tx
+    _ef_tx.commit()
+    print("Set Plone email-from: Site Administrator <%s>" % _ef_addr)
 
 print("Step 8 script complete.")
 PYEOF
@@ -617,6 +626,7 @@ PYEOF
             PHASE7C_SITE_ID="$PLONE_SITE_ID" \
             PHASE7C_SITE_TITLE="$PLONE_SITE_TITLE" \
             PHASE7C_ADMIN_PW="$PLONE_ADMIN_PW" \
+            PHASE7C_EMAIL_FROM="siteadmin@$DOMAIN" \
             bash -c "cd '$PLONE_INSTANCE_DIR' && bin/instance run '$CREATE_SCRIPT'"; then
         log_fail "bin/instance run failed. The site may be in a partial state."
         log_fail "Check the output above for the Python traceback."

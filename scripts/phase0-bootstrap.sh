@@ -378,7 +378,7 @@ NOTIFICATION_EMAIL="wglover@docentims.com"
 
 # Test mailbox is auto-conventioned, never user-configurable. Phase 4 creates
 # it. It will appear in the auto-derived display below.
-TEST_MAILBOX_LOCAL="test"
+TEST_MAILBOX_LOCAL="siteadmin"
 
 step "Roundcube Plus"
 
