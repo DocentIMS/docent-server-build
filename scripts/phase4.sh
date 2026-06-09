@@ -425,7 +425,9 @@ postconf -e "compatibility_level = 3.6"
 
 postconf -e "smtpd_tls_cert_file = $CERT_DIR/fullchain.pem"
 postconf -e "smtpd_tls_key_file = $CERT_DIR/privkey.pem"
-postconf -e "smtpd_use_tls = yes"
+# smtpd_tls_security_level = may enables opportunistic inbound TLS. The legacy
+# boolean smtpd_use_tls is deprecated (logs a "will be removed" warning) and
+# redundant with the security_level setting below, so it is intentionally omitted.
 postconf -e "smtpd_tls_security_level = may"
 postconf -e "smtp_tls_security_level = encrypt"
 postconf -e "smtpd_tls_session_cache_database = btree:\${data_directory}/smtpd_scache"
