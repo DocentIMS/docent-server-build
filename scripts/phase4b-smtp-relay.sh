@@ -161,6 +161,60 @@ fi
 log_done "Compiled $SASL_PASSWD_FILE (mode 600 owner root)"
 
 # ============================================================================
+# STEP 1b: Self-healing watcher so sasl_passwd.db can never go stale
+# ============================================================================
+# Postfix reads the compiled sasl_passwd.db, NOT the text file. If anyone edits
+# /etc/postfix/sasl_passwd by hand (e.g. to rotate the SMTP2GO password) and
+# forgets to run `postmap`, Postfix keeps authenticating with the OLD creds and
+# fails with "535 Incorrect authentication data" - while the text file looks
+# correct. This bit us once (a hand-edit left the .db stale). Install a systemd
+# path unit that watches the text file and re-runs postmap + reloads Postfix on
+# every change, so a hand-edit self-heals and can never go stale again.
+step "Step 1b: Installing sasl_passwd auto-recompile watcher (systemd path unit)"
+
+WATCH_SERVICE="/etc/systemd/system/postfix-sasl-postmap.service"
+WATCH_PATH="/etc/systemd/system/postfix-sasl-postmap.path"
+
+# Resolve absolute binary paths (systemd Exec* requires them).
+POSTMAP_BIN="$(command -v postmap || echo /usr/sbin/postmap)"
+SYSTEMCTL_BIN="$(command -v systemctl || echo /usr/bin/systemctl)"
+CHMOD_BIN="$(command -v chmod || echo /bin/chmod)"
+
+# The oneshot service: recompile the map, re-tighten the .db perms, reload
+# Postfix. It watches the text file only, and writes a DIFFERENT file
+# (sasl_passwd.db), so it cannot retrigger itself.
+tee "$WATCH_SERVICE" >/dev/null <<EOF
+[Unit]
+Description=Rebuild postfix sasl_passwd hash map and reload postfix
+After=postfix.service
+
+[Service]
+Type=oneshot
+ExecStart=$POSTMAP_BIN $SASL_PASSWD_FILE
+ExecStartPost=$CHMOD_BIN 600 ${SASL_PASSWD_FILE}.db
+ExecStartPost=$SYSTEMCTL_BIN reload-or-restart postfix
+EOF
+
+tee "$WATCH_PATH" >/dev/null <<EOF
+[Unit]
+Description=Watch postfix sasl_passwd and rebuild its hash map on change
+
+[Path]
+PathChanged=$SASL_PASSWD_FILE
+Unit=postfix-sasl-postmap.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+if systemctl enable --now postfix-sasl-postmap.path >/dev/null 2>&1; then
+    log_done "Watcher active: edits to $SASL_PASSWD_FILE now auto-run postmap + reload Postfix"
+else
+    log_warn "Could not enable postfix-sasl-postmap.path; after editing $SASL_PASSWD_FILE run 'postmap' + reload Postfix manually"
+fi
+
+# ============================================================================
 # STEP 2: Configure Postfix main.cf for the SMTP2GO relay
 # ============================================================================
 step "Step 2: Configuring Postfix relay settings in $MAIN_CF"
@@ -424,6 +478,8 @@ if [ -f "${SASL_PASSWD_FILE}.db" ]; then
 fi
 
 verify_cmd "postfix service is active" systemctl is-active --quiet postfix
+verify_cmd "sasl_passwd auto-recompile watcher is active" \
+    systemctl is-active --quiet postfix-sasl-postmap.path
 
 echo ""
 echo "  Verification: $VERIFY_PASS passed, $VERIFY_FAIL failed"
