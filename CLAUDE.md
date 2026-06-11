@@ -48,10 +48,10 @@ smtp_sasl_mechanism_filter = plain, login
 **Gotcha:** Debian's default `main.cf` already ships `smtp_tls_security_level = may`. Adding a second `= encrypt` causes the *repeating overriding earlier entry* warning that floods the logs. Remove the original `may` line (the `smtp_` one — leave `smtpd_tls_security_level = may`, which is the unrelated inbound setting).
 
 ### Credentials file (`/etc/postfix/sasl_passwd`)
-The SMTP username is whatever you named the SMTP2GO SMTP user (here it's literally `docentims.com` — it doesn't have to be auto-generated, and it's **not** your account login). Write it with a quoted heredoc so special chars in the password aren't mangled:
+The SMTP username is whatever you named the SMTP2GO SMTP user — it's **per-account**, **not** your account login, and **not** the domain name. Look it up in the SMTP2GO dashboard under **Settings → Users (SMTP)**; do **not** assume it from another tenant (each build's user lives in that build's `org-secrets.local` as `SMTP2GO_USER`). Write it with a quoted heredoc so special chars in the password aren't mangled:
 ```bash
 sudo tee /etc/postfix/sasl_passwd > /dev/null <<'EOF'
-[mail.smtp2go.com]:587 docentims.com:THE_SMTP_USER_PASSWORD
+[mail.smtp2go.com]:587 <SMTP2GO_USER>:<SMTP_USER_PASSWORD>
 EOF
 ```
 **Gotchas learned:**

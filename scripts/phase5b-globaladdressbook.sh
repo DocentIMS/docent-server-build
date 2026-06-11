@@ -33,6 +33,16 @@ ADDRESSBOOK_DISPLAY_NAME="Project Contacts"
 ADDRESSBOOK_USER="_project_contacts_user_"
 VMAIL_ROOT=/var/vmail
 
+# Roundcube database - the globaladdressbook backing user lives in its `users`
+# table. Defaults match phase5.sh; tenant.local may override via common.sh.
+ROUNDCUBE_DB="roundcube"
+ROOT_DEFAULTS_FILE="/root/.my.cnf"
+# Host stored on the backing user's row. The plugin looks the user up with
+# rcube_user::query($user, 'localhost') because our plugin config sets no
+# 'host' key, so it falls back to the plugin's DEFAULT_HOST = 'localhost'.
+# The seeded mail_host MUST match this or the lookup won't find the row.
+ADDRESSBOOK_USER_HOST="localhost"
+
 # Load shared helpers and per-tenant config. lib/common.sh sources
 # tenant.local/secrets.local (overriding the hardcoded defaults above) and
 # provides colors, logging helpers, and verification helpers.
@@ -229,6 +239,40 @@ else
 fi
 
 # ============================================================================
+# STEP 5b: Seed the Project Contacts backing user
+# ============================================================================
+# The 'project_contacts' book is owned by the backing account $ADDRESSBOOK_USER
+# (see the plugin config in Step 3). The plugin will auto-create that row in
+# Roundcube's `users` table on first access, but that lazy path is flaky: when
+# it fails, rcube_user::query() returns nothing, the 'project_contacts' source
+# never registers, and rcmail::get_address_book('project_contacts') throws
+#   "Addressbook source (project_contacts) not found!"
+# Because phase5 sets BOTH default_addressbook AND collected_recipients to
+# 'project_contacts', this fires on every compose/send: the mail is handed to
+# SMTP fine, but Roundcube then crashes saving recipients and returns a broken
+# response -> the browser's "connection error (failed to reach the server)"
+# toast. Seed the row deterministically so the source always resolves.
+# Idempotent; mail_host must match the plugin's lookup host.
+step "Step 5b: Seeding the Project Contacts backing user ($ADDRESSBOOK_USER)"
+
+if [ ! -f "$ROOT_DEFAULTS_FILE" ]; then
+    log_warn "$ROOT_DEFAULTS_FILE not found - cannot seed $ADDRESSBOOK_USER (phase 3 sets this up)"
+elif ! mysql --defaults-file="$ROOT_DEFAULTS_FILE" -Nse \
+        "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA='$ROUNDCUBE_DB' AND TABLE_NAME='users';" 2>/dev/null | grep -q 1; then
+    log_warn "Roundcube 'users' table not found in DB '$ROUNDCUBE_DB' - cannot seed (phase 5 must run first)"
+else
+    SEEDED=$(mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$ROUNDCUBE_DB" -Nse \
+        "SELECT COUNT(*) FROM users WHERE username='$ADDRESSBOOK_USER' AND mail_host='$ADDRESSBOOK_USER_HOST';" 2>/dev/null || echo "0")
+    if [ "$SEEDED" -ge 1 ]; then
+        log_skip "Backing user $ADDRESSBOOK_USER already exists (host $ADDRESSBOOK_USER_HOST)"
+    else
+        mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$ROUNDCUBE_DB" -e \
+            "INSERT INTO users (created, username, mail_host) VALUES (NOW(), '$ADDRESSBOOK_USER', '$ADDRESSBOOK_USER_HOST');"
+        log_done "Created backing user $ADDRESSBOOK_USER (host $ADDRESSBOOK_USER_HOST)"
+    fi
+fi
+
+# ============================================================================
 # STEP 6: Reload Apache so the new plugin loads
 # ============================================================================
 step "Step 6: Reloading Apache"
@@ -265,6 +309,8 @@ verify_cmd "Plugin load symlink exists" \
     test -L "$ROUNDCUBE_PLUGINS_LOAD/$PLUGIN_NAME"
 verify_cmd "Plugin appears in plugins array" \
     grep -q "'$PLUGIN_NAME'" "$ROUNDCUBE_CONFIG"
+verify_cmd "Project Contacts backing user exists (so the source resolves)" \
+    bash -c "mysql --defaults-file='$ROOT_DEFAULTS_FILE' '$ROUNDCUBE_DB' -Nse \"SELECT 1 FROM users WHERE username='$ADDRESSBOOK_USER' AND mail_host='$ADDRESSBOOK_USER_HOST'\" | grep -q 1"
 verify_cmd "Apache is running" \
     systemctl is-active --quiet apache2
 
