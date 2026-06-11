@@ -17,7 +17,7 @@ set -u
 # Non-domain-dependent constants. These are the same regardless of tenant.
 DOMAIN="docenttemplate.com"      # default - overridden by tenant.local
 MAIL_HOSTNAME="mail.docenttemplate.com"  # default - overridden by tenant.local
-TEST_MAILBOX_LOCAL="siteadmin"             # default - tenant.local sets TEST_MAILBOX
+SITEADMIN_MAILBOX_LOCAL="siteadmin"             # default - tenant.local sets SITEADMIN_MAILBOX
 
 VMAIL_USER="vmail"
 VMAIL_UID=5000
@@ -43,7 +43,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 # (If we set them before sourcing, bash evaluates the variables immediately
 # and they keep the docenttemplate.com defaults even after tenant.local
 # overrides DOMAIN.)
-TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${DOMAIN}"
+SITEADMIN_MAILBOX="${SITEADMIN_MAILBOX_LOCAL}@${DOMAIN}"
 DKIM_KEY_DIR="/etc/opendkim/keys/${DOMAIN}"
 CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
 
@@ -51,7 +51,7 @@ CERT_DIR="/etc/letsencrypt/live/${DOMAIN}"
 # REPORT TRACKING
 # ============================================================================
 REPORT=()
-# DO NOT initialize MAIL_DB_PW or TEST_MAILBOX_PW here - they were already
+# DO NOT initialize MAIL_DB_PW or SITEADMIN_MAILBOX_PW here - they were already
 # set by sourcing secrets.local above. Setting them to "" would wipe out
 # the canonical values from CREDENTIALS.txt and force the script to
 # generate new ones, breaking the canonical-credentials design.
@@ -343,26 +343,26 @@ else
 fi
 
 MBOX_EXISTS=$(mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -Nse \
-    "SELECT COUNT(*) FROM virtual_mailboxes WHERE email='$TEST_MAILBOX';" 2>/dev/null || echo "0")
+    "SELECT COUNT(*) FROM virtual_mailboxes WHERE email='$SITEADMIN_MAILBOX';" 2>/dev/null || echo "0")
 if [ "$MBOX_EXISTS" -gt 0 ]; then
-    log_skip "Mailbox $TEST_MAILBOX already exists"
+    log_skip "Mailbox $SITEADMIN_MAILBOX already exists"
 else
-    # Use TEST_MAILBOX_PW from secrets.local if available, otherwise generate.
-    # When phase0 was used, TEST_MAILBOX_PW is the password documented in
+    # Use SITEADMIN_MAILBOX_PW from secrets.local if available, otherwise generate.
+    # When phase0 was used, SITEADMIN_MAILBOX_PW is the password documented in
     # CREDENTIALS.txt - we MUST use it so CREDENTIALS.txt stays canonical.
-    if [ -z "${TEST_MAILBOX_PW:-}" ]; then
-        TEST_MAILBOX_PW=$(gen_pw 22)
-        log_warn "No TEST_MAILBOX_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
+    if [ -z "${SITEADMIN_MAILBOX_PW:-}" ]; then
+        SITEADMIN_MAILBOX_PW=$(gen_pw 22)
+        log_warn "No SITEADMIN_MAILBOX_PW in secrets.local - generated a random one (NOT in CREDENTIALS.txt)"
     fi
-    HASHED_PW=$(doveadm pw -s SHA512-CRYPT -p "$TEST_MAILBOX_PW" 2>/dev/null)
+    HASHED_PW=$(doveadm pw -s SHA512-CRYPT -p "$SITEADMIN_MAILBOX_PW" 2>/dev/null)
     if [ -z "$HASHED_PW" ]; then
         log_fail "doveadm pw failed - cannot create mailbox"
         exit 1
     fi
     mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -e \
         "INSERT INTO virtual_mailboxes (domain_id, email, password)
-         SELECT id, '$TEST_MAILBOX', '$HASHED_PW' FROM virtual_domains WHERE name='$DOMAIN';"
-    log_done "Created site-admin mailbox $TEST_MAILBOX"
+         SELECT id, '$SITEADMIN_MAILBOX', '$HASHED_PW' FROM virtual_domains WHERE name='$DOMAIN';"
+    log_done "Created site-admin mailbox $SITEADMIN_MAILBOX"
 fi
 
 # ============================================================================
@@ -1120,10 +1120,10 @@ else
 fi
 
 if mysql --defaults-file="$ROOT_DEFAULTS_FILE" "$MAIL_DB" -Nse \
-   "SELECT 1 FROM virtual_mailboxes WHERE email='$TEST_MAILBOX';" 2>/dev/null | grep -q 1; then
-    vp "Test mailbox $TEST_MAILBOX exists in DB"
+   "SELECT 1 FROM virtual_mailboxes WHERE email='$SITEADMIN_MAILBOX';" 2>/dev/null | grep -q 1; then
+    vp "Site-admin mailbox $SITEADMIN_MAILBOX exists in DB"
 else
-    vf "Test mailbox $TEST_MAILBOX missing from DB"
+    vf "Site-admin mailbox $SITEADMIN_MAILBOX missing from DB"
 fi
 
 if [ -f "$DKIM_KEY_DIR/$DKIM_SELECTOR.private" ]; then
@@ -1231,10 +1231,10 @@ else
     vf "Postfix cannot resolve $DOMAIN via MariaDB"
 fi
 
-if postmap -q "$TEST_MAILBOX" mysql:/etc/postfix/mysql-virtual-mailbox-maps.cf 2>/dev/null | grep -q 1; then
-    vp "Postfix can resolve $TEST_MAILBOX via MariaDB"
+if postmap -q "$SITEADMIN_MAILBOX" mysql:/etc/postfix/mysql-virtual-mailbox-maps.cf 2>/dev/null | grep -q 1; then
+    vp "Postfix can resolve $SITEADMIN_MAILBOX via MariaDB"
 else
-    vf "Postfix cannot resolve $TEST_MAILBOX via MariaDB"
+    vf "Postfix cannot resolve $SITEADMIN_MAILBOX via MariaDB"
 fi
 
 # SMTP banner check - read greeting via openssl (clean disconnect, no

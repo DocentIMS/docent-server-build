@@ -378,7 +378,7 @@ NOTIFICATION_EMAIL="wglover@docentims.com"
 
 # Test mailbox is auto-conventioned, never user-configurable. Phase 4 creates
 # it. It will appear in the auto-derived display below.
-TEST_MAILBOX_LOCAL="siteadmin"
+SITEADMIN_MAILBOX_LOCAL="siteadmin"
 
 step "Roundcube Plus"
 
@@ -438,7 +438,7 @@ WP_DB_NAME="wordpress_${DOMAIN_STEM}"
 WP_DB_USER="wp_$(echo "$DOMAIN_STEM" | head -c 2)_user"
 WP_ADMIN_USERNAME="wpadmin"
 WP_SITE_TITLE="Docent IMS"
-TEST_MAILBOX="${TEST_MAILBOX_LOCAL}@${DOMAIN}"
+SITEADMIN_MAILBOX="${SITEADMIN_MAILBOX_LOCAL}@${DOMAIN}"
 
 # ============================================================================
 # GENERATE SECRETS
@@ -450,7 +450,7 @@ SHARED_ADMIN_PW=$(gen_pw 22)
 ESPEN_PW=$(gen_pw 22)
 ROOT_DB_PW=$(gen_pw 28)
 MAIL_DB_PW=$(gen_pw 28)
-TEST_MAILBOX_PW=$(gen_pw 22)
+SITEADMIN_MAILBOX_PW=$(gen_pw 22)
 ROUNDCUBE_DB_PW=$(gen_pw 28)
 ROUNDCUBE_DES_KEY=$(gen_pw 24)
 WP_DB_PW=$(gen_pw 28)
@@ -478,7 +478,7 @@ ESPEN_USER="${ESPEN_USER}"
 SSH_PORT="${SSH_PORT}"
 TIMEZONE="${TIMEZONE}"
 NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL}"
-TEST_MAILBOX_LOCAL="${TEST_MAILBOX_LOCAL}"
+SITEADMIN_MAILBOX_LOCAL="${SITEADMIN_MAILBOX_LOCAL}"
 
 # Backward compat: phase scripts still reference STAFF_USER
 # (resolves to the shareable admin so existing logic keeps working)
@@ -493,7 +493,7 @@ WP_DB_NAME="${WP_DB_NAME}"
 WP_DB_USER="${WP_DB_USER}"
 WP_ADMIN_USERNAME="${WP_ADMIN_USERNAME}"
 WP_SITE_TITLE="${WP_SITE_TITLE}"
-TEST_MAILBOX="${TEST_MAILBOX}"
+SITEADMIN_MAILBOX="${SITEADMIN_MAILBOX}"
 
 CERTBOT_EMAIL="${NOTIFICATION_EMAIL}"
 DMARC_RUA_EMAIL="${NOTIFICATION_EMAIL}"
@@ -533,7 +533,7 @@ STAFF_PW="${SHARED_ADMIN_PW}"
 
 ROOT_DB_PW="${ROOT_DB_PW}"
 MAIL_DB_PW="${MAIL_DB_PW}"
-TEST_MAILBOX_PW="${TEST_MAILBOX_PW}"
+SITEADMIN_MAILBOX_PW="${SITEADMIN_MAILBOX_PW}"
 ROUNDCUBE_DB_PW="${ROUNDCUBE_DB_PW}"
 ROUNDCUBE_DES_KEY="${ROUNDCUBE_DES_KEY}"
 WP_DB_PW="${WP_DB_PW}"
@@ -629,8 +629,8 @@ cat > "$CREDENTIALS_FILE" << CREDENTIALS_EOF
                     test that email works.
   WHERE YOU USE IT: https://${DOMAIN}/mail/
 
-  Email address: ${TEST_MAILBOX}
-  Password:      ${TEST_MAILBOX_PW}
+  Email address: ${SITEADMIN_MAILBOX}
+  Password:      ${SITEADMIN_MAILBOX_PW}
 
 ==============================================================
   5. BACKEND PASSWORDS (mostly software-only, listed for recovery)
@@ -711,8 +711,8 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
 
   Webmail (Roundcube):
     https://${DOMAIN}/mail/
-    Username: ${TEST_MAILBOX_LOCAL}    (or full: ${TEST_MAILBOX})
-    Password: ${TEST_MAILBOX_PW}
+    Username: ${SITEADMIN_MAILBOX_LOCAL}    (or full: ${SITEADMIN_MAILBOX})
+    Password: ${SITEADMIN_MAILBOX_PW}
 
   WordPress admin:
     https://${DOMAIN}/wp-admin/
@@ -832,14 +832,14 @@ cat > "$QUICK_REFERENCE_FILE" << QUICKREF_EOF
 ==============================================================
 
   Send a local test message:
-    echo "test body" | mail -s "test subject" ${TEST_MAILBOX}
+    echo "test body" | mail -s "test subject" ${SITEADMIN_MAILBOX}
 
   Confirm it arrived:
     sudo find /var/vmail/${DOMAIN} -name 'new' -type d
-    sudo ls -la /var/vmail/${DOMAIN}/${TEST_MAILBOX_LOCAL}/new/
+    sudo ls -la /var/vmail/${DOMAIN}/${SITEADMIN_MAILBOX_LOCAL}/new/
 
   GTUBE spam test (should land in Junk folder, not Inbox):
-    Send to ${TEST_MAILBOX} from any external account with this in
+    Send to ${SITEADMIN_MAILBOX} from any external account with this in
     the body (single line, no quotes):
       XJS*C4JDBQADN1.NSBN3*2IDNEN*GTUBE-STANDARD-ANTI-UBE-TEST-EMAIL*C.34X
 

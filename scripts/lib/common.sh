@@ -73,7 +73,7 @@ if [ -f "$REPO_ROOT/secrets.local" ]; then
     _docent_secret_vars=(
         ROOT_DB_PW MAIL_DB_PW ROUNDCUBE_DB_PW WP_DB_PW
         PLONE_ADMIN_PW ADMIN_PW SHARED_ADMIN_PW ESPEN_PW
-        TEST_MAILBOX_PW ROUNDCUBE_DES_KEY XAI_API_KEY LICENSE_KEY
+        SITEADMIN_MAILBOX_PW ROUNDCUBE_DES_KEY XAI_API_KEY LICENSE_KEY
     )
     for _v in "${_docent_secret_vars[@]}"; do
         _val="${!_v:-}"
