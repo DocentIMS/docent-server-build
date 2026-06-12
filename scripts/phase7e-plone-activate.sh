@@ -230,10 +230,25 @@ if THEME:
     try:
         from plone.app.theming.utils import applyTheme, getAvailableThemes
         themes = list(getAvailableThemes())
-        # plone.app.theming Theme objects carry the registered id as __name__.
+
+        # The identifying attribute varies across plone.app.theming versions
+        # (name / __name__ / title). Try them all; fall back to repr so the
+        # listing is always informative and we can match on any of them.
+        def theme_label(t):
+            for attr in ("name", "__name__", "title"):
+                v = getattr(t, attr, None)
+                if v:
+                    return str(v)
+            return repr(t)
+
         match = None
         for t in themes:
-            if getattr(t, "__name__", None) == THEME:
+            ids = (
+                getattr(t, "name", None),
+                getattr(t, "__name__", None),
+                getattr(t, "title", None),
+            )
+            if THEME in ids:
                 match = t
                 break
         if match is not None:
@@ -241,8 +256,8 @@ if THEME:
             transaction.commit()
             print("THEME %s activated" % THEME)
         else:
-            names = ", ".join(getattr(t, "__name__", "?") for t in themes)
-            print("WARN  theme '%s' not found. Available themes: %s" % (THEME, names))
+            labels = ", ".join(theme_label(t) for t in themes)
+            print("WARN  theme '%s' not found. Available themes: %s" % (THEME, labels))
             print("WARN  set PLONE_THEME to one of the above and re-run phase 7e.")
     except Exception as exc:
         transaction.abort()
