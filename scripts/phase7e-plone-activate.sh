@@ -64,11 +64,13 @@ ACTIVATION_ORDER=(
     medialog.meadows
 )
 
-# Diazo theme to make active at the end. Override with PLONE_THEME in
-# tenant.local if the theme's registered name differs. If the name is not
-# found, the script lists the available theme names and continues (warning,
-# not a failure) so you can set PLONE_THEME correctly.
-PLONE_THEME="${PLONE_THEME:-meadows}"
+# Diazo theme to make active at the end. This is the registered theme name -
+# for the Docent stack it is 'docent-ims-theme' (shipped by medialog.docenttheme;
+# its manifest.cfg declares prefix = /++theme++docent-ims-theme). Override with
+# PLONE_THEME in tenant.local if it differs. If the name is not found, the
+# script lists the available theme names and continues (warning, not a failure)
+# so you can set PLONE_THEME correctly.
+PLONE_THEME="${PLONE_THEME:-docent-ims-theme}"
 
 # === BEGIN tenant.local/secrets.local source block ===
 __PHASE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -86,7 +88,7 @@ unset __PHASE_SCRIPT_DIR __PHASE_REPO_ROOT
 # === END tenant.local/secrets.local source block ===
 
 # Re-apply PLONE_THEME default in case tenant.local set it.
-PLONE_THEME="${PLONE_THEME:-meadows}"
+PLONE_THEME="${PLONE_THEME:-docent-ims-theme}"
 
 if [ -z "${DOMAIN:-}" ]; then
     echo "FATAL: DOMAIN is not set. tenant.local must define it before phase 7e runs."
@@ -228,35 +230,29 @@ for name in PRODUCTS:
 # not a failure, because the registered name can differ from the egg name).
 if THEME:
     try:
-        from plone.app.theming.utils import applyTheme, getAvailableThemes
-        themes = list(getAvailableThemes())
+        from plone.app.theming.utils import (
+            applyTheme,
+            getTheme,
+            getAvailableThemes,
+        )
 
-        # The identifying attribute varies across plone.app.theming versions
-        # (name / __name__ / title). Try them all; fall back to repr so the
-        # listing is always informative and we can match on any of them.
-        def theme_label(t):
-            for attr in ("name", "__name__", "title"):
-                v = getattr(t, attr, None)
-                if v:
-                    return str(v)
-            return repr(t)
-
-        match = None
-        for t in themes:
-            ids = (
-                getattr(t, "name", None),
-                getattr(t, "__name__", None),
-                getattr(t, "title", None),
-            )
-            if THEME in ids:
-                match = t
-                break
-        if match is not None:
-            applyTheme(match)
+        # Canonical lookup by registered theme name (e.g. 'docent-ims-theme').
+        theme = getTheme(THEME)
+        if theme is not None:
+            applyTheme(theme)
             transaction.commit()
             print("THEME %s activated" % THEME)
         else:
-            labels = ", ".join(theme_label(t) for t in themes)
+            # Not found - list what IS available so PLONE_THEME can be set.
+            # The id attribute varies across plone.app.theming versions
+            # (name / __name__ / title); fall back to repr so it is never blank.
+            def theme_label(t):
+                for attr in ("name", "__name__", "title"):
+                    v = getattr(t, attr, None)
+                    if v:
+                        return str(v)
+                return repr(t)
+            labels = ", ".join(theme_label(t) for t in getAvailableThemes())
             print("WARN  theme '%s' not found. Available themes: %s" % (THEME, labels))
             print("WARN  set PLONE_THEME to one of the above and re-run phase 7e.")
     except Exception as exc:
