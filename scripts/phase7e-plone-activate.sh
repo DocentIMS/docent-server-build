@@ -199,7 +199,11 @@ if zope_admin is None:
 newSecurityManager(None, zope_admin.__of__(app.acl_users))
 setSite(site)
 
-from Products.CMFPlone.utils import get_installer
+try:
+    # Plone 6.1+ location; avoids the CMFPlone deprecation warning.
+    from plone.base.utils import get_installer
+except ImportError:
+    from Products.CMFPlone.utils import get_installer
 
 qi = get_installer(site, getattr(site, "REQUEST", None))
 
@@ -226,9 +230,10 @@ if THEME:
     try:
         from plone.app.theming.utils import applyTheme, getAvailableThemes
         themes = list(getAvailableThemes())
+        # plone.app.theming Theme objects carry the registered id as __name__.
         match = None
         for t in themes:
-            if getattr(t, "name", None) == THEME:
+            if getattr(t, "__name__", None) == THEME:
                 match = t
                 break
         if match is not None:
@@ -236,7 +241,7 @@ if THEME:
             transaction.commit()
             print("THEME %s activated" % THEME)
         else:
-            names = ", ".join(getattr(t, "name", "?") for t in themes)
+            names = ", ".join(getattr(t, "__name__", "?") for t in themes)
             print("WARN  theme '%s' not found. Available themes: %s" % (THEME, names))
             print("WARN  set PLONE_THEME to one of the above and re-run phase 7e.")
     except Exception as exc:
