@@ -344,9 +344,11 @@ fi
 # This mirrors how phase 7b verifies the Plone egg.
 if [ "${#PRODUCTS[@]}" -gt 0 ]; then
     for prod in "${PRODUCTS[@]}"; do
-        # '.' -> '?' so the glob also matches the underscore form some
-        # packaging tools use (collective.x vs collective_x).
+        # '.' and '-' -> '?' so the glob also matches the underscore form
+        # packaging tools normalize to (collective.x -> collective_x,
+        # python-docx -> python_docx).
         prod_glob="${prod//./?}"
+        prod_glob="${prod_glob//-/?}"
         if   [ -n "$(find "$PLONE_INSTANCE_DIR/eggs"          -maxdepth 3 -iname "${prod_glob}*" -print -quit 2>/dev/null)" ] \
            || [ -n "$(find "$PLONE_INSTANCE_DIR/develop-eggs" -maxdepth 3 -iname "${prod_glob}*" -print -quit 2>/dev/null)" ] \
            || [ -d "$PLONE_INSTANCE_DIR/src/$prod" ]; then
