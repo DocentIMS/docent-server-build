@@ -82,7 +82,6 @@ PHASES=(
     "7b:phase7b-plone-buildout.sh"
     "7c:phase7c-plone-frontend.sh"
     "7d:phase7d-plone-products.sh"
-    "7e:phase7e-plone-activate.sh"
 )
 # After this label completes in the default run, the script prompts before
 # running anything past it. (Phases past this point are the Plone install,
@@ -348,11 +347,9 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
         PLONE_TO_RUN=()
         for entry in "${PHASES[@]}"; do
             label="${entry%%:*}"
-            # 7d (add-on products) has its own separate prompt below, and 7e
-            # (activation) chains off 7d, so both are deliberately excluded
-            # from this 7a/7b/7c auto-run list.
+            # 7d (add-on products) has its own separate prompt below, so it
+            # is deliberately excluded from this 7a/7b/7c auto-run list.
             [ "$label" = "7d" ] && continue
-            [ "$label" = "7e" ] && continue
             case "$PLONE_LABELS" in
                 *" $label "*) PLONE_TO_RUN+=("$entry") ;;
             esac
@@ -494,66 +491,6 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
             echo ""
             echo "${GREEN}  ✓ Phase $label completed.${RESET}"
             TO_RUN+=("7d:phase7d-plone-products.sh")   # include 7d in the summary
-
-            # ----------------------------------------------------------
-            # Phase 7e - activate the add-ons in the site, in dependency
-            # order. Chains automatically off a successful 7d (activation
-            # is the completion of "install products"). Run later on its
-            # own with: sudo bash $0 --only 7e
-            # ----------------------------------------------------------
-            label="7e"
-            script="phase7e-plone-activate.sh"
-            script_path="$SCRIPT_DIR/$script"
-            log_path="/tmp/phase${label}-run.log"
-
-            if [ ! -f "$script_path" ]; then
-                echo ""
-                echo "${RED}ERROR: Phase $label script not found at $script_path${RESET}"
-                exit 1
-            fi
-
-            echo ""
-            echo "${BOLD}${CYAN}============================================================${RESET}"
-            echo "${BOLD}${CYAN}  PHASE $label - $script${RESET}"
-            echo "${BOLD}${CYAN}  Log: $log_path${RESET}"
-            echo "${BOLD}${CYAN}============================================================${RESET}"
-            echo ""
-
-            set +e
-            bash "$script_path" 2>&1 | tee "$log_path"
-            rc=${PIPESTATUS[0]}
-            set -e
-
-            if [ "$rc" -ne 0 ]; then
-                echo ""
-                echo "${RED}============================================================${RESET}"
-                echo "${RED}  PHASE $label FAILED (exit code $rc)${RESET}"
-                echo "${RED}============================================================${RESET}"
-                echo ""
-                echo "  Log: $log_path"
-                echo ""
-                echo "  Investigate the log, fix the issue, then resume:"
-                echo "    sudo bash $0 --only $label"
-                exit "$rc"
-            fi
-
-            if grep -qE '^\s*\[FAIL\]' "$log_path"; then
-                echo ""
-                echo "${YELLOW}  WARNING: Phase $label had [FAIL] checks.${RESET}"
-                echo "${YELLOW}  Review the log before continuing.${RESET}"
-                echo ""
-                read -r -p "Continue anyway? Type ${BOLD}yes${RESET} to proceed: " keep_going
-                keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
-                if [ "$keep_going" != "yes" ]; then
-                    echo "Stopped at user request. Resume with:"
-                    echo "  sudo bash $0 --only $label"
-                    exit 1
-                fi
-            fi
-
-            echo ""
-            echo "${GREEN}  ✓ Phase $label completed.${RESET}"
-            TO_RUN+=("7e:phase7e-plone-activate.sh")   # include 7e in the summary
         else
             echo ""
             echo "${YELLOW}  Skipping phase 7d (Plone add-on products). Run later with:${RESET}"

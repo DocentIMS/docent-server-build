@@ -25,9 +25,8 @@
 #     its version and the admin password exactly as phase 7b set them.
 #   - It does NOT ACTIVATE the add-ons inside the Plone site. After this phase
 #     the add-ons are AVAILABLE (listed in Site Setup -> Add-ons) but not yet
-#     installed into the site. Activation is handled by phase 7e
-#     (phase7e-plone-activate.sh), which installs the profiles in dependency
-#     order. run-phases.sh chains 7e automatically after 7d.
+#     installed into the site. Activation is a manual UI step - see MANUAL
+#     NEXT STEPS at the end.
 #
 # Idempotent. Safe to re-run. Re-running re-copies products.cfg and re-runs
 # buildout (itself idempotent - a no-op if nothing has changed).
