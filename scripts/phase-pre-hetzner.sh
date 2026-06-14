@@ -102,7 +102,12 @@ ask_yes_no() {
     # Single letters y/n and a blank Enter are NOT accepted.
     local prompt="$1" response
     while true; do
-        read -r -p "${YELLOW}${prompt}${RESET} ${CYAN}(type yes or no)${RESET}: " response
+        {
+            echo ""
+            echo "${BOLD}${YELLOW}──────────────────── ❓ ANSWER ────────────────────${RESET}"
+            echo "${BOLD}${YELLOW}  ${prompt}${RESET}"
+        } >&2
+        read -r -p "${BOLD}${YELLOW}❓ type yes or no: ${RESET}" response
         case "$response" in
             [Yy][Ee][Ss]) return 0 ;;
             [Nn][Oo])     return 1 ;;

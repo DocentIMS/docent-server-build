@@ -147,7 +147,12 @@ ask_yes_no() {
     local prompt="$1"
     local response=""
     while true; do
-        read -r -p "${YELLOW}${prompt}${RESET} ${BOLD}(type yes or no)${RESET}: " response
+        {
+            echo ""
+            echo "${BOLD}${YELLOW}──────────────────── ❓ ANSWER ────────────────────${RESET}"
+            echo "${BOLD}${YELLOW}  ${prompt}${RESET}"
+        } >&2
+        read -r -p "${BOLD}${YELLOW}❓ type yes or no: ${RESET}" response
         response=$(echo "$response" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
         case "$response" in
             yes) return 0 ;;

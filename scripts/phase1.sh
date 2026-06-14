@@ -178,7 +178,10 @@ if [ -f /var/run/reboot-required ]; then
     echo ""
     echo "==================================================================="
     echo ""
-    read -r -p "Type 'yes' to reboot now (anything else aborts): " reboot_confirm
+    echo ""
+    echo "${BOLD:-}${YELLOW:-}──────────────────── ❓ ANSWER ────────────────────${RESET:-}"
+    echo "${BOLD:-}${YELLOW:-}  Reboot now? (required to finish phase 1)${RESET:-}"
+    read -r -p "${BOLD:-}${YELLOW:-}❓ type yes to reboot (anything else aborts): ${RESET:-}" reboot_confirm
     if [ "$reboot_confirm" = "yes" ]; then
         echo ""
         echo "  Rebooting in 5 seconds. SSH back in and re-run phase 1."
@@ -243,7 +246,10 @@ if [ -n "$INSTALLED_KERNEL_PKG" ] && [ "$RUNNING_KERNEL" != "$INSTALLED_KERNEL_P
     echo ""
     echo "==================================================================="
     echo ""
-    read -r -p "Type 'yes' to reboot now (anything else aborts): " reboot_confirm
+    echo ""
+    echo "${BOLD:-}${YELLOW:-}──────────────────── ❓ ANSWER ────────────────────${RESET:-}"
+    echo "${BOLD:-}${YELLOW:-}  Reboot now? (required to finish phase 1)${RESET:-}"
+    read -r -p "${BOLD:-}${YELLOW:-}❓ type yes to reboot (anything else aborts): ${RESET:-}" reboot_confirm
     if [ "$reboot_confirm" = "yes" ]; then
         echo ""
         echo "  Rebooting in 5 seconds. SSH back in and re-run phase 1."

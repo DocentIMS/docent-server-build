@@ -55,6 +55,16 @@ action_cmd() {
     echo ""
 }
 
+# --------------------------------------------------------------------------
+# answer_box - print a yellow "the script is waiting on YOU" banner before a
+# read prompt, so questions never blend into the explanation. $1 = question.
+# --------------------------------------------------------------------------
+answer_box() {
+    echo ""
+    echo "${BOLD}${YELLOW}──────────────────── ❓ ANSWER ────────────────────${RESET}"
+    echo "${BOLD}${YELLOW}  $1${RESET}"
+}
+
 # ============================================================================
 # Banner - printed first, before any pre-flight output, so the script
 # always identifies itself as the first thing on screen.
@@ -283,7 +293,8 @@ echo "    - Phase 1 may reboot the server. After reboot, SSH back in"
 echo "      and re-run this script - already-done phases will be skipped."
 echo "    - All phases are idempotent. Re-running is safe."
 echo ""
-read -r -p "Type ${BOLD}yes${RESET} to start: " confirm
+answer_box "Start the build now?"
+read -r -p "${BOLD}${YELLOW}❓ type yes to start: ${RESET}" confirm
 # Normalize to lowercase so YES/Yes/yes are all accepted
 confirm=$(echo "$confirm" | tr '[:upper:]' '[:lower:]')
 if [ "$confirm" != "yes" ]; then
@@ -341,7 +352,8 @@ for entry in "${TO_RUN[@]}"; do
         echo "${YELLOW}  WARNING: Phase $label had [FAIL] checks in its verification block.${RESET}"
         echo "${YELLOW}  Review the log before continuing.${RESET}"
         echo ""
-        read -r -p "Continue anyway? Type ${BOLD}yes${RESET} to proceed: " keep_going
+        answer_box "Continue anyway?"
+        read -r -p "${BOLD}${YELLOW}❓ type yes to proceed: ${RESET}" keep_going
         # Normalize to lowercase so YES/Yes/yes are all accepted
         keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
         if [ "$keep_going" != "yes" ]; then
@@ -377,7 +389,8 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
     action_cmd "sudo bash $0 --from 7a"
     echo ""
     while true; do
-        read -r -p "Run phase 7 (Plone) now? ${BOLD}(type yes or no)${RESET}: " ans
+        answer_box "Run phase 7 (Plone) now?"
+        read -r -p "${BOLD}${YELLOW}❓ type yes or no: ${RESET}" ans
         ans_norm=$(echo "$ans" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
         case "$ans_norm" in
             yes) PLONE_OPT_IN="yes"; break ;;
@@ -445,7 +458,8 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 echo "${YELLOW}  WARNING: Phase $label had [FAIL] checks.${RESET}"
                 echo "${YELLOW}  Review the log before continuing.${RESET}"
                 echo ""
-                read -r -p "Continue anyway? Type ${BOLD}yes${RESET} to proceed: " keep_going
+                answer_box "Continue anyway?"
+                read -r -p "${BOLD}${YELLOW}❓ type yes to proceed: ${RESET}" keep_going
                 keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
                 if [ "$keep_going" != "yes" ]; then
                     echo "Stopped at user request. Resume with:"
@@ -476,7 +490,8 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
         echo "  You can always run it later via:  sudo bash $0 --only 7d"
         echo ""
         while true; do
-            read -r -p "Install Plone products based on the buildout on GitHub? ${BOLD}(type yes or no)${RESET}: " ans7d
+            answer_box "Install the Plone add-on products (from the GitHub buildout)?"
+            read -r -p "${BOLD}${YELLOW}❓ type yes or no: ${RESET}" ans7d
             ans7d_norm=$(echo "$ans7d" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
             case "$ans7d_norm" in
                 yes) PRODUCTS_OPT_IN="yes"; break ;;
@@ -527,7 +542,8 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 echo "${YELLOW}  WARNING: Phase $label had [FAIL] checks.${RESET}"
                 echo "${YELLOW}  Review the log before continuing.${RESET}"
                 echo ""
-                read -r -p "Continue anyway? Type ${BOLD}yes${RESET} to proceed: " keep_going
+                answer_box "Continue anyway?"
+                read -r -p "${BOLD}${YELLOW}❓ type yes to proceed: ${RESET}" keep_going
                 keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
                 if [ "$keep_going" != "yes" ]; then
                     echo "Stopped at user request. Resume with:"
@@ -587,7 +603,8 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 echo "${YELLOW}  WARNING: Phase $label had [FAIL] checks.${RESET}"
                 echo "${YELLOW}  Review the log before continuing.${RESET}"
                 echo ""
-                read -r -p "Continue anyway? Type ${BOLD}yes${RESET} to proceed: " keep_going
+                answer_box "Continue anyway?"
+                read -r -p "${BOLD}${YELLOW}❓ type yes to proceed: ${RESET}" keep_going
                 keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
                 if [ "$keep_going" != "yes" ]; then
                     echo "Stopped at user request. Resume with:"

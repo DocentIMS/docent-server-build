@@ -82,6 +82,13 @@ if [ -f /etc/docent-control-host ]; then
     exit 1
 fi
 
+# answer_box - yellow banner before a read prompt so questions stand out.
+answer_box() {
+    echo ""
+    echo "${BOLD}${YELLOW}──────────────────── ❓ ANSWER ────────────────────${RESET}"
+    echo "${BOLD}${YELLOW}  $1${RESET}"
+}
+
 echo ""
 echo "${BOLD}${CYAN}============================================================${RESET}"
 echo "${BOLD}${CYAN}  DOCENT SERVER BUILD${RESET}"
@@ -128,7 +135,8 @@ echo "  Hostname: ${CYAN}${CURRENT_HOSTNAME}${RESET}"
 echo "  IP:       ${CYAN}${CURRENT_IP}${RESET}"
 echo "  OS:       ${CYAN}${PRETTY_NAME}${RESET}"
 echo ""
-read -r -p "Is this the server you intend to build? Type ${BOLD}yes${RESET} to continue: " confirm
+answer_box "Is this the server you intend to build?"
+read -r -p "${BOLD}${YELLOW}❓ type yes to continue: ${RESET}" confirm
 if [ "$confirm" != "yes" ]; then
     echo "${YELLOW}Aborted. Run bootstrap.sh again on the correct server.${RESET}"
     exit 1
@@ -175,7 +183,8 @@ echo ""
 # Explicit yes/no after key paste - too easy to hit Enter without actually
 # pasting and saving the key in GitHub.
 while true; do
-    read -r -p "Have you added the key to GitHub? ${BOLD}(type yes or no)${RESET}: " ans
+    answer_box "Have you added the key to GitHub?"
+    read -r -p "${BOLD}${YELLOW}❓ type yes or no: ${RESET}" ans
     case "$(echo "$ans" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')" in
         yes) break ;;
         no)  echo "${YELLOW}Take your time - re-run bootstrap.sh after adding the key.${RESET}"
@@ -224,7 +233,8 @@ while [ "$attempt" -le "$max_attempts" ]; do
     echo "    - DNS resolving github.com is broken"
     echo ""
     if [ "$attempt" -lt "$max_attempts" ]; then
-        read -r -p "Try again? Type ${BOLD}yes${RESET} after fixing the issue: " retry
+        answer_box "Try again (after fixing the issue)?"
+        read -r -p "${BOLD}${YELLOW}❓ type yes to retry: ${RESET}" retry
         if [ "$retry" != "yes" ]; then
             echo "${YELLOW}Aborted. Re-run bootstrap.sh when ready.${RESET}"
             exit 1
