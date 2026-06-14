@@ -131,6 +131,38 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 # ============================================================================
+# Pre-flight: REFUSE to run on the build/control (template) host
+# ============================================================================
+# These phases provision a TARGET server and will harden/convert whatever box
+# they run on. They must NEVER run on the control box (the machine you run
+# phase-pre-hetzner.sh from). Two guards:
+#   1) /etc/docent-control-host sentinel  -> create it once on the control box
+#   2) automatic: this machine's IP must match SERVER_IP from tenant.local
+if [ -f /etc/docent-control-host ]; then
+    echo "${RED}REFUSING: this is the docent build/control host"
+    echo "(marker /etc/docent-control-host is present).${RESET}"
+    echo "Provisioning phases must run ON THE TARGET server, not here."
+    echo "Hand off: scp the files to root@<target>, ssh in, run bootstrap there."
+    exit 1
+fi
+if [ -f "$TENANT_FILE" ]; then . "$TENANT_FILE"; fi
+if [ -n "${SERVER_IP:-}" ]; then
+    _MY_IPS="$(hostname -I 2>/dev/null) $(curl -s --max-time 5 https://ifconfig.me 2>/dev/null)"
+    if [ -n "$(printf '%s' "$_MY_IPS" | tr -d '[:space:]')" ]; then
+        case " $_MY_IPS " in
+            *" $SERVER_IP "*) : ;;   # this machine IS the target - good
+            *)
+                echo "${RED}REFUSING: this machine's IP is not SERVER_IP ($SERVER_IP)"
+                echo "from tenant.local.${RESET}"
+                echo "These phases must run ON THE TARGET ($SERVER_IP), not on this box."
+                echo "If you are on the build/control box, hand off to the target and run there."
+                exit 1
+                ;;
+        esac
+    fi
+fi
+
+# ============================================================================
 # Pre-flight: phase 0 must have run
 # ============================================================================
 if [ ! -f "$TENANT_FILE" ] || [ ! -f "$SECRETS_FILE" ]; then

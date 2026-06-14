@@ -69,6 +69,19 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# ============================================================================
+# Pre-flight: REFUSE to run on the build/control (template) host
+# ============================================================================
+# bootstrap.sh provisions a TARGET server. Never run it on the control box
+# (where phase-pre-hetzner.sh runs) or it will convert/harden it. The control
+# box is marked with /etc/docent-control-host.
+if [ -f /etc/docent-control-host ]; then
+    echo "${RED}REFUSING: this is the docent build/control host"
+    echo "(marker /etc/docent-control-host is present).${RESET}"
+    echo "bootstrap.sh runs on the NEW target server - scp it there and run it on that box."
+    exit 1
+fi
+
 echo ""
 echo "${BOLD}${CYAN}============================================================${RESET}"
 echo "${BOLD}${CYAN}  DOCENT SERVER BUILD${RESET}"

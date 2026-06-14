@@ -867,23 +867,33 @@ cat <<EOF
   phase0-bootstrap.sh as soon as the records resolve. phase0 has a
   built-in DNS check and will warn you if they don't yet.
 
+${BOLD}${YELLOW}READ THIS: the rest of the build runs ON THE NEW SERVER, not here.${RESET}
+${BOLD}${YELLOW}This box (the template/control host) only CREATES servers. Everything${RESET}
+${BOLD}${YELLOW}from step 4 on must be typed AFTER you SSH into ${SERVER_IP}.${RESET}
+
 ${BOLD}Next:${RESET}
-  1. Update nameservers at your registrar (see above)
-  2. Copy bootstrap.sh and the three handoff files to the new server.
-     Copy-paste BOTH lines below - the first moves you to the repo root
-     so the scp works no matter where you currently are:
+
+  ${BOLD}--- ON THIS (TEMPLATE) BOX ---${RESET}
+  1. Update nameservers at your registrar (see above).
+  2. Copy bootstrap.sh + the handoff files to the new server (both lines;
+     the cd makes the scp work no matter where you are):
        cd ${REPO_ROOT}
        scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local${EGG_CACHE_SCP} root@${SERVER_IP}:/root/
      ${EGG_CACHE_NOTE}
-  3. SSH into the new server from this same template tab - your key logs
-     you straight in, no password:
+  3. SSH into the new server. ${BOLD}This is the hand-off - you are now leaving${RESET}
+     ${BOLD}the template box:${RESET}
        ssh root@${SERVER_IP}
-     (First connect may ask to trust the host key - type yes. The /etc/motd
-     shown on login tells you the next command to run. Type 'exit' to come
-     back to the template box.)
-  4. When phase 0 finishes, run:
+     (First connect: trust the host key - type yes.)
+
+  ${BOLD}--- ON THE NEW SERVER (the prompt changes to the new box) ---${RESET}
+  4. Run bootstrap (clones the repo and runs phase 0):
+       bash /root/bootstrap.sh
+  5. When phase 0 finishes, run the rest of the build:
        sudo bash /root/server-build/scripts/run-phases.sh
-     (runs phases 1-6 plus the DKIM DNS record automatically; it will
-      prompt before the optional Plone phases)
+     (phases 1-6 + DKIM automatically; it prompts before the Plone phases)
+
+  ${BOLD}${RED}!! NEVER run bootstrap.sh or run-phases.sh on THIS template box !!${RESET}
+  ${RED}They are guarded and will refuse here (so the template can't be${RESET}
+  ${RED}converted/hardened by accident). Always hand off to the target first.${RESET}
 
 EOF
