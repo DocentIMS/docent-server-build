@@ -875,21 +875,22 @@ ${BOLD}Next:${RESET}
 
   ${BOLD}--- ON THIS (TEMPLATE) BOX ---${RESET}
   1. Update nameservers at your registrar (see above).
-  2. Copy bootstrap.sh + the handoff files to the new server (both lines;
-     the cd makes the scp work no matter where you are):
-       cd ${REPO_ROOT}
-       scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local${EGG_CACHE_SCP} root@${SERVER_IP}:/root/
+  2. Copy the files to the new server, then SSH in (the cd makes scp work
+     from anywhere; the ssh is the hand-off - your prompt changes after it):
+${BOLD}${GREEN}═══════════ 👉 YOUR TURN — run these (ON TEMPLATE) ═══════════${RESET}
+    ${BOLD}${GREEN}cd ${REPO_ROOT}${RESET}
+    ${BOLD}${GREEN}scp scripts/bootstrap.sh tenant.local hetzner.local org-secrets.local${EGG_CACHE_SCP} root@${SERVER_IP}:/root/${RESET}
+    ${BOLD}${GREEN}ssh root@${SERVER_IP}${RESET}
+${BOLD}${GREEN}═════════════════════════════════════════════════════════════${RESET}
      ${EGG_CACHE_NOTE}
-  3. SSH into the new server. ${BOLD}This is the hand-off - you are now leaving${RESET}
-     ${BOLD}the template box:${RESET}
-       ssh root@${SERVER_IP}
-     (First connect: trust the host key - type yes.)
+     (First SSH connect: trust the host key - type yes.)
 
-  ${BOLD}--- ON THE NEW SERVER (the prompt changes to the new box) ---${RESET}
-  4. Run bootstrap (clones the repo and runs phase 0):
-       bash /root/bootstrap.sh
-  5. When phase 0 finishes, run the rest of the build:
-       sudo bash /root/server-build/scripts/run-phases.sh
+  ${BOLD}--- ON THE NEW SERVER (the prompt is now the new box) ---${RESET}
+  3. Run bootstrap (clones the repo + runs phase 0), then the rest:
+${BOLD}${GREEN}════════ 👉 YOUR TURN — run these (ON THE NEW SERVER) ════════${RESET}
+    ${BOLD}${GREEN}bash /root/bootstrap.sh${RESET}
+    ${BOLD}${GREEN}sudo bash /root/server-build/scripts/run-phases.sh${RESET}
+${BOLD}${GREEN}═════════════════════════════════════════════════════════════${RESET}
      (phases 1-6 + DKIM automatically; it prompts before the Plone phases)
 
   ${BOLD}${RED}!! NEVER run bootstrap.sh or run-phases.sh on THIS template box !!${RESET}

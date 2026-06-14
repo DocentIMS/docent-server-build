@@ -960,6 +960,8 @@ ${BOLD}${GREEN}=============================================================
   PHASE 0 COMPLETE
 =============================================================${RESET}
 
-Next:  ${BOLD}sudo bash ${REPO_ROOT}/scripts/run-phases.sh${RESET}
+${BOLD}${GREEN}════════════════ 👉 YOUR TURN — run this ════════════════${RESET}
+    ${BOLD}${GREEN}sudo bash ${REPO_ROOT}/scripts/run-phases.sh${RESET}
+${BOLD}${GREEN}═════════════════════════════════════════════════════════${RESET}
 
 EOF

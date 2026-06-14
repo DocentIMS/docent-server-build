@@ -42,6 +42,19 @@ GREEN=$'\e[32m'
 YELLOW=$'\e[33m'
 CYAN=$'\e[36m'
 
+# --------------------------------------------------------------------------
+# action_cmd - print a command the OPERATOR must type inside an unmistakable
+# block, so "your turn" steps never blend into the explanation text around
+# them. Each argument is one command line.
+# --------------------------------------------------------------------------
+action_cmd() {
+    echo ""
+    echo "${BOLD}${GREEN}════════════════ 👉 YOUR TURN — run this ════════════════${RESET}"
+    for _c in "$@"; do echo "${BOLD}${GREEN}    ${_c}${RESET}"; done
+    echo "${BOLD}${GREEN}═════════════════════════════════════════════════════════${RESET}"
+    echo ""
+}
+
 # ============================================================================
 # Banner - printed first, before any pre-flight output, so the script
 # always identifies itself as the first thing on screen.
@@ -317,7 +330,7 @@ for entry in "${TO_RUN[@]}"; do
         echo "  Repo: $REPO_ROOT"
         echo ""
         echo "  Investigate the log, fix the issue, then resume:"
-        echo "    sudo bash $0 --from $label"
+        action_cmd "sudo bash $0 --from $label"
         exit "$rc"
     fi
 
@@ -333,7 +346,7 @@ for entry in "${TO_RUN[@]}"; do
         keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
         if [ "$keep_going" != "yes" ]; then
             echo "Stopped at user request. Resume with:"
-            echo "  sudo bash $0 --from $label"
+            action_cmd "sudo bash $0 --from $label"
             exit 1
         fi
     fi
@@ -361,7 +374,7 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
     echo ""
     echo "  Skip phase 7 if this server is for mail/WordPress only and won't"
     echo "  host Plone. You can always run phase 7 later via:"
-    echo "    sudo bash $0 --from 7a"
+    action_cmd "sudo bash $0 --from 7a"
     echo ""
     while true; do
         read -r -p "Run phase 7 (Plone) now? ${BOLD}(type yes or no)${RESET}: " ans
@@ -423,7 +436,7 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 echo "  Log: $log_path"
                 echo ""
                 echo "  Investigate the log, fix the issue, then resume:"
-                echo "    sudo bash $0 --from $label"
+                action_cmd "sudo bash $0 --from $label"
                 exit "$rc"
             fi
 
@@ -436,7 +449,7 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
                 if [ "$keep_going" != "yes" ]; then
                     echo "Stopped at user request. Resume with:"
-                    echo "  sudo bash $0 --from $label"
+                    action_cmd "sudo bash $0 --from $label"
                     exit 1
                 fi
             fi
@@ -505,7 +518,7 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 echo "  Log: $log_path"
                 echo ""
                 echo "  Investigate the log, fix the issue, then resume:"
-                echo "    sudo bash $0 --only $label"
+                action_cmd "sudo bash $0 --only $label"
                 exit "$rc"
             fi
 
@@ -518,7 +531,7 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
                 if [ "$keep_going" != "yes" ]; then
                     echo "Stopped at user request. Resume with:"
-                    echo "  sudo bash $0 --only $label"
+                    action_cmd "sudo bash $0 --only $label"
                     exit 1
                 fi
             fi
@@ -565,7 +578,7 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 echo "  Log: $log_path"
                 echo ""
                 echo "  Investigate the log, fix the issue, then resume:"
-                echo "    sudo bash $0 --only $label"
+                action_cmd "sudo bash $0 --only $label"
                 exit "$rc"
             fi
 
@@ -578,7 +591,7 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
                 keep_going=$(echo "$keep_going" | tr '[:upper:]' '[:lower:]')
                 if [ "$keep_going" != "yes" ]; then
                     echo "Stopped at user request. Resume with:"
-                    echo "  sudo bash $0 --only $label"
+                    action_cmd "sudo bash $0 --only $label"
                     exit 1
                 fi
             fi
@@ -589,12 +602,12 @@ if [ "$SHOW_PLONE_PROMPT" = "yes" ]; then
         else
             echo ""
             echo "${YELLOW}  Skipping phase 7d (Plone add-on products). Run later with:${RESET}"
-            echo "    sudo bash $0 --only 7d"
+            action_cmd "sudo bash $0 --only 7d"
         fi
     else
         echo ""
         echo "${YELLOW}  Skipping phase 7 (Plone). Run later with:${RESET}"
-        echo "    sudo bash $0 --from 7a"
+        action_cmd "sudo bash $0 --from 7a"
     fi
 fi
 
