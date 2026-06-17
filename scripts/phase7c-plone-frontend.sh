@@ -533,6 +533,7 @@ if SITE_ID in app.objectIds():
     if site_is_healthy(existing):
         print("Site '/%s' already exists and is healthy; skipping creation" % SITE_ID)
         site = existing
+        created = False
     else:
         print("Site '/%s' exists but is missing Classic UI content types (broken)." % SITE_ID)
         print("Deleting and recreating with distribution_name='classic'.")
@@ -548,6 +549,7 @@ if SITE_ID in app.objectIds():
         transaction.commit()
         print("Recreated Plone Site /%s with distribution_name='classic'" % SITE_ID)
         site = app[SITE_ID]
+        created = True
 else:
     print("Creating Plone Site /%s with title '%s', distribution_name='classic'" % (SITE_ID, SITE_TITLE))
     addPloneSite(
@@ -559,6 +561,7 @@ else:
     transaction.commit()
     print("Created Plone Site /%s" % SITE_ID)
     site = app[SITE_ID]
+    created = True
 
 # Verify the site is now healthy before continuing.
 if not site_is_healthy(site):
@@ -606,6 +609,27 @@ if _ef_addr:
     _ef_tx.commit()
     print("Set Plone email-from: Site Administrator <%s>" % _ef_addr)
 
+# Example/starter content (plone.app.contenttypes:plone-content) - the demo
+# "Welcome to Plone" page + News/Events folders. This replaces the old
+# "install example content" checkbox removed in Plone 6.1. Imported ONLY on a
+# freshly created site (so re-runs never duplicate it) and only when enabled.
+# Best-effort: a failure warns but does not abort site creation.
+_ex = os.environ.get("PHASE7C_EXAMPLE_CONTENT", "yes").strip().lower()
+if created and _ex in ("yes", "true", "1", "on"):
+    try:
+        print("Importing example content (plone.app.contenttypes:plone-content)...")
+        site.portal_setup.runAllImportStepsFromProfile(
+            "profile-plone.app.contenttypes:plone-content")
+        transaction.commit()
+        print("Example content imported.")
+    except Exception as _exc:
+        transaction.abort()
+        print("WARN: example content import failed (%s); continuing without it." % _exc)
+elif not created:
+    print("Site pre-existed; not importing example content (avoids duplicates).")
+else:
+    print("Example content disabled (PHASE7C_EXAMPLE_CONTENT=%s)." % _ex)
+
 print("Step 8 script complete.")
 PYEOF
     chown "$PLONE_USER:$PLONE_USER" "$CREATE_SCRIPT"
@@ -627,6 +651,7 @@ PYEOF
             PHASE7C_SITE_TITLE="$PLONE_SITE_TITLE" \
             PHASE7C_ADMIN_PW="$PLONE_ADMIN_PW" \
             PHASE7C_EMAIL_FROM="siteadmin@$DOMAIN" \
+            PHASE7C_EXAMPLE_CONTENT="${PLONE_EXAMPLE_CONTENT:-yes}" \
             bash -c "cd '$PLONE_INSTANCE_DIR' && bin/instance run '$CREATE_SCRIPT'"; then
         log_fail "bin/instance run failed. The site may be in a partial state."
         log_fail "Check the output above for the Python traceback."
