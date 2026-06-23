@@ -86,7 +86,8 @@ control box (Template)**; everything else runs **on the new target server**
     `medialog.docxtransform`, `plone.app.changeownership`.
 - **`phase7e` — activate the Plone add-ons + theme.**
   - Verify 7a–7d; write the activation script.
-  - Install the add-on profiles **in dependency order** and activate the Diazo theme (`docent-ims-theme`); restart Plone.
+  - Install the add-on profiles **in dependency order** and activate the Diazo theme (`docent-ims-theme`).
+  - Remove seeded test/dev accounts that add-ons create on install (default: `vbauser@docentims.com`, `docent-tester`, `dummyuser@docentims.com`; override via `PLONE_REMOVE_USERS`); restart Plone.
 
 ## Back on the Template / control box
 
