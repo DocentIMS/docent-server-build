@@ -60,6 +60,7 @@ ACTIVATION_ORDER=(
     onlyoffice.plone
     medialog.docxtransform
     plone.app.changeownership
+    DocentIMS.TinyMCEModifications
     medialog.docenttheme
     medialog.meadows
 )
