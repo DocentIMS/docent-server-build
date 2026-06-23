@@ -116,7 +116,7 @@ CORE_LAST_LABEL="6"
 # Set of phase labels that belong to the Plone chain. Used to format the
 # prompt and to detect whether an explicit --from or --only is targeting
 # Plone (so we don't prompt redundantly).
-PLONE_LABELS=" 7a 7b 7c 7d "
+PLONE_LABELS=" 7a 7b 7c 7d 7e "
 
 # ============================================================================
 # Argument parsing
