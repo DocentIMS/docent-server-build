@@ -82,7 +82,7 @@ control box (Template)**; everything else runs **on the new target server**
 - **`phase7d` — build the Docent Plone add-ons.**
   - Verify 7a/7b/7c; copy `products.cfg` into the instance; **run the add-on buildout**; restart Plone.
   - Add-ons: `collective.collectionfilter`, `collective.sidebar`, `medialog.notifications`,
-    `onlyoffice.plone`, `DocentIMS.ActionItems`, `medialog.docenttheme`, `medialog.meadows`,
+    `onlyoffice.plone`, `DocentIMS.ActionItems`, `medialog.docenttheme`,
     `medialog.docxtransform`, `plone.app.changeownership`, `DocentIMS.TinyMCEModifications`.
 - **`phase7e` — activate the Plone add-ons + theme.**
   - Verify 7a–7d; write the activation script.

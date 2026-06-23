@@ -62,7 +62,9 @@ ACTIVATION_ORDER=(
     plone.app.changeownership
     DocentIMS.TinyMCEModifications
     medialog.docenttheme
-    medialog.meadows
+    # medialog.meadows REMOVED 2026-06-22 (redundant empty bundle; see products.cfg).
+    # To restore: uncomment the next line AND restore it in products.cfg.
+    #medialog.meadows
 )
 
 # Diazo theme to make active at the end. This is the registered theme name -
