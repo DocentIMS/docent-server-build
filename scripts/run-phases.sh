@@ -101,6 +101,7 @@ PHASES=(
     "5b:phase5b-globaladdressbook.sh"
     "5c:phase5c-email-ai.sh"
     "6:phase6.sh"
+    "help:phase-help.sh"
     "7a:phase7a-plone-prereqs.sh"
     "7b:phase7b-plone-buildout.sh"
     "7c:phase7c-plone-frontend.sh"
@@ -228,7 +229,7 @@ if [ -n "$ONLY_PHASE" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --only $ONLY_PHASE: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 4b post-dkim 5 5a 5b 5c 6 7a 7b 7c 7d"
+        echo "Valid phase labels: 1 2 3 4 4b post-dkim 5 5a 5b 5c 6 help 7a 7b 7c 7d 7e"
         exit 1
     fi
 elif [ -n "$START_FROM" ]; then
@@ -256,7 +257,7 @@ elif [ -n "$START_FROM" ]; then
     done
     if [ ${#TO_RUN[@]} -eq 0 ]; then
         echo "${RED}ERROR: --from $START_FROM: no such phase.${RESET}"
-        echo "Valid phase labels: 1 2 3 4 4b post-dkim 5 5a 5b 5c 6 7a 7b 7c 7d"
+        echo "Valid phase labels: 1 2 3 4 4b post-dkim 5 5a 5b 5c 6 help 7a 7b 7c 7d 7e"
         exit 1
     fi
     # Only prompt for Plone if we started in core (we'll have stopped before 7a)

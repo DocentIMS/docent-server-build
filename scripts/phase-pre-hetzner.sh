@@ -579,7 +579,7 @@ if [ "$ZONE_PREEXISTING" = "yes" ]; then
     echo ""
 
     PREEXISTING_RECORDS=()
-    for pair in "@:A" "www:A" "mail:A" "team:A" "@:MX" "@:TXT" "_dmarc:TXT" "@:CAA"; do
+    for pair in "@:A" "www:A" "mail:A" "team:A" "help:A" "@:MX" "@:TXT" "_dmarc:TXT" "@:CAA"; do
         rname="${pair%%:*}"
         rtype="${pair##*:}"
         rbody=$(hcloud_get "/zones/${ZONE_ID}/rrsets/${rname}/${rtype}")
@@ -631,7 +631,7 @@ echo "  Notification email: $NOTIFICATION_EMAIL"
 #             tenant.local already exposes DEFAULT_SITE_DIR as the webroot used
 #             for the team.<domain> certbot --webroot challenge, so the A record
 #             must exist before that phase runs)
-for sub in "@" "www" "mail" "team"; do
+for sub in "@" "www" "mail" "team" "help"; do
     if hcloud_rrset_upsert "$ZONE_ID" "$sub" "A" "$SERVER_IP" 3600; then
         log_done "A    $sub -> $SERVER_IP"
     else
@@ -851,7 +851,7 @@ ${BOLD}Server:${RESET}
 
 ${BOLD}DNS:${RESET}
   Zone:     $DOMAIN (id $ZONE_ID)
-  Records:  A (@/www/mail/team), MX, TXT (SPF + DMARC), CAA (x3)
+  Records:  A (@/www/mail/team/help), MX, TXT (SPF + DMARC), CAA (x3)
   DKIM:     added automatically after phase 4 by run-phases.sh (post-dkim)
 
 ${BOLD}REQUIRED next step at your registrar:${RESET}

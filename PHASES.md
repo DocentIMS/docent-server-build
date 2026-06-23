@@ -41,6 +41,9 @@ control box (Template)**; everything else runs **on the new target server**
   assistant).
 - **`phase6` — WordPress** — **WordPress** core at `https://<domain>/` (finish
   setup at `/wp-admin/install.php`).
+- **`help` — Help site** — Clones **`DocentIMS/HelpFiles`** and serves its static
+  `WebHelp/` output at `https://help.<domain>/` (own Apache vhost + Let's Encrypt
+  cert). Static HTML, no build step. Re-pulls the repo on re-run.
 - **`phase7a` — Plone prerequisites** — OS packages + the `plone` user + working
   directory (`/home/plone/<sitename>/`). Plone itself is not installed yet.
 - **`phase7b` — Plone install** — **Plone 6.2** via buildout.
@@ -69,6 +72,7 @@ A hardened Ubuntu host serving:
 - **Plone 6.2** on `team.<domain>` (themed, with starter content)
 - **Roundcube webmail** on `mail.<domain>` (Plus plugins + AI + shared
   address book)
+- **Help site** on `help.<domain>` (static Docent WebHelp)
 
 …backed by a full **mail stack** (Postfix/Dovecot/DKIM/DMARC/SpamAssassin +
 SMTP2GO relay), **MariaDB**, **TLS** on every vhost, and external **UptimeRobot**
